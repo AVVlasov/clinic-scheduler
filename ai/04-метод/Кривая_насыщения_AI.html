@@ -1,0 +1,109 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кривая насыщения AI-рычага</title>
+<style>
+:root{color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+ background:var(--bg);color:var(--tp);padding:32px 24px}
+.viz-root{--surface-1:#fcfcfb;--bg:#f6f6f4;--tp:#0b0b0b;--ts:#52514e;--tm:#8a8983;
+ --series-1:#2a78d6;--series-2:#eb6834;--grid:#e4e4e0;--rule:#d6d6d1}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])) .viz-root{
+ color-scheme:dark;--surface-1:#1a1a19;--bg:#111110;--tp:#fff;--ts:#c3c2b7;--tm:#8f8e86;
+ --series-1:#3987e5;--series-2:#d95926;--grid:#2c2c2a;--rule:#3a3a37}}
+:root[data-theme="dark"] .viz-root{color-scheme:dark;--surface-1:#1a1a19;--bg:#111110;--tp:#fff;
+ --ts:#c3c2b7;--tm:#8f8e86;--series-1:#3987e5;--series-2:#d95926;--grid:#2c2c2a;--rule:#3a3a37}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-size:23px;font-weight:650;margin:0 0 6px;letter-spacing:-.01em}
+.sub{color:var(--ts);margin:0 0 26px;font-size:14.5px;max-width:76ch}
+.card{background:var(--surface-1);border:1px solid var(--rule);border-radius:12px;padding:20px 18px 8px;position:relative}
+svg{width:100%;height:auto;display:block;overflow:visible}
+.grid line{stroke:var(--grid);stroke-width:1}
+.axis{stroke:var(--rule);stroke-width:1}
+.tick{fill:var(--tm);font-size:12px}
+.axlbl{fill:var(--ts);font-size:13px}
+.ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.ln.s1{stroke:var(--series-1)} .ln.s2{stroke:var(--series-2)}
+.dl{font-size:13px;font-weight:600} .s1t{fill:var(--series-1)} .s2t{fill:var(--series-2)}
+.claim{stroke:var(--tm);stroke-width:1.5;stroke-dasharray:5 4}
+.claimlbl{fill:var(--tm);font-size:13px;font-weight:600}
+.anno line{stroke:var(--tm);stroke-width:1;stroke-dasharray:3 3}
+.anno text{fill:var(--ts);font-size:12px}
+.pt{fill:transparent;cursor:crosshair}
+.pt:hover{fill:currentColor;fill-opacity:.18}
+.pt.s1{color:var(--series-1)} .pt.s2{color:var(--series-2)}
+#tip{position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--surface-1);
+ border:1px solid var(--rule);border-radius:8px;padding:8px 11px;font-size:13px;
+ box-shadow:0 4px 14px rgba(0,0,0,.13);white-space:nowrap}
+#tip b{font-weight:650}
+.legend{display:flex;gap:20px;margin:14px 0 4px;font-size:13.5px;color:var(--ts);flex-wrap:wrap}
+.legend i{width:20px;height:2px;display:inline-block;vertical-align:middle;margin-right:7px}
+.note{margin:22px 0 0;padding:16px 18px;background:var(--surface-1);border:1px solid var(--rule);
+ border-radius:12px;font-size:14.5px;color:var(--ts)}
+.note b{color:var(--tp)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:14px}
+th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--grid)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ts);font-weight:600}
+details{margin-top:18px} summary{cursor:pointer;color:var(--ts);font-size:13.5px}
+</style></head><body class="viz-root"><div class="wrap">
+<h1>Насколько сильнее станет проект, если модель станет быстрее</h1>
+<p class="sub">По оси X — во сколько раз LLM быстрее человека на написании кода. По оси Y — во сколько раз
+сжимается весь проект «Расписание» в человеко-часах. 113 задач, 53 422 базовых часа.</p>
+<div class="card"><svg viewBox="0 0 980 520" role="img" aria-label="Кривая насыщения">
+<g class="grid">
+<line x1="64" y1="456.0" x2="812" y2="456.0"/><line x1="64" y1="354.1" x2="812" y2="354.1"/><line x1="64" y1="252.2" x2="812" y2="252.2"/><line x1="64" y1="150.3" x2="812" y2="150.3"/><line x1="64" y1="48.4" x2="812" y2="48.4"/>
+</g>
+<line class="axis" x1="64" y1="456" x2="812" y2="456"/>
+<text class="tick" x="64.0" y="478" text-anchor="middle">3x</text><text class="tick" x="219.0" y="478" text-anchor="middle">10x</text><text class="tick" x="360.5" y="478" text-anchor="middle">30x</text><text class="tick" x="486.8" y="478" text-anchor="middle">80x</text><text class="tick" x="657.0" y="478" text-anchor="middle">300x</text><text class="tick" x="812.0" y="478" text-anchor="middle">1000x</text>
+<text class="tick" x="52" y="460.0" text-anchor="end">0x</text><text class="tick" x="52" y="358.1" text-anchor="end">5x</text><text class="tick" x="52" y="256.2" text-anchor="end">10x</text><text class="tick" x="52" y="154.3" text-anchor="end">15x</text><text class="tick" x="52" y="52.4" text-anchor="end">20x</text>
+<line class="claim" x1="64" y1="48.4" x2="812" y2="48.4"/>
+<text class="claimlbl" x="822" y="52.4">заявлено 20x</text>
+<path class="ln s2" d="M 64.0 415.1 L 129.8 410.1 L 173.1 407.5 L 219.0 400.1 L 271.2 387.3 L 308.3 376.4 L 360.5 358.6 L 397.5 347.0 L 449.7 332.1 L 486.8 322.7 L 539.0 311.4 L 576.0 304.7 L 633.5 296.4 L 694.0 290.3 L 812.0 285.3"/>
+<path class="ln s1" d="M 64.0 415.1 L 129.8 411.1 L 173.1 409.2 L 219.0 406.6 L 271.2 404.4 L 308.3 403.2 L 360.5 401.9 L 397.5 401.3 L 449.7 400.6 L 486.8 400.3 L 539.0 399.9 L 576.0 399.7 L 633.5 399.6 L 694.0 399.4 L 812.0 399.3"/>
+<text class="dl s2t" x="822" y="289.3">код + анализ + QA</text>
+<text class="dl s2t" x="822" y="305.3">→ 8.4x</text>
+<text class="dl s1t" x="822" y="403.3">только код</text>
+<text class="dl s1t" x="822" y="419.3">→ 2.8x</text>
+<g class="anno">
+  <line x1="173.1" y1="409.2" x2="173.1" y2="369.2"/>
+  <text x="173.1" y="361.2" text-anchor="middle">первая версия модели</text>
+  <line x1="486.8" y1="322.7" x2="486.8" y2="290.7"/>
+  <text x="486.8" y="282.7" text-anchor="middle">неделя → 30 минут</text>
+</g>
+<circle class="pt s1" cx="64.0" cy="415.1" r="9" data-x="3" data-y="2.008" data-s="только код"/><circle class="pt s2" cx="64.0" cy="415.1" r="9" data-x="3" data-y="2.007" data-s="код + анализ + QA"/><circle class="pt s1" cx="129.8" cy="411.1" r="9" data-x="5" data-y="2.202" data-s="только код"/><circle class="pt s2" cx="129.8" cy="410.1" r="9" data-x="5" data-y="2.25" data-s="код + анализ + QA"/><circle class="pt s1" cx="173.1" cy="409.2" r="9" data-x="7" data-y="2.297" data-s="только код"/><circle class="pt s2" cx="173.1" cy="407.5" r="9" data-x="7" data-y="2.381" data-s="код + анализ + QA"/><circle class="pt s1" cx="219.0" cy="406.6" r="9" data-x="10" data-y="2.424" data-s="только код"/><circle class="pt s2" cx="219.0" cy="400.1" r="9" data-x="10" data-y="2.741" data-s="код + анализ + QA"/><circle class="pt s1" cx="271.2" cy="404.4" r="9" data-x="15" data-y="2.534" data-s="только код"/><circle class="pt s2" cx="271.2" cy="387.3" r="9" data-x="15" data-y="3.373" data-s="код + анализ + QA"/><circle class="pt s1" cx="308.3" cy="403.2" r="9" data-x="20" data-y="2.592" data-s="только код"/><circle class="pt s2" cx="308.3" cy="376.4" r="9" data-x="20" data-y="3.907" data-s="код + анализ + QA"/><circle class="pt s1" cx="360.5" cy="401.9" r="9" data-x="30" data-y="2.654" data-s="только код"/><circle class="pt s2" cx="360.5" cy="358.6" r="9" data-x="30" data-y="4.777" data-s="код + анализ + QA"/><circle class="pt s1" cx="397.5" cy="401.3" r="9" data-x="40" data-y="2.686" data-s="только код"/><circle class="pt s2" cx="397.5" cy="347.0" r="9" data-x="40" data-y="5.349" data-s="код + анализ + QA"/><circle class="pt s1" cx="449.7" cy="400.6" r="9" data-x="60" data-y="2.718" data-s="только код"/><circle class="pt s2" cx="449.7" cy="332.1" r="9" data-x="60" data-y="6.081" data-s="код + анализ + QA"/><circle class="pt s1" cx="486.8" cy="400.3" r="9" data-x="80" data-y="2.735" data-s="только код"/><circle class="pt s2" cx="486.8" cy="322.7" r="9" data-x="80" data-y="6.541" data-s="код + анализ + QA"/><circle class="pt s1" cx="539.0" cy="399.9" r="9" data-x="120" data-y="2.751" data-s="только код"/><circle class="pt s2" cx="539.0" cy="311.4" r="9" data-x="120" data-y="7.095" data-s="код + анализ + QA"/><circle class="pt s1" cx="576.0" cy="399.7" r="9" data-x="160" data-y="2.76" data-s="только код"/><circle class="pt s2" cx="576.0" cy="304.7" r="9" data-x="160" data-y="7.423" data-s="код + анализ + QA"/><circle class="pt s1" cx="633.5" cy="399.6" r="9" data-x="250" data-y="2.769" data-s="только код"/><circle class="pt s2" cx="633.5" cy="296.4" r="9" data-x="250" data-y="7.831" data-s="код + анализ + QA"/><circle class="pt s1" cx="694.0" cy="399.4" r="9" data-x="400" data-y="2.775" data-s="только код"/><circle class="pt s2" cx="694.0" cy="290.3" r="9" data-x="400" data-y="8.132" data-s="код + анализ + QA"/><circle class="pt s1" cx="812.0" cy="399.3" r="9" data-x="1000" data-y="2.781" data-s="только код"/><circle class="pt s2" cx="812.0" cy="285.3" r="9" data-x="1000" data-y="8.374" data-s="код + анализ + QA"/>
+<text class="axlbl" x="438" y="508" text-anchor="middle">Во сколько раз модель быстрее человека на написании кода</text>
+</svg><div id="tip"></div>
+<div class="legend">
+<span><i style="background:var(--series-1)"></i>Ускоряем только написание кода</span>
+<span><i style="background:var(--series-2)"></i>Ускоряем ещё анализ, QA и документацию</span>
+</div></div>
+<p class="note"><b>Синяя кривая упирается в 2,8x и дальше не растёт.</b> Переход с 7x на 80x —
+то есть вера в «неделя работы за 30 минут» — двигает проект с 2,30x до 2,73x. Это 19%.
+Написание кода составляет 41% часов проекта, и рычаг на нём уже стоит; дальнейшее ускорение
+упирается во всё остальное.<br><br>
+<b>Оранжевая кривая — там, где рычаг ещё не выбран.</b> Если тем же способом ускорить анализ,
+QA и документацию, проект сжимается в 6,5 раза, а не в 2. Именно здесь вы правы,
+и в первой версии модели я это недооценил.<br><br>
+<b>Обе упираются в 10,7x при бесконечно сильной модели.</b> Остаются 5 014 часов, не зависящих
+от скорости генерации: опытная эксплуатация на 46 клиниках, приёмо-сдаточные испытания,
+аттестация ИСПДн, волны переключения и управление проектом на календарном полу.
+Для 20x нужно уложиться в 2 671 час — вдвое меньше одного этого остатка.</p>
+<details><summary>Таблица значений</summary>
+<table><thead><tr><th>Коэффициент на коде</th><th>Только код</th><th>Код + анализ + QA</th></tr></thead><tbody>
+<tr><td>3x</td><td>2.01x</td><td>2.01x</td></tr><tr><td>5x</td><td>2.20x</td><td>2.25x</td></tr><tr><td>7x</td><td>2.30x</td><td>2.38x</td></tr><tr><td>10x</td><td>2.42x</td><td>2.74x</td></tr><tr><td>15x</td><td>2.53x</td><td>3.37x</td></tr><tr><td>20x</td><td>2.59x</td><td>3.91x</td></tr><tr><td>30x</td><td>2.65x</td><td>4.78x</td></tr><tr><td>40x</td><td>2.69x</td><td>5.35x</td></tr><tr><td>60x</td><td>2.72x</td><td>6.08x</td></tr><tr><td>80x</td><td>2.73x</td><td>6.54x</td></tr><tr><td>120x</td><td>2.75x</td><td>7.09x</td></tr><tr><td>160x</td><td>2.76x</td><td>7.42x</td></tr><tr><td>250x</td><td>2.77x</td><td>7.83x</td></tr><tr><td>400x</td><td>2.77x</td><td>8.13x</td></tr><tr><td>1000x</td><td>2.78x</td><td>8.37x</td></tr>
+</tbody></table></details>
+</div>
+<script>
+const tip=document.getElementById('tip'),card=document.querySelector('.card');
+document.querySelectorAll('.pt').forEach(p=>{
+ p.addEventListener('mouseenter',e=>{
+  const r=card.getBoundingClientRect(),b=p.getBoundingClientRect();
+  tip.innerHTML='<b>'+p.dataset.s+'</b><br>коэффициент '+p.dataset.x+'x → сжатие '+p.dataset.y+'x';
+  tip.style.opacity=1;
+  tip.style.left=Math.min(b.left-r.left+12,r.width-210)+'px';
+  tip.style.top=(b.top-r.top-46)+'px';
+ });
+ p.addEventListener('mouseleave',()=>tip.style.opacity=0);
+});
+</script></body></html>

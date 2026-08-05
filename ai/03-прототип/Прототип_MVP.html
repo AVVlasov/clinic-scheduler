@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Расписание — прототип MVP</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#F4F6F9; --panel:#fff; --ink:#1B2430; --ink2:#5A6675; --ink3:#8A94A3;
+--line:#E1E6ED; --line2:#CDD5E0; --brand:#1F5FA9; --brand2:#E8F0FA; --brandD:#164680;
+--vip:#F9D6E4; --vipB:#D9799F; --dms:#CFE3F7; --dmsB:#5A93CC;
+--prim1:#B7E8B0; --prim1B:#4CA83F; --prim2:#DCF2D8; --prim2B:#8CC584;
+--block:#DDE1E6; --blockB:#98A2AE; --equip:#FBE6C8; --equipB:#D69B3E;
+--ok:#2E8B57; --warn:#C77700; --err:#C0392B; --q:#7B4FBF; --qbg:#F1EAFB;
+}
+body{font:14px/1.5 -apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+/* ---------- SIDEBAR ---------- */
+.side{width:252px;flex:0 0 252px;background:#12233A;color:#C8D3E0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.side .logo{padding:16px 18px;border-bottom:1px solid #1E3busy}
+.side .logo{border-bottom:1px solid #1E3350}
+.side .logo b{display:block;color:#fff;font-size:15px;letter-spacing:.2px}
+.side .logo span{font-size:11px;color:#7E90A8}
+.navgrp{padding:14px 18px 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.9px;color:#61748C;font-weight:700}
+.navi{display:flex;align-items:center;gap:9px;padding:8px 18px;cursor:pointer;font-size:13px;border-left:3px solid transparent;transition:.12s}
+.navi:hover{background:#1A2E49;color:#fff}
+.navi.on{background:#1A2E49;color:#fff;border-left-color:#4A90E2;font-weight:600}
+.navi .ic{width:16px;text-align:center;opacity:.85;font-size:13px}
+.navi .qb{margin-left:auto;background:var(--q);color:#fff;font-size:9.5px;padding:1px 5px;border-radius:8px;font-weight:700}
+.sidefoot{margin-top:auto;padding:14px 18px;font-size:11px;color:#61748C;border-top:1px solid #1E3350;line-height:1.5}
+/* ---------- MAIN ---------- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{background:var(--panel);border-bottom:1px solid var(--line);padding:11px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:30}
+.top h1{font-size:16px;font-weight:650;letter-spacing:-.1px}
+.top .sub{font-size:11.5px;color:var(--ink3)}
+.spacer{flex:1}
+.sel{border:1px solid var(--line2);background:#fff;border-radius:6px;padding:5px 9px;font-size:12.5px;color:var(--ink);font-family:inherit;cursor:pointer}
+.btn{border:1px solid var(--line2);background:#fff;border-radius:6px;padding:5px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;color:var(--ink);transition:.12s}
+.btn:hover{border-color:var(--brand);color:var(--brand)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.btn.pri:hover{background:var(--brandD)}
+.btn.sm{padding:3px 8px;font-size:11.5px}
+.body{padding:20px 22px 60px;flex:1}
+.scr{display:none} .scr.on{display:block}
+/* ---------- CARDS ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;margin-bottom:16px;overflow:hidden}
+.card>h3{font-size:13px;font-weight:650;padding:11px 15px;border-bottom:1px solid var(--line);background:#FAFBFD;display:flex;align-items:center;gap:8px}
+.card>h3 .tag{font-size:10px;font-weight:600;padding:1.5px 7px;border-radius:9px;background:var(--brand2);color:var(--brand)}
+.pad{padding:15px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:1100px){.grid2,.grid3{grid-template-columns:1fr}}
+/* ---------- QUESTION MARKER ---------- */
+.q{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;
+   background:var(--q);color:#fff;font-size:11px;font-weight:700;cursor:pointer;vertical-align:middle;
+   margin-left:5px;flex:0 0 auto;user-select:none}
+.q:hover{background:#5F35A3}
+.qpop{position:fixed;z-index:200;max-width:400px;background:#fff;border:1px solid var(--q);border-left:4px solid var(--q);
+      border-radius:8px;box-shadow:0 10px 34px rgba(20,25,40,.2);padding:13px 15px;display:none;font-size:12.5px;line-height:1.55}
+.qpop b{display:block;color:var(--q);font-size:11px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.qpop .why{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2);color:var(--ink2);font-size:11.5px}
+/* ---------- TABLES ---------- */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3);
+   padding:8px 10px;border-bottom:1px solid var(--line);background:#FAFBFD;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #EEF1F5;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#FAFCFE}
+/* ---------- SCHEDULE GRID ---------- */
+.gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+.sg{border-collapse:separate;border-spacing:0;min-width:1000px;font-size:12px}
+.sg th,.sg td{border-right:1px solid #EDF0F4;border-bottom:1px solid #EDF0F4;padding:0}
+.sg th{background:#F7F9FC;padding:7px 8px;font-size:10.5px;position:sticky;top:0;z-index:5}
+.sg .res{width:210px;min-width:210px;position:sticky;left:0;background:#fff;z-index:6;padding:8px 10px;border-right:1px solid var(--line2)}
+.sg th.res{background:#F7F9FC;z-index:8}
+.sg .res .nm{font-weight:600;font-size:12px;line-height:1.25}
+.sg .res .sp{font-size:10.5px;color:var(--ink3);margin-top:1px}
+.sg .res .badges{margin-top:3px;display:flex;gap:3px;flex-wrap:wrap}
+.mini{font-size:9px;padding:.5px 5px;border-radius:7px;background:#EEF2F7;color:var(--ink2);border:1px solid #E1E7EF;white-space:nowrap}
+.mini.eq{background:#FDF3E3;color:#8A5F14;border-color:#F0DCBB}
+.mini.ch{background:#EAF6EC;color:#2C6E3C;border-color:#CFE8D5}
+.sg td.cell{text-align:center;vertical-align:middle;font-size:10.5px;cursor:pointer;position:relative;
+  height:38px;padding:4px 6px;transition:.1s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sg td.cell:hover{outline:2px solid var(--brand);outline-offset:-2px}
+.sg td.cell.free{background:#fff;color:var(--ink3)}
+.sg td.cell.free:hover{background:var(--brand2)}
+.sg td.res{vertical-align:middle}
+.s-vip{background:var(--vip);border-left:3px solid var(--vipB)}
+.s-dms{background:var(--dms);border-left:3px solid var(--dmsB)}
+.s-p1{background:var(--prim1);border-left:3px solid var(--prim1B)}
+.s-p2{background:var(--prim2);border-left:3px solid var(--prim2B)}
+.s-bl{background:var(--block);color:#6C7684;border-left:3px solid var(--blockB);cursor:not-allowed}
+.sg td.cell.s-bl:hover{outline:none}
+.s-eq{background:var(--equip);border-left:3px solid var(--equipB)}
+.s-multi::after{content:'';position:absolute;right:4px;top:4px;width:5px;height:5px;border-radius:50%;background:#C0392B}
+.sg td.cell .lbl{font-weight:500}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink2);padding:11px 2px 0}
+.legend i{display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+/* ---------- STEPPER ---------- */
+.steps{display:flex;gap:0;margin-bottom:18px;background:#fff;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.step{flex:1;padding:11px 14px;font-size:12.5px;color:var(--ink3);border-right:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer}
+.step:last-child{border-right:none}
+.step .n{width:20px;height:20px;border-radius:50%;background:#EDF1F6;color:var(--ink3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:0 0 auto}
+.step.done{color:var(--ok)} .step.done .n{background:#DFF1E6;color:var(--ok)}
+.step.act{color:var(--brand);font-weight:650;background:var(--brand2)} .step.act .n{background:var(--brand);color:#fff}
+/* ---------- FORM ---------- */
+.fld{margin-bottom:13px}
+.fld label{display:block;font-size:11.5px;font-weight:600;color:var(--ink2);margin-bottom:4px}
+.fld input,.fld select,.fld textarea{width:100%;border:1px solid var(--line2);border-radius:6px;padding:7px 10px;font:13px inherit;font-family:inherit;color:var(--ink);background:#fff}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(31,95,169,.11)}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid var(--line2);background:#fff;border-radius:16px;padding:5px 13px;font-size:12.5px;cursor:pointer;transition:.12s}
+.chip:hover{border-color:var(--brand)}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+/* ---------- MISC ---------- */
+.note{border-left:3px solid var(--brand);background:var(--brand2);padding:9px 13px;border-radius:0 7px 7px 0;font-size:12.5px;margin:12px 0;line-height:1.55}
+.note.w{border-left-color:var(--warn);background:#FFF6E6}
+.note.e{border-left-color:var(--err);background:#FDECEA}
+.note.nq{border-left-color:var(--q);background:var(--qbg)}
+.kv{display:grid;grid-template-columns:170px 1fr;gap:7px 14px;font-size:12.5px}
+.kv dt{color:var(--ink3)} .kv dd{font-weight:500}
+.pill{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:11px}
+.pill.g{background:#E4F4EA;color:#22683C} .pill.y{background:#FDF2DC;color:#8A5F14}
+.pill.r{background:#FCE7E4;color:#96271C} .pill.b{background:var(--brand2);color:var(--brand)}
+.pill.gr{background:#EDF0F4;color:#5A6675}
+.cart{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+.cart .it{padding:11px 14px;border-bottom:1px solid #EEF1F5;display:flex;gap:12px;align-items:flex-start}
+.cart .it:last-child{border-bottom:none}
+.cart .it .n{font-weight:600;font-size:13px}
+.cart .it .m{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.cart .it .pr{margin-left:auto;text-align:right;white-space:nowrap}
+.cart .tot{padding:12px 14px;background:#FAFBFD;border-top:1px solid var(--line);display:flex;font-weight:650;font-size:13.5px}
+.tl{position:relative;padding-left:22px}
+.tl::before{content:'';position:absolute;left:6px;top:5px;bottom:5px;width:2px;background:var(--line2)}
+.tl .ev{position:relative;padding-bottom:13px;font-size:12.5px}
+.tl .ev::before{content:'';position:absolute;left:-20px;top:5px;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid var(--brand)}
+.tl .ev .t{font-size:11px;color:var(--ink3)}
+.stat{display:flex;gap:14px;flex-wrap:wrap}
+.stat .b{flex:1;min-width:132px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:13px 15px}
+.stat .b .v{font-size:23px;font-weight:680;letter-spacing:-.5px;line-height:1.1}
+.stat .b .l{font-size:11.5px;color:var(--ink3);margin-top:3px}
+.matrix td.y{background:#E4F4EA;text-align:center;color:#22683C;font-weight:700}
+.matrix td.n{background:#FAFBFD;text-align:center;color:#C5CCD6}
+.matrix td.p{background:#FDF2DC;text-align:center;color:#8A5F14;font-weight:700}
+.matrix th.rot{writing-mode:vertical-rl;transform:rotate(180deg);height:112px;font-size:10.5px;text-align:left;padding:8px 4px}
+.phone{width:310px;border:9px solid #23303F;border-radius:26px;background:#fff;overflow:hidden;box-shadow:0 8px 26px rgba(20,30,45,.16)}
+.phone .ph{background:var(--brand);color:#fff;padding:11px 14px;font-size:13.5px;font-weight:600}
+.phone .pb{padding:14px}
+</style></head><body>
+<div class="qpop" id="qpop"></div>
+<div class="app">
+<div class="side"><div class="logo"><b>Расписание и запись</b><span>Прототип к обсуждению объёма · MVP</span></div><div class="navgrp">РАБОЧЕЕ МЕСТО</div><div class="navi" data-s="dash"><span class="ic">◱</span>Обзор<span class="qb">1</span></div><div class="navi" data-s="grid"><span class="ic">▦</span>Сетка расписания<span class="qb">3</span></div><div class="navi" data-s="day"><span class="ic">◷</span>День и карточка записи<span class="qb">3</span></div><div class="navi" data-s="book"><span class="ic">＋</span>Запись от услуги<span class="qb">5</span></div><div class="navi" data-s="wait"><span class="ic">⏱</span>Лист ожидания<span class="qb">3</span></div><div class="navi" data-s="mass"><span class="ic">⚠</span>Снос расписания<span class="qb">2</span></div><div class="navgrp">СПРАВОЧНИКИ (НСИ)</div><div class="navi" data-s="nsidoc"><span class="ic">◉</span>Врачи<span class="qb">3</span></div><div class="navi" data-s="nsieq"><span class="ic">⚙</span>Оборудование<span class="qb">2</span></div><div class="navi" data-s="nsimx"><span class="ic">▩</span>Матрица компетенций<span class="qb">2</span></div><div class="navi" data-s="nsidur"><span class="ic">⌛</span>Правила длительности<span class="qb">2</span></div><div class="navgrp">ВНЕШНИЕ КАНАЛЫ</div><div class="navi" data-s="lkp"><span class="ic">▢</span>Личный кабинет<span class="qb">2</span></div><div class="navi" data-s="notif"><span class="ic">✉</span>Уведомления<span class="qb">3</span></div><div class="navgrp">ИТОГ</div><div class="navi" data-s="qlist"><span class="ic">?</span>Все вопросы к РП<span class="qb">31</span></div><div class="sidefoot">Прототип носит иллюстративный характер.<br>Данные вымышленные.<br>Август 2026</div></div><div class="main"><div class="top"><div><h1 id="tt"></h1><div class="sub" id="ts"></div></div><div class="spacer"></div><select class="sel"><option>Клиника на Ярославской</option><option>Волгоградский пр-т</option><option>Все 46 клиник</option></select><select class="sel"><option>4 – 9 августа 2026</option><option>11 – 16 августа 2026</option></select><button class="btn">Фильтры</button><button class="btn pri">Создать запись</button></div><div class="body"><div class="scr" id="s-dash" data-t="Обзор" data-sub="Прототип к обсуждению объёма — сеть 46 клиник, 5 442 врача">
+<div class="stat">
+ <div class="b"><div class="v">46</div><div class="l">клиник в контуре записи</div></div>
+ <div class="b"><div class="v">5 442</div><div class="l">врача</div></div>
+ <div class="b"><div class="v">850 тыс.</div><div class="l">записей в пиковый месяц</div></div>
+ <div class="b"><div class="v">200 RPS</div><div class="l">чтение расписания по API</div></div>
+ <div class="b"><div class="v">99,99%</div><div class="l">целевой SLA, режим 24/7</div></div>
+</div>
+<div class="note nq"><b>Как пользоваться прототипом.</b> Фиолетовые значки <span class="q" data-q="demo">?</span> — открытые вопросы,
+которые меняют оценку. Нажмите на любой, чтобы увидеть формулировку и то, на что она влияет. Экраны кликабельны: сетка расписания,
+запись от услуги, лист ожидания, снос расписания, справочники и личный кабинет.</div>
+<div class="grid2">
+<div class="card"><h3>Что показывает прототип <span class="tag">объём MVP</span></h3><div class="pad">
+<table><tbody>
+<tr><td><b>Сетка расписания</b></td><td>Врачи и оборудование в одной сетке, цветовые приоритеты, блокировки, многослотовые записи</td></tr>
+<tr><td><b>Запись от услуги</b></td><td>Опросник → фильтрация по компетенциям и оборудованию → подбор слота → корзина</td></tr>
+<tr><td><b>Лист ожидания</b></td><td>Заявки с приоритетами, автоподбор при освобождении слота, лист на улучшение даты</td></tr>
+<tr><td><b>Снос расписания</b></td><td>Массовая отмена, список пострадавших, статусы обработки, перезапись</td></tr>
+<tr><td><b>Справочники</b></td><td>Врачи, оборудование, матрица компетенций, правила длительности</td></tr>
+<tr><td><b>Личный кабинет</b></td><td>Самозапись, перенос и отмена, двустороннее подтверждение визита</td></tr>
+</tbody></table></div></div>
+<div class="card"><h3>Целевая архитектура из концепта заказчика</h3><div class="pad">
+<div class="kv">
+<dt>Schedule</dt><dd>модель записи: сетка, записи, заявки</dd>
+<dt>Timeslots</dt><dd>модель чтения: оптимизирована под поиск слотов</dd>
+<dt>Administration</dt><dd>справочники, репликация картотеки из МИС</dd>
+<dt>Notifications</dt><dd>уведомления по событиям записи</dd>
+<dt>Schedule API GW</dt><dd>внутренние потребители</dd>
+<dt>Timeslots API GW</dt><dd>внешние потребители, контур DMZ</dd>
+</div>
+<div class="note">Синхронизация модели записи в модель чтения — не более 5 секунд. Это требование определяет
+и архитектуру, и объём работ по консистентности.<span class="q" data-q="sync">?</span></div>
+</div></div></div></div><div class="scr" id="s-grid" data-t="Сетка расписания" data-sub="АРМ оператора · Клиника на Ярославской · неделя 4–9 августа">
+<div class="card"><h3>Врачи и оборудование в одной сетке
+<span class="q" data-q="eqgrid">?</span>
+<span class="tag">MUST HAVE</span></h3><div class="pad" style="padding-top:0">
+<div class="gridwrap"><table class="sg"><thead><tr><th class="res">Ресурс</th><th>Пн 4 авг</th><th>Вт 5 авг</th><th>Ср 6 авг</th><th>Чт 7 авг</th><th>Пт 8 авг</th><th>Сб 9 авг</th></tr></thead><tbody><tr><td class="res"><div class="nm">Иванова М. С.</div><div class="sp">Косметолог, дерматолог</div><div class="badges"><span class="mini ch">мультиспец.</span><span class="mini eq">Аппарат BBL</span><span class="mini eq">Криолиполиз</span></div></td><td class="cell s-p1"><span class="lbl">8 / 16</span></td><td class="cell s-dms"><span class="lbl">12 / 16</span></td><td class="cell free"><span class="lbl">5 / 16</span></td><td class="cell s-vip"><span class="lbl">14 / 16</span></td><td class="cell s-bl"><span class="lbl">отпуск</span></td><td class="cell free"><span class="lbl">3 / 12</span></td></tr><tr><td class="res"><div class="nm">Петров А. В.</div><div class="sp">Стоматолог-терапевт</div><div class="badges"><span class="mini ch">детский</span><span class="mini eq">Микроскоп Leica</span></div></td><td class="cell free"><span class="lbl">6 / 18</span></td><td class="cell s-p2"><span class="lbl">11 / 18</span></td><td class="cell s-p1"><span class="lbl">15 / 18</span></td><td class="cell free"><span class="lbl">9 / 18</span></td><td class="cell s-dms"><span class="lbl">16 / 18</span></td><td class="cell s-bl"><span class="lbl">—</span></td></tr><tr><td class="res"><div class="nm">Соколова Е. Н.</div><div class="sp">Стоматолог-хирург</div><div class="badges"><span class="mini eq">Наркоз</span><span class="mini eq">Микроскоп Leica</span></div></td><td class="cell s-vip"><span class="lbl">13 / 14</span></td><td class="cell free"><span class="lbl">7 / 14</span></td><td class="cell s-bl"><span class="lbl">учёба</span></td><td class="cell s-p1"><span class="lbl">12 / 14</span></td><td class="cell free"><span class="lbl">8 / 14</span></td><td class="cell free"><span class="lbl">4 / 10</span></td></tr><tr><td class="res"><div class="nm">Кузнецов Д. И.</div><div class="sp">Врач УЗД</div><div class="badges"><span class="mini eq">УЗИ Samsung RS85</span></div></td><td class="cell s-dms"><span class="lbl">15 / 20</span></td><td class="cell s-dms"><span class="lbl">18 / 20</span></td><td class="cell s-p2"><span class="lbl">14 / 20</span></td><td class="cell free"><span class="lbl">11 / 20</span></td><td class="cell s-vip"><span class="lbl">19 / 20</span></td><td class="cell free"><span class="lbl">6 / 12</span></td></tr><tr><td class="res"><div class="nm">Морозова Л. П.</div><div class="sp">Терапевт</div><div class="badges"><span class="mini ch">ВНД</span></div></td><td class="cell free"><span class="lbl">5 / 16</span></td><td class="cell free"><span class="lbl">9 / 16</span></td><td class="cell s-p1"><span class="lbl">12 / 16</span></td><td class="cell s-bl"><span class="lbl">больничный</span></td><td class="cell s-bl"><span class="lbl">больничный</span></td><td class="cell s-bl"><span class="lbl">—</span></td></tr><tr><td class="res"><div class="nm">Волков С. А.</div><div class="sp">Эндоскопист</div><div class="badges"><span class="mini ch">работа в паре</span><span class="mini eq">Эндоскоп Olympus</span></div></td><td class="cell s-p1"><span class="lbl">9 / 12</span></td><td class="cell free"><span class="lbl">4 / 12</span></td><td class="cell s-dms"><span class="lbl">10 / 12</span></td><td class="cell s-p2"><span class="lbl">8 / 12</span></td><td class="cell free"><span class="lbl">6 / 12</span></td><td class="cell s-bl"><span class="lbl">—</span></td></tr><tr><td class="res"><div class="nm">Зайцева О. М.</div><div class="sp">Анестезиолог</div><div class="badges"><span class="mini ch">работа в паре</span><span class="mini eq">Наркоз</span></div></td><td class="cell free"><span class="lbl">3 / 12</span></td><td class="cell s-vip"><span class="lbl">11 / 12</span></td><td class="cell s-dms"><span class="lbl">10 / 12</span></td><td class="cell free"><span class="lbl">5 / 12</span></td><td class="cell s-p1"><span class="lbl">9 / 12</span></td><td class="cell s-bl"><span class="lbl">—</span></td></tr><tr><td class="res" style="background:#FFFBF4"><div class="nm" style="color:#8A5F14">ОБОРУДОВАНИЕ</div><div class="sp">отдельный бронируемый ресурс</div></td><td style="background:#FFFBF4"></td><td style="background:#FFFBF4"></td><td style="background:#FFFBF4"></td><td style="background:#FFFBF4"></td><td style="background:#FFFBF4"></td><td style="background:#FFFBF4"></td></tr><tr><td class="res"><div class="nm">МРТ Siemens 1.5T</div><div class="sp">каб. 204</div><div class="badges"><span class="mini eq">ресурс</span></div></td><td class="cell s-eq"><span class="lbl">14 / 16</span></td><td class="cell s-eq"><span class="lbl">15 / 16</span></td><td class="cell s-bl"><span class="lbl">ТО аппарата</span></td><td class="cell s-eq"><span class="lbl">16 / 16</span></td><td class="cell s-eq"><span class="lbl">13 / 16</span></td><td class="cell free"><span class="lbl">5 / 10</span></td></tr><tr><td class="res"><div class="nm">КТ Canon Aquilion</div><div class="sp">каб. 205</div><div class="badges"><span class="mini eq">ресурс</span></div></td><td class="cell s-eq"><span class="lbl">11 / 14</span></td><td class="cell s-eq"><span class="lbl">13 / 14</span></td><td class="cell s-eq"><span class="lbl">14 / 14</span></td><td class="cell free"><span class="lbl">8 / 14</span></td><td class="cell s-bl"><span class="lbl">ремонт</span></td><td class="cell s-bl"><span class="lbl">—</span></td></tr><tr><td class="res"><div class="nm">УЗИ Samsung RS85</div><div class="sp">каб. 118</div><div class="badges"><span class="mini eq">ресурс</span></div></td><td class="cell free"><span class="lbl">7 / 18</span></td><td class="cell s-eq"><span class="lbl">12 / 18</span></td><td class="cell s-eq"><span class="lbl">15 / 18</span></td><td class="cell s-eq"><span class="lbl">11 / 18</span></td><td class="cell free"><span class="lbl">9 / 18</span></td><td class="cell free"><span class="lbl">4 / 12</span></td></tr><tr><td class="res"><div class="nm">Аппарат BBL Sciton</div><div class="sp">каб. 302</div><div class="badges"><span class="mini eq">ресурс</span></div></td><td class="cell s-eq"><span class="lbl">9 / 10</span></td><td class="cell free"><span class="lbl">4 / 10</span></td><td class="cell s-eq"><span class="lbl">8 / 10</span></td><td class="cell s-bl"><span class="lbl">охлаждение</span></td><td class="cell s-eq"><span class="lbl">7 / 10</span></td><td class="cell free"><span class="lbl">2 / 8</span></td></tr><tr><td class="res"><div class="nm">Микроскоп Leica M320</div><div class="sp">каб. 411</div><div class="badges"><span class="mini eq">ресурс</span></div></td><td class="cell s-eq"><span class="lbl">10 / 12</span></td><td class="cell s-eq"><span class="lbl">11 / 12</span></td><td class="cell free"><span class="lbl">6 / 12</span></td><td class="cell s-eq"><span class="lbl">9 / 12</span></td><td class="cell free"><span class="lbl">5 / 12</span></td><td class="cell s-bl"><span class="lbl">—</span></td></tr></tbody></table></div><div class="legend"><span><i style="background:var(--vip)"></i>VIP</span><span><i style="background:var(--dms)"></i>ДМС</span><span><i style="background:var(--prim1)"></i>Первичный в холдинге</span><span><i style="background:var(--prim2)"></i>Первичный на площадке</span><span><i style="background:var(--equip)"></i>Занятое оборудование</span><span><i style="background:var(--block)"></i>Блокировка</span><span><i style="background:#fff;border:1px solid #CDD5E0"></i>Свободно</span><span style="color:#C0392B">● запись длиннее одного слота</span></div>
+<div class="note w"><b>Что здесь важно для оценки.</b> Оборудование — самостоятельный бронируемый ресурс со своим графиком,
+плановыми технологическими перерывами и зависимостями внутри кабинета. Строки «Наркоз» и «Микроскоп» на экране дня показывают,
+как одна запись занимает три ресурса одновременно.<span class="q" data-q="eqdep">?</span></div>
+<div class="note nq">Праздничные дни могут применяться на весь холдинг или на отдельные площадки, с уведомлением пользователя об изменении графика.
+<span class="q" data-q="holiday">?</span></div>
+</div></div></div><div class="scr" id="s-day" data-t="День и карточка записи" data-sub="Соколова Е. Н. · стоматолог-хирург · 6 августа · шаг сетки 30 мин">
+<div class="card"><h3>Связанные услуги требуют двух специалистов и оборудования одновременно
+<span class="q" data-q="pair">?</span>
+<span class="tag">MUST HAVE</span></h3><div class="pad" style="padding-top:0">
+<div class="gridwrap"><table class="sg"><thead><tr><th class="res">Ресурс</th><th>09:00</th><th>09:30</th><th>10:00</th><th>10:30</th><th>11:00</th><th>11:30</th><th>12:00</th><th>12:30</th><th>13:00</th><th>13:30</th><th>14:00</th><th>14:30</th></tr></thead><tbody><tr><td class="res"><div class="nm">Соколова Е. Н.</div><div class="sp">Стоматолог-хирург</div><div class="badges"><span class="mini ch">работа в паре</span></div></td><td class="cell s-p1"><span class="lbl">Смирнов А.</span></td><td class="cell s-p1"><span class="lbl"></span></td><td class="cell s-dms"><span class="lbl">Титова Р.</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell s-vip s-multi"><span class="lbl">Белов К.</span></td><td class="cell s-vip"><span class="lbl"></span></td><td class="cell s-vip"><span class="lbl"></span></td><td class="cell s-bl"><span class="lbl">обед</span></td><td class="cell s-p2"><span class="lbl">Орлова Н.</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell s-dms"><span class="lbl">Гусев П.</span></td><td class="cell free"><span class="lbl">свободно</span></td></tr><tr><td class="res"><div class="nm">Зайцева О. М.</div><div class="sp">Анестезиолог</div><div class="badges"><span class="mini ch">работа в паре</span></div></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell s-vip s-multi"><span class="lbl">Белов К.</span></td><td class="cell s-vip"><span class="lbl"></span></td><td class="cell s-vip"><span class="lbl"></span></td><td class="cell s-bl"><span class="lbl">обед</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td></tr><tr><td class="res"><div class="nm">Микроскоп Leica M320</div><div class="sp">каб. 411</div><div class="badges"><span class="mini eq">ресурс</span></div></td><td class="cell s-eq"><span class="lbl">Смирнов А.</span></td><td class="cell s-eq"><span class="lbl"></span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell s-eq s-multi"><span class="lbl">Белов К.</span></td><td class="cell s-eq"><span class="lbl"></span></td><td class="cell s-eq"><span class="lbl"></span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell s-eq"><span class="lbl">Орлова Н.</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td></tr><tr><td class="res"><div class="nm">Наркоз (стойка №2)</div><div class="sp">каб. 411</div><div class="badges"><span class="mini eq">ресурс</span><span class="mini eq">зависимый</span></div></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell s-eq s-multi"><span class="lbl">Белов К.</span></td><td class="cell s-eq"><span class="lbl"></span></td><td class="cell s-eq"><span class="lbl"></span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell s-bl"><span class="lbl">недоступен</span></td><td class="cell s-bl"><span class="lbl">недоступен</span></td><td class="cell free"><span class="lbl">свободно</span></td><td class="cell free"><span class="lbl">свободно</span></td></tr></tbody></table></div><div class="legend"><span><i style="background:var(--vip)"></i>VIP</span><span><i style="background:var(--dms)"></i>ДМС</span><span><i style="background:var(--prim1)"></i>Первичный в холдинге</span><span><i style="background:var(--prim2)"></i>Первичный на площадке</span><span><i style="background:var(--equip)"></i>Занятое оборудование</span><span><i style="background:var(--block)"></i>Блокировка</span><span><i style="background:#fff;border:1px solid #CDD5E0"></i>Свободно</span><span style="color:#C0392B">● запись длиннее одного слота</span></div></div></div>
+<div class="grid2">
+<div class="card"><h3>Карточка записи</h3><div class="pad">
+<div class="kv">
+<dt>Пациент</dt><dd>Белов К. Р., 1978 г. р. <span class="pill r">VIP</span></dd>
+<dt>Услуга</dt><dd>Имплантация, 1 этап (установка импланта)</dd>
+<dt>Длительность</dt><dd>90 мин — 3 слота по 30 мин, одна запись</dd>
+<dt>Ресурсы</dt><dd>Соколова Е. Н. · Зайцева О. М. · Микроскоп Leica · Наркоз</dd>
+<dt>Стоимость</dt><dd>84 500 ₽ (фактическая, не минимальная по прайсу)</dd>
+<dt>Тип приёма</dt><dd>Лечение, многоэтапное · этап 1 из 3</dd>
+<dt>Создал</dt><dd>Оператор КЦ Ефимова Т. · 28.07.2026 14:12</dd>
+<dt>Статус</dt><dd><span class="pill g">Подтверждено пациентом</span></dd>
+<dt>Подготовка</dt><dd>Отправлена памятка, КТ от 20.07 приложена</dd>
+</div>
+<div class="note w" style="margin-bottom:0">Обязательная предшествующая услуга — консультация имплантолога — найдена в истории от 14.07.2026. Проверка пройдена.
+<span class="q" data-q="prereq">?</span></div>
+</div></div>
+<div class="card"><h3>История изменений записи</h3><div class="pad"><div class="tl">
+<div class="ev"><div class="t">28.07 14:12 · Ефимова Т., КЦ</div>Запись создана на 06.08 11:00</div>
+<div class="ev"><div class="t">28.07 14:13 · Система</div>Забронированы ресурсы: врач, анестезиолог, микроскоп, наркоз</div>
+<div class="ev"><div class="t">28.07 14:14 · Система</div>Отправлено уведомление: push доставлен</div>
+<div class="ev"><div class="t">31.07 09:40 · Пациент, ЛКП</div>Визит подтверждён</div>
+<div class="ev"><div class="t">02.08 18:05 · Система</div>Проверка подготовки: КТ приложена</div>
+</div>
+<div class="note nq" style="margin-bottom:0">Глубина хранения истории расписания — не менее 2–3 лет для анализа «год к году».
+<span class="q" data-q="audit">?</span></div>
+</div></div>
+</div></div><div class="scr" id="s-book" data-t="Запись от услуги" data-sub="Сценарий 3.2.1 / 3.3.2 · опросник → подбор → корзина → одна транзакция">
+<div class="steps">
+ <div class="step done"><span class="n">✓</span>Услуга или проблема</div>
+ <div class="step done"><span class="n">✓</span>Опросник</div>
+ <div class="step act"><span class="n">3</span>Подбор врача и слота</div>
+ <div class="step"><span class="n">4</span>Корзина</div>
+ <div class="step"><span class="n">5</span>Подтверждение</div>
+</div>
+<div class="grid2">
+<div class="card"><h3>Шаг 1–2. Опросник по услуге
+<span class="q" data-q="quiz">?</span>
+<span class="tag">MVP</span></h3><div class="pad">
+<div class="fld"><label>Услуга или проблема</label><input value="Удаление зуба мудрости" readonly></div>
+<div class="fld"><label>Возраст пациента</label><div class="chips"><span class="chip">до 3 лет</span><span class="chip">3–17</span><span class="chip on">18+</span></div></div>
+<div class="fld"><label>Зуб ретинирован или дистопирован?</label><div class="chips"><span class="chip on">Да</span><span class="chip">Нет</span><span class="chip">Не знаю</span></div></div>
+<div class="fld"><label>Требуется седация или наркоз?</label><div class="chips"><span class="chip on">Седация</span><span class="chip">Наркоз</span><span class="chip">Нет</span></div></div>
+<div class="fld"><label>Есть КТ давностью до 6 месяцев?</label><div class="chips"><span class="chip on">Да, от 20.07.2026</span><span class="chip">Нет</span></div></div>
+<div class="note"><b>Результат опросника.</b> Услуга уточнена до «Сложное удаление третьего моляра с седацией».
+Требуется хирург с допуском к седации и анестезиолог. Длительность пересчитана: 60 → 90 мин.
+<span class="q" data-q="dur">?</span></div>
+</div></div>
+<div class="card"><h3>Шаг 3. Подбор — отфильтровано по компетенциям и ресурсам</h3><div class="pad">
+<table><thead><tr><th>Врач</th><th>Клиника</th><th>Ближайший слот</th><th>Цена</th></tr></thead><tbody>
+<tr><td><b>Соколова Е. Н.</b><div style="font-size:11px;color:#8A94A3">хирург · допуск к седации</div></td><td>Ярославская</td>
+<td>06.08 11:00<div style="font-size:11px;color:#8A94A3">+ Зайцева О. М.</div></td><td>18 400 ₽</td></tr>
+<tr><td><b>Гаврилов П. Т.</b><div style="font-size:11px;color:#8A94A3">хирург · допуск к седации</div></td><td>Волгоградский</td>
+<td>07.08 15:30</td><td>17 900 ₽</td></tr>
+<tr style="opacity:.5"><td>Петров А. В.<div style="font-size:11px;color:#8A94A3">терапевт — нет компетенции</div></td><td>—</td><td>скрыт</td><td>—</td></tr>
+<tr style="opacity:.5"><td>Юдин Р. К.<div style="font-size:11px;color:#8A94A3">хирург, нет допуска к седации</div></td><td>—</td><td>скрыт</td><td>—</td></tr>
+</tbody></table>
+<div class="note w">Из 214 хирургов сети подходят 2 в радиусе поиска. Фильтрация по матрице компетенций, допуску к оборудованию,
+совместной доступности с анестезиологом и ограничениям по возрасту.
+<span class="q" data-q="search">?</span></div>
+</div></div></div>
+<div class="grid2">
+<div class="card"><h3>Шаг 4. Корзина — одна транзакция
+<span class="q" data-q="cart">?</span>
+<span class="tag">MVP</span></h3><div class="pad">
+<div class="cart">
+ <div class="it"><div><div class="n">Консультация имплантолога</div>
+  <div class="m">06.08 · 10:00–10:30 · Соколова Е. Н.</div></div><div class="pr">4 200 ₽</div></div>
+ <div class="it"><div><div class="n">Сложное удаление с седацией</div>
+  <div class="m">06.08 · 11:00–12:30 · Соколова Е. Н. + Зайцева О. М. + наркоз</div>
+  <div class="m" style="color:#C77700">минимальный интервал после консультации — 30 мин, соблюдён</div></div><div class="pr">18 400 ₽</div></div>
+ <div class="it"><div><div class="n">КТ челюсти контрольная</div>
+  <div class="m">13.08 · 09:30–10:00 · КТ Canon Aquilion</div>
+  <div class="m" style="color:#C77700">не ранее 7 дней после удаления — соблюдено</div></div><div class="pr">6 800 ₽</div></div>
+ <div class="it"><div><div class="n">Осмотр после удаления</div>
+  <div class="m">13.08 · 10:15–10:45 · Соколова Е. Н.</div></div><div class="pr">бесплатно</div></div>
+ <div class="tot"><span>Итого, 4 услуги, 2 визита</span><span style="margin-left:auto">29 400 ₽</span></div>
+</div>
+<div class="note e" style="margin-bottom:0">Слоты удерживаются 15 минут. При истечении корзина пересобирается,
+занятые за это время слоты подсвечиваются и предлагается замена.</div>
+</div></div>
+<div class="card"><h3>Что проверяется при подтверждении</h3><div class="pad">
+<table><tbody>
+<tr><td>Доступность всех ресурсов на всё время</td><td><span class="pill g">пройдено</span></td></tr>
+<tr><td>Обязательная предварительная консультация</td><td><span class="pill g">в корзине</span></td></tr>
+<tr><td>Минимальные интервалы между связанными услугами</td><td><span class="pill g">соблюдены</span></td></tr>
+<tr><td>Наличие КТ давностью до 6 месяцев</td><td><span class="pill g">от 20.07.2026</span></td></tr>
+<tr><td>Ограничения по возрасту и полу</td><td><span class="pill g">нет ограничений</span></td></tr>
+<tr><td>Пересечение с другими записями пациента</td><td><span class="pill y">TO BE</span></td></tr>
+<tr><td>Покрытие полисом ДМС</td><td><span class="pill y">TO BE</span></td></tr>
+<tr><td>Лимит льготных пациентов у врача</td><td><span class="pill g">3 из 5 на смену</span></td></tr>
+</tbody></table>
+<div class="note nq" style="margin-bottom:0">Проверок много, и каждая — обращение к своему источнику данных.
+<span class="q" data-q="perf">?</span></div>
+</div></div></div></div><div class="scr" id="s-wait" data-t="Лист ожидания" data-sub="Заявки с приоритетами · автоподбор при освобождении слота">
+<div class="card"><h3>Заявки на запись <span class="tag">MUST HAVE</span>
+<span class="q" data-q="wlauto">?</span>
+</h3><div class="pad" style="padding-top:0">
+<table><thead><tr><th>Пациент</th><th>Тип заявки</th><th>Что нужно</th><th>Окно</th><th>Приоритет</th><th>Статус</th><th></th></tr></thead><tbody>
+<tr><td><b>Белов К. Р.</b><div style="font-size:11px;color:#8A94A3">есть запись на 21.08</div></td>
+ <td>Улучшение даты</td><td>Соколова Е. Н., имплантация этап 2</td><td>08.08 – 20.08</td>
+ <td><span class="pill r">VIP</span></td><td><span class="pill y">ждёт слот</span></td><td><button class="btn sm">Подобрать</button></td></tr>
+<tr><td><b>Титова Р. А.</b></td><td>Заявка от врача</td><td>Кузнецов Д. И., УЗИ брюшной полости</td><td>до 15.08</td>
+ <td><span class="pill b">ДМС</span></td><td><span class="pill g">предложен слот 09.08</span></td><td><button class="btn sm">Открыть</button></td></tr>
+<tr><td><b>Гусев П. Н.</b></td><td>Ближайший слот</td><td>Любой стоматолог-терапевт, острая боль</td><td>сегодня</td>
+ <td><span class="pill r">срочно</span></td><td><span class="pill r">не найден</span></td><td><button class="btn sm">Обзвон</button></td></tr>
+<tr><td><b>Орлова Н. С.</b></td><td>При переносе</td><td>перенос из сноса 05.08</td><td>06.08 – 12.08</td>
+ <td><span class="pill gr">обычный</span></td><td><span class="pill g">перезаписана</span></td><td><button class="btn sm">Открыть</button></td></tr>
+<tr><td><b>Смирнов А. Л.</b></td><td>Далёкие слоты</td><td>Иванова М. С., курс BBL, 5 процедур</td><td>сентябрь–октябрь</td>
+ <td><span class="pill gr">обычный</span></td><td><span class="pill y">расписание не открыто</span></td><td><button class="btn sm">Копировать</button></td></tr>
+</tbody></table></div></div>
+<div class="grid2">
+<div class="card"><h3>Освободился слот — что делает система</h3><div class="pad">
+<div class="note"><b>06.08, 11:00, Соколова Е. Н.</b> — пациент отменил запись. Слот освободился вместе с микроскопом и наркозом.</div>
+<table><thead><tr><th>Очередь</th><th>Кандидат</th><th>Почему</th><th>Действие</th></tr></thead><tbody>
+<tr><td>1</td><td>Белов К. Р.</td><td>VIP, окно подходит, врач совпадает</td><td><span class="pill g">предложение отправлено</span></td></tr>
+<tr><td>2</td><td>Гусев П. Н.</td><td>срочно, но нужен терапевт, не хирург</td><td><span class="pill gr">пропущен</span></td></tr>
+<tr><td>3</td><td>Смирнов А. Л.</td><td>окно не совпадает</td><td><span class="pill gr">пропущен</span></td></tr>
+</tbody></table>
+<div class="note w" style="margin-bottom:0">У пациента уже есть страховочная запись на 21.08. При принятии предложения она снимается,
+при истечении таймаута — остаётся.
+<span class="q" data-q="wltimeout">?</span></div>
+</div></div>
+<div class="card"><h3>Правила приоритета</h3><div class="pad">
+<table><tbody>
+<tr><td>VIP-пациент</td><td><span class="pill r">высший</span></td></tr>
+<tr><td>Пациент с большей корзиной</td><td><span class="pill y">повышенный</span></td></tr>
+<tr><td>Срочная заявка (острая боль)</td><td><span class="pill y">повышенный</span></td></tr>
+<tr><td>Перенос из сноса расписания</td><td><span class="pill b">обычный+</span></td></tr>
+<tr><td>Обычная заявка</td><td><span class="pill gr">обычный</span></td></tr>
+</tbody></table>
+<div class="note nq" style="margin-bottom:0">При конфликте VIP и корзины — приоритет у VIP.
+<span class="q" data-q="wlconf">?</span></div>
+</div></div></div></div><div class="scr" id="s-mass" data-t="Снос расписания" data-sub="Массовая отмена · Соколова Е. Н. заболела · затронуто 34 записи на 5 дней">
+<div class="card"><h3>Инструмент управления массовыми отменами <span class="tag">MUST HAVE</span>
+<span class="q" data-q="massrule">?</span>
+</h3><div class="pad" style="padding-top:0">
+<div class="stat" style="margin-bottom:14px">
+ <div class="b"><div class="v">34</div><div class="l">записей затронуто</div></div>
+ <div class="b"><div class="v">19</div><div class="l">автопредложение отправлено</div></div>
+ <div class="b"><div class="v">11</div><div class="l">требуют обзвона</div></div>
+ <div class="b"><div class="v">8</div><div class="l">перезаписаны</div></div>
+ <div class="b"><div class="v">4</div><div class="l">отказались</div></div>
+</div>
+<table><thead><tr><th>Пациент</th><th>Было</th><th>Услуга</th><th>Категория</th><th>Канал</th><th>Статус обработки</th><th></th></tr></thead><tbody>
+<tr><td><b>Белов К. Р.</b> <span class="pill r">VIP</span></td><td>06.08 11:00</td><td>Имплантация, этап 1</td>
+ <td>сложная</td><td>обзвон</td><td><span class="pill y">в работе, Ефимова Т.</span></td><td><button class="btn sm">Перезаписать</button></td></tr>
+<tr><td>Титова Р. А. <span class="pill b">ДМС</span></td><td>06.08 10:00</td><td>Консультация</td>
+ <td>рядовая</td><td>push + SMS</td><td><span class="pill g">перезаписана на 08.08</span></td><td><button class="btn sm">Открыть</button></td></tr>
+<tr><td>Орлова Н. С.</td><td>06.08 13:00</td><td>Осмотр после удаления</td>
+ <td>рядовая</td><td>push</td><td><span class="pill g">перезаписана на 07.08</span></td><td><button class="btn sm">Открыть</button></td></tr>
+<tr><td>Гусев П. Н.</td><td>07.08 09:30</td><td>Сложное удаление + седация</td>
+ <td>сложная</td><td>обзвон</td><td><span class="pill r">не дозвонились, 2 попытки</span></td><td><button class="btn sm">Повторить</button></td></tr>
+<tr><td>Смирнов А. Л.</td><td>07.08 14:00</td><td>Санация</td>
+ <td>рядовая</td><td>push + SMS</td><td><span class="pill gr">предложение отправлено</span></td><td><button class="btn sm">Открыть</button></td></tr>
+<tr><td>Никитина В. Д.</td><td>08.08 11:30</td><td>Удаление, наркоз</td>
+ <td>сложная</td><td>обзвон</td><td><span class="pill r">отказ, ушла в другую клинику</span></td><td><button class="btn sm">Открыть</button></td></tr>
+</tbody></table>
+<div class="note w">Отмена автоматически освободила ресурсы: 34 слота врача, 22 слота микроскопа, 9 слотов наркоза.
+Именно этого не делает текущая система — оборудование оставалось занятым под отменённый приём.</div>
+<div class="note nq" style="margin-bottom:0">Для сложных услуг перезапись требует пересборки всей цепочки: связанные визиты, этапы лечения, курсовые процедуры.
+<span class="q" data-q="masschain">?</span></div>
+</div></div></div><div class="scr" id="s-nsidoc" data-t="Справочник врачей" data-sub="Структурированные атрибуты вместо текстовых комментариев">
+<div class="card"><h3>Карточка врача: Соколова Е. Н. <span class="tag">MUST HAVE</span>
+<span class="q" data-q="docattr">?</span>
+</h3><div class="pad">
+<div class="grid2">
+<div>
+<div class="fld"><label>Специальности (мультиспециализация)</label><div class="chips">
+ <span class="chip on">Стоматолог-хирург</span><span class="chip on">Имплантолог</span><span class="chip">+ добавить</span></div></div>
+<div class="fld"><label>Основная площадка</label><input value="Ярославская" readonly></div>
+<div class="fld"><label>Временные площадки</label><input value="Волгоградский (01.09.2026 – 31.10.2026)" readonly></div>
+<div class="fld"><label>Ограничения по возрасту пациента</label><input value="от 18 до 99 лет" readonly></div>
+<div class="fld"><label>Работа по ДМС</label><div class="chips"><span class="chip on">Да</span><span class="chip">Нет</span></div></div>
+<div class="fld"><label>Лимит льготных пациентов на смену</label><input value="5" readonly></div>
+</div>
+<div>
+<div class="fld"><label>Допуски к оборудованию</label><div class="chips">
+ <span class="chip on">Микроскоп Leica M320</span><span class="chip on">Наркоз</span><span class="chip on">Седация</span></div></div>
+<div class="fld"><label>Бесплатные консультации перед операцией</label><div class="chips"><span class="chip on">Да</span><span class="chip">Нет</span></div></div>
+<div class="fld"><label>Работа в паре</label><input value="требуется анестезиолог для услуг с седацией и наркозом" readonly></div>
+<div class="fld"><label>Выдаёт больничный лист</label><div class="chips"><span class="chip">Да</span><span class="chip on">Нет</span></div></div>
+<div class="fld"><label>Стаж</label><input value="14 лет (рассчитан от 12.03.2012)" readonly></div>
+<div class="fld"><label>Теги специализации</label><div class="chips">
+ <span class="chip on">ретинированные зубы</span><span class="chip on">костная пластика</span></div></div>
+</div></div>
+<div class="note e">Что было в текущей системе в поле «Дополнительная информация» одним текстом:
+<i>«только сложные удаления, детей не берёт, по ДМС до 14:00, наркоз только по вторникам и четвергам, перед имплантацией обязательна консультация»</i>
+— пять правил, которые оператор должен был прочитать и не ошибиться.
+<span class="q" data-q="docmigr">?</span></div>
+<div class="note w" style="margin-bottom:0">«Наркоз только по вторникам и четвергам» — это уже не атрибут врача, а правило доступности услуги во времени.
+<span class="q" data-q="docrule">?</span></div>
+</div></div></div><div class="scr" id="s-nsieq" data-t="Справочник оборудования" data-sub="Оборудование как самостоятельный ресурс со своим графиком">
+<div class="card"><h3>Оборудование <span class="tag">MUST HAVE</span></h3><div class="pad" style="padding-top:0">
+<table><thead><tr><th>Аппарат</th><th>Тип</th><th>Кабинет</th><th>График</th><th>Техперерыв</th><th>Зависимости</th><th>Плановый ремонт</th></tr></thead><tbody>
+<tr><td><b>МРТ Siemens 1.5T</b></td><td>МРТ</td><td>204</td><td>08:00–21:00</td><td>15 мин каждые 4 иссл.</td><td>—</td><td>12.09 – 14.09</td></tr>
+<tr><td><b>КТ Canon Aquilion</b></td><td>КТ</td><td>205</td><td>08:00–20:00</td><td>10 мин каждые 6 иссл.</td><td>—</td><td>—</td></tr>
+<tr><td><b>Аппарат BBL Sciton</b></td><td>Косметология</td><td>302</td><td>10:00–19:00</td><td>20 мин охлаждение</td>
+ <td><span class="pill y">блокирует Криолиполиз</span></td><td>—</td></tr>
+<tr><td><b>Криолиполиз Coolsculpt</b></td><td>Косметология</td><td>302</td><td>10:00–19:00</td><td>—</td>
+ <td><span class="pill y">блокируется BBL</span></td><td>—</td></tr>
+<tr><td><b>Микроскоп Leica M320</b></td><td>Стоматология</td><td>411</td><td>по графику врача</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><b>Наркозная стойка №2</b></td><td>Анестезия</td><td>411</td><td>по графику анестезиолога</td><td>30 мин обработка</td>
+ <td><span class="pill y">требует анестезиолога</span></td><td>—</td></tr>
+</tbody></table>
+<div class="note w">В кабинете 302 два аппарата, но один оператор. Занятие BBL делает криолиполиз недоступным,
+хотя формально аппарат свободен. Это то самое требование 1.1 про зависимости внутри кабинета.</div>
+<div class="grid2" style="margin-top:14px">
+<div class="note nq" style="margin:0">Технологические перерывы бывают разные: фиксированные по времени, после N процедур, зависящие от конкретной услуги.
+<span class="q" data-q="eqbreak">?</span></div>
+<div class="note nq" style="margin:0">Требование 3.1.2: бронирование конкретного аппарата, любого из подходящей группы, или отложенное — когда выбор делает врач на приёме.
+<span class="q" data-q="eqbook">?</span></div>
+</div></div></div></div><div class="scr" id="s-nsimx" data-t="Матрица компетенций" data-sub="Связка «Врач — Услуга — Оборудование» вместо сверки с базой знаний">
+<div class="card"><h3>Врач × Услуга <span class="tag">MUST HAVE</span>
+<span class="q" data-q="mxsize">?</span>
+</h3><div class="pad" style="padding-top:0">
+<table class="matrix"><thead><tr><th style="min-width:170px">Врач</th><th class="rot">Консультация</th><th class="rot">Сложное удаление</th><th class="rot">Имплантация</th><th class="rot">УЗИ брюшной полости</th><th class="rot">Фотоомоложение BBL</th><th class="rot">Криолиполиз</th><th class="rot">МРТ головного мозга</th></tr></thead><tbody><tr><td style="font-weight:600;white-space:nowrap">Соколова Е. Н.</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td></tr><tr><td style="font-weight:600;white-space:nowrap">Петров А. В.</td><td class="y">✓</td><td class="p">!</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td></tr><tr><td style="font-weight:600;white-space:nowrap">Гаврилов П. Т.</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td></tr><tr><td style="font-weight:600;white-space:nowrap">Кузнецов Д. И.</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td></tr><tr><td style="font-weight:600;white-space:nowrap">Иванова М. С.</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td><td class="n">·</td></tr><tr><td style="font-weight:600;white-space:nowrap">Лебедев Н. О.</td><td class="y">✓</td><td class="n">·</td><td class="n">·</td><td class="p">!</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td></tr></tbody></table>
+<div class="legend"><span>✓ — выполняет</span><span>! — выполняет с ограничением</span><span>· — не выполняет</span></div>
+<div class="note w">Пример ограничения: Петров А. В. выполняет удаление только подвижных молочных зубов.
+В текущей системе это текст в комментарии, здесь — правило, которое применяется автоматически при подборе.</div>
+<div class="note nq" style="margin-bottom:0">Третье измерение — оборудование. Врач связан и с услугой, и с допуском к конкретному аппарату.
+<span class="q" data-q="mx3d">?</span></div>
+</div></div></div><div class="scr" id="s-nsidur" data-t="Правила длительности" data-sub="Многофакторный расчёт вместо фиксированного шага">
+<div class="card"><h3>Базовая длительность и модификаторы <span class="tag">MUST HAVE</span></h3><div class="pad" style="padding-top:0">
+<table><thead><tr><th>Условие</th><th>Фактор</th><th>Эффект</th><th>Приоритет</th></tr></thead><tbody>
+<tr><td>Базовая длительность услуги</td><td>Сложное удаление</td><td>60 мин</td><td>база</td></tr>
+<tr><td>Врач</td><td>Соколова Е. Н.</td><td>−10 мин</td><td>1</td></tr>
+<tr><td>Тип приёма</td><td>Первичный</td><td>+15 мин</td><td>2</td></tr>
+<tr><td>Оборудование</td><td>Микроскоп Leica M320</td><td>+10 мин</td><td>3</td></tr>
+<tr><td>Возраст пациента</td><td>старше 70 лет</td><td>+15 мин</td><td>4</td></tr>
+<tr><td>Маломобильность</td><td>да</td><td>+1 слот</td><td>5</td></tr>
+<tr><td>Клиника</td><td>Ярославская</td><td>без изменений</td><td>6</td></tr>
+<tr style="background:#FFF8E8"><td colspan="2"><b>Итоговая длительность</b></td><td><b>90 мин = 3 слота по 30 мин</b></td><td></td></tr>
+</tbody></table>
+<div class="note e">Это ядро расчёта. Оно вызывается при каждом подборе слота — то есть до 200 раз в секунду.
+Предвычислить его заранее нельзя: часть факторов зависит от пациента, который ещё не выбран.
+<span class="q" data-q="durcalc">?</span></div>
+<div class="note nq" style="margin-bottom:0">Требование 2.2: устранить жёсткую привязку к фиксированной длительности слотов.
+Требование 2.7: для вызовов на дом — слоты-интервалы «с 13:00 до 15:00» вместо точного времени.
+<span class="q" data-q="durvnd">?</span></div>
+</div></div></div><div class="scr" id="s-lkp" data-t="Личный кабинет пациента" data-sub="Самозапись · перенос и отмена · двустороннее подтверждение">
+<div class="grid3">
+<div class="card"><h3>Самозапись</h3><div class="pad" style="display:flex;justify-content:center">
+<div class="phone"><div class="ph">Запись на приём</div><div class="pb">
+<div class="fld"><label>Что беспокоит</label><input value="Косметология — пигментация" readonly></div>
+<div class="fld"><label>Уточните</label><div class="chips"><span class="chip on">Лицо</span><span class="chip">Зона декольте</span><span class="chip">Кисти</span></div></div>
+<div class="fld"><label>Были ли процедуры за 14 дней</label><div class="chips"><span class="chip">Да</span><span class="chip on">Нет</span></div></div>
+<div class="note" style="font-size:11.5px;margin:10px 0">Подходит: фотоомоложение BBL, 45 мин, 12 400 ₽.<br>Требуется консультация косметолога перед процедурой.</div>
+<div style="font-size:12px;font-weight:600;margin-bottom:6px">Ближайшие слоты</div>
+<div class="chips"><span class="chip on">07.08 15:00</span><span class="chip">08.08 11:30</span><span class="chip">11.08 10:00</span></div>
+<button class="btn pri" style="width:100%;margin-top:12px">В корзину · 2 услуги</button>
+</div></div></div></div>
+<div class="card"><h3>Перенос и отмена</h3><div class="pad" style="display:flex;justify-content:center">
+<div class="phone"><div class="ph">Предстоящие приёмы</div><div class="pb">
+<div style="border:1px solid #E1E6ED;border-radius:8px;padding:11px;margin-bottom:10px">
+ <div style="font-weight:600;font-size:13px">Имплантация, этап 1</div>
+ <div style="font-size:11.5px;color:#8A94A3;margin:3px 0">06.08, 11:00–12:30 · Соколова Е. Н.</div>
+ <div style="font-size:11.5px;color:#8A94A3">Ярославская, каб. 411 · 84 500 ₽</div>
+ <div style="margin-top:8px"><span class="pill g">Подтверждено</span></div>
+ <div style="display:flex;gap:6px;margin-top:9px"><button class="btn sm">Перенести</button><button class="btn sm">Отменить</button></div>
+ <div style="font-size:11px;color:#C77700;margin-top:7px">Подготовка: не есть за 6 часов, КТ приложена</div>
+</div>
+<div style="border:1px solid #E1E6ED;border-radius:8px;padding:11px">
+ <div style="font-weight:600;font-size:13px">Консультация косметолога</div>
+ <div style="font-size:11.5px;color:#8A94A3;margin:3px 0">07.08, 15:00 · Иванова М. С.</div>
+ <div style="margin-top:8px"><span class="pill y">Ожидает подтверждения</span></div>
+</div>
+</div></div></div>
+<div class="note nq" style="margin:0 15px 15px">Отмена освобождает все ресурсы: врача, кабинет и оборудование.
+<span class="q" data-q="lkprule">?</span></div>
+</div>
+<div class="card"><h3>Подтверждение визита</h3><div class="pad" style="display:flex;justify-content:center">
+<div class="phone"><div class="ph">Напоминание</div><div class="pb">
+<div style="font-size:13px;line-height:1.55">Завтра, 6 августа в 11:00 вас ждёт Соколова Е. Н.<br>
+<span style="color:#8A94A3;font-size:12px">Ярославская, каб. 411</span></div>
+<div class="note" style="font-size:11.5px;margin:11px 0">Не есть за 6 часов до приёма. Возьмите паспорт и результаты КТ.</div>
+<div style="display:grid;gap:7px">
+ <button class="btn pri" style="width:100%">Подтверждаю приход</button>
+ <button class="btn" style="width:100%">Перенести</button>
+ <button class="btn" style="width:100%">Отменить</button>
+</div>
+<div style="font-size:11px;color:#8A94A3;margin-top:11px;text-align:center">Каскад: push → WhatsApp → SMS</div>
+</div></div></div>
+<div class="note nq" style="margin:0 15px 15px">Ответ фиксируется в статусе записи и возвращается в МИС.
+<span class="q" data-q="confirm">?</span></div>
+</div></div></div><div class="scr" id="s-notif" data-t="Уведомления и каскад" data-sub="Триггерный движок · Push → WhatsApp → SMS">
+<div class="grid2">
+<div class="card"><h3>Триггеры уведомлений <span class="tag">MVP</span></h3><div class="pad" style="padding-top:0">
+<table><thead><tr><th>Событие</th><th>Канал</th><th>Шаблон</th><th>В MVP</th></tr></thead><tbody>
+<tr><td>Запись создана</td><td>push → WhatsApp → SMS</td><td>подтверждение + подготовка</td><td><span class="pill g">да</span></td></tr>
+<tr><td>Напоминание перед приёмом</td><td>push → WhatsApp → SMS</td><td>время, адрес, памятка</td><td><span class="pill g">да</span></td></tr>
+<tr><td>Подтверждение визита</td><td>push</td><td>кнопки: подтвердить, перенести, отменить</td><td><span class="pill g">да</span></td></tr>
+<tr><td>Отмена по форс-мажору</td><td>push → WhatsApp → SMS + обзвон</td><td>альтернативы для перезаписи</td><td><span class="pill g">да</span></td></tr>
+<tr><td>Слот из листа ожидания освободился</td><td>push → SMS</td><td>предложение с таймаутом</td><td><span class="pill g">да</span></td></tr>
+<tr><td>Истёк срок рекомендации врача</td><td>push</td><td>приглашение на повторный визит</td><td><span class="pill y">MVP, уточнить</span></td></tr>
+<tr><td>Маркетинговые рассылки</td><td>—</td><td>—</td><td><span class="pill gr">отдельный сервис</span></td></tr>
+<tr><td>Результаты анализов</td><td>—</td><td>—</td><td><span class="pill gr">отдельный сервис</span></td></tr>
+</tbody></table>
+<div class="note nq" style="margin-bottom:0">В FAQ зафиксировано: планируется отдельный проект по сервису уведомлений.
+<span class="q" data-q="notifown">?</span></div>
+</div></div>
+<div class="card"><h3>Каскад доставки</h3><div class="pad">
+<div class="tl">
+<div class="ev"><div class="t">Шаг 1 · сразу</div><b>Push</b> через внутренний Gateway. Есть ЛКП — отправляем.</div>
+<div class="ev"><div class="t">Шаг 2 · через 10 мин, если не доставлено</div><b>WhatsApp</b> через Seventech</div>
+<div class="ev"><div class="t">Шаг 3 · через 20 мин, если не доставлено</div><b>SMS</b> через Seventech</div>
+<div class="ev"><div class="t">Шаг 4 · за 24 ч до приёма, если нет ответа</div><b>Голосовой робот</b>, результат возвращается в МИС</div>
+</div>
+<div class="note w">Каскад настраивается на пользовательском уровне в зависимости от сценария.
+<span class="q" data-q="cascade">?</span></div>
+<div class="note nq" style="margin-bottom:0">Отдельные текстовки на каждый канал, для каждого события, с подстановкой данных записи.
+<span class="q" data-q="templ">?</span></div>
+</div></div></div></div><div class="scr" id="s-qlist" data-t="Все вопросы к руководителю проекта" data-sub="31 вопросов, каждый из которых меняет оценку"><div class="note nq"><b>Как это использовать на встрече.</b> Вопросы отсортированы по экранам прототипа. Проходите экран за экраном, показывайте интерфейс и задавайте вопрос там, где он возникает — так собеседник видит контекст, а не абстрактную формулировку. Правая колонка — для нас: что именно меняется в оценке от ответа.</div><div class="card"><h3>Открытые вопросы</h3><div class="pad" style="padding-top:0"><table><thead><tr><th style="width:28px">№</th><th style="width:150px">Экран</th><th style="width:44%">Вопрос</th><th>На что влияет</th></tr></thead><tbody><tr><td style="color:#8A94A3">1</td><td><span class="pill b">Общее</span></td><td><b>Синхронизация write → read</b><div style="margin-top:4px">5 секунд — это допустимое отставание модели чтения или максимальное время до того, как слот исчезнет из внешних каналов?</div></td><td style="color:#5A6675;font-size:12px">Если это гарантия для внешних каналов, нужна синхронная инвалидация и подтверждение доставки. Разница в объёме работ — примерно вдвое по этому узлу.</td></tr><tr><td style="color:#8A94A3">2</td><td><span class="pill b">Сетка расписания</span></td><td><b>Оборудование в общей сетке</b><div style="margin-top:4px">Оборудование показываем в той же сетке, что и врачей, или отдельным представлением по кабинетам?</div></td><td style="color:#5A6675;font-size:12px">В MVP MAP это два разных пункта: «Просмотр расписания с записями» в MUST HAVE и «представление в разрезе кабинета или оборудования» в MVP. Если нужны оба — это два интерфейса, а не один.</td></tr><tr><td style="color:#8A94A3">3</td><td><span class="pill b">Сетка расписания</span></td><td><b>Зависимости оборудования в кабинете</b><div style="margin-top:4px">Правило «если занят аппарат А, то аппарат Б недоступен из-за отсутствия отдельного оператора» — это настраиваемое правило произвольной формы или фиксированный набор типов зависимости?</div></td><td style="color:#5A6675;font-size:12px">Конфигурируемый движок правил и жёсткий справочник зависимостей отличаются по трудоёмкости в 3–4 раза.</td></tr><tr><td style="color:#8A94A3">4</td><td><span class="pill b">Сетка расписания</span></td><td><b>Праздничные дни</b><div style="margin-top:4px">Кто и на каком уровне управляет производственным календарём: единый календарь холдинга, календарь площадки, или оба с приоритетом?</div></td><td style="color:#5A6675;font-size:12px">Это влияет на модель данных расписания и на инструмент массового пересчёта сетки.</td></tr><tr><td style="color:#8A94A3">5</td><td><span class="pill b">Запись и ресурсы</span></td><td><b>Совместная доступность</b><div style="margin-top:4px">При записи на услугу, требующую двух специалистов, система должна предлагать только совместно доступные слоты. Что делать, если совместных слотов нет — предлагать ближайшие раздельные с ручным сведением или сразу заводить заявку в лист ожидания?</div></td><td style="color:#5A6675;font-size:12px">Это разные алгоритмы подбора. Второй вариант требует связки подбора с листом ожидания и добавляет заметный объём.</td></tr><tr><td style="color:#8A94A3">6</td><td><span class="pill b">Запись и ресурсы</span></td><td><b>Предшествующие услуги</b><div style="margin-top:4px">Где источник истины по истории оказанных услуг — МИС или новый сервис? И на какую глубину нужно проверять срок годности анализов и справок?</div></td><td style="color:#5A6675;font-size:12px">Если проверять придётся синхронным запросом в МИС на каждом подборе слота, требование «поиск слота ≤0,5 с» становится недостижимым. Нужна реплика или кеш.</td></tr><tr><td style="color:#8A94A3">7</td><td><span class="pill b">Запись и ресурсы</span></td><td><b>Аудит и хранение</b><div style="margin-top:4px">2–3 года — это про историю изменений записей или про всю сетку расписания целиком? И нужен ли доступ к этим данным из интерфейса или достаточно выгрузки?</div></td><td style="color:#5A6675;font-size:12px">Хранение всей сетки за 3 года при 850 тыс. записей в месяц — это заметный объём и отдельная стратегия партиционирования и архивации.</td></tr><tr><td style="color:#8A94A3">8</td><td><span class="pill b">Запись от услуги</span></td><td><b>Конструктор опросников</b><div style="margin-top:4px">В FAQ зафиксировано: нужен конфигурируемый конструктор опросников. Кто ведёт опросники после запуска — методолог заказчика в интерфейсе или это остаётся задачей разработки? Нужны ли версионирование опросников и ветвление вопросов по ответам?</div></td><td style="color:#5A6675;font-size:12px">Полноценный конструктор с ветвлением, версиями и предпросмотром — это отдельный продукт внутри продукта. Фиксированный набор анкет дешевле в 3–4 раза.</td></tr><tr><td style="color:#8A94A3">9</td><td><span class="pill b">Запись от услуги</span></td><td><b>Модификаторы длительности</b><div style="margin-top:4px">Длительность зависит от врача, клиники, типа приёма, оборудования, возраста и маломобильности пациента. Модификаторы складываются, перемножаются или действует приоритет? Что делать при конфликте двух правил?</div></td><td style="color:#5A6675;font-size:12px">Это ядро расчёта. От ответа зависит модель данных и то, можно ли вообще предвычислять слоты, или длительность считается на каждый запрос — а это прямо бьёт в требование 0,5 с.</td></tr><tr><td style="color:#8A94A3">10</td><td><span class="pill b">Запись от услуги</span></td><td><b>Область поиска слота</b><div style="margin-top:4px">В каком радиусе ищем альтернативы: текущая площадка, связанные площадки, город, вся сеть? Может ли пациент или оператор расширять область поиска?</div></td><td style="color:#5A6675;font-size:12px">От этого зависит стоимость запроса поиска. Поиск по всей сети из 46 клиник с проверкой совместной доступности двух специалистов и оборудования — это принципиально другая задача по производительности.</td></tr><tr><td style="color:#8A94A3">11</td><td><span class="pill b">Запись от услуги</span></td><td><b>Корзина и блокировка слотов</b><div style="margin-top:4px">На какое время корзина удерживает слоты, пока пациент оформляет запись? Что происходит при частичном отказе — если один слот из четырёх уже занят, откатываем всю корзину или предлагаем замену внутри неё?</div></td><td style="color:#5A6675;font-size:12px">Полный откат транзакции и частичная пересборка — это два разных механизма. Второй требует саги с компенсациями и удваивает объём по этому узлу.</td></tr><tr><td style="color:#8A94A3">12</td><td><span class="pill b">Запись от услуги</span></td><td><b>Бюджет времени на подбор</b><div style="margin-top:4px">Требование — поиск свободного слота не более 0,5 секунды. Сколько из этих проверок должно выполняться синхронно в момент подбора, а что можно проверить только на этапе подтверждения записи?</div></td><td style="color:#5A6675;font-size:12px">Это главный архитектурный вопрос всего проекта. Он определяет, что попадёт в модель чтения, а что останется синхронным запросом, и напрямую задаёт объём работ по производительности.</td></tr><tr><td style="color:#8A94A3">13</td><td><span class="pill b">Лист ожидания</span></td><td><b>Степень автоматизации подбора</b><div style="margin-top:4px">В FAQ ответ: «автоматизированный подбор обсуждаемо с MVP». Что делает система при освобождении слота — сама переносит запись, отправляет предложение пациенту с таймаутом, или ставит задачу оператору?</div></td><td style="color:#5A6675;font-size:12px">Автоперенос требует правил разрешения конфликтов между заявками, таймаутов, страховочных записей и отката. Это в 2–3 раза дороже, чем уведомление оператора.</td></tr><tr><td style="color:#8A94A3">14</td><td><span class="pill b">Лист ожидания</span></td><td><b>Таймаут и страховочная запись</b><div style="margin-top:4px">Сколько времени держим слот для пациента из листа ожидания и что происходит при отказе — предлагаем следующему по очереди или возвращаем слот в общий доступ? Страховочная запись всё это время блокирует ресурс.</div></td><td style="color:#5A6675;font-size:12px">Двойная блокировка ресурса на время таймаута ощутимо влияет на плотность записи. Нужно понимать бизнес-правило, прежде чем проектировать.</td></tr><tr><td style="color:#8A94A3">15</td><td><span class="pill b">Лист ожидания</span></td><td><b>Разрешение конфликтов</b><div style="margin-top:4px">Требование 3.3.4: при конфликте записать в первую очередь VIP или пациента с большей корзиной. Как сравниваются «VIP» и «корзина на 200 тысяч»? Нужна ли настраиваемая формула приоритета или порядок фиксированный?</div></td><td style="color:#5A6675;font-size:12px">Настраиваемая формула — это отдельный конфигуратор правил. Фиксированный порядок реализуется за считанные дни.</td></tr><tr><td style="color:#8A94A3">16</td><td><span class="pill b">Снос расписания</span></td><td><b>Правила выбора канала перезаписи</b><div style="margin-top:4px">В FAQ: автопредложение или обзвон настраивается «в зависимости от времени до приёма, клиники, группы услуг». Кто и где ведёт эти правила, и сколько их будет реально — 5 или 50?</div></td><td style="color:#5A6675;font-size:12px">Если правил десятки и они меняются бизнесом, нужен конфигуратор с приоритетами и предпросмотром. Это отдельный модуль.</td></tr><tr><td style="color:#8A94A3">17</td><td><span class="pill b">Снос расписания</span></td><td><b>Пересборка цепочек лечения</b><div style="margin-top:4px">При сносе расписания у пациента с многоэтапным лечением сдвигается один этап или пересобирается вся цепочка с контролем сроков между этапами?</div></td><td style="color:#5A6675;font-size:12px">Пересборка цепочки с проверкой допустимых интервалов — это отдельный алгоритм планирования, а не просто перенос записи.</td></tr><tr><td style="color:#8A94A3">18</td><td><span class="pill b">Справочник врачей</span></td><td><b>Объём структурированных атрибутов</b><div style="margin-top:4px">Требование 1.4: вывести все настройки врача из текстовых комментариев в структурированные поля. В файле «Атрибуты для записи к врачу» — более 250 строк атрибутов по 7 сценариям записи. Сколько из них попадает в первую очередь и кто их будет заполнять для 5 442 врачей?</div></td><td style="color:#5A6675;font-size:12px">Это самый недооценённый пункт. 250 атрибутов — это не только интерфейс, это ещё и миграция, и первичное заполнение. Заполнение 5 442 карточек — отдельный проект, который надо явно вынести из периметра разработки.</td></tr><tr><td style="color:#8A94A3">19</td><td><span class="pill b">Справочник врачей</span></td><td><b>Разбор текстовых комментариев</b><div style="margin-top:4px">Кто и как разбирает текстовые комментарии из 1С в структурированные атрибуты для 5 442 врачей — вручную силами заказчика, полуавтоматически с нашей стороны, или это остаётся за периметром?</div></td><td style="color:#5A6675;font-size:12px">Если разбор на нас, это тысячи часов. Нужно зафиксировать в договоре явно.</td></tr><tr><td style="color:#8A94A3">20</td><td><span class="pill b">Справочник врачей</span></td><td><b>Правила доступности во времени</b><div style="margin-top:4px">Требуется ли настройка доступности услуги или оборудования по дням недели и часам отдельно от расписания врача? Например, «наркоз только вт и чт», «МРТ детям только до 15:00».</div></td><td style="color:#5A6675;font-size:12px">Это дополнительное измерение в модели доступности. Если его не заложить сразу, оно всплывёт на приёмке.</td></tr><tr><td style="color:#8A94A3">21</td><td><span class="pill b">Оборудование</span></td><td><b>Модель технологических перерывов</b><div style="margin-top:4px">Перерыв привязан к аппарату, к услуге, или к паре «услуга + аппарат»? Считается ли он от начала или от окончания процедуры, и попадает ли внутрь длительности слота или добавляется сверху?</div></td><td style="color:#5A6675;font-size:12px">От этого зависит движок нарезки таймслотов. Переделывать его после запуска очень дорого.</td></tr><tr><td style="color:#8A94A3">22</td><td><span class="pill b">Оборудование</span></td><td><b>Отложенное бронирование</b><div style="margin-top:4px">Как работает отложенное бронирование: слот аппарата держится «вслепую» на всю группу, или не держится вовсе и врач рискует не получить аппарат?</div></td><td style="color:#5A6675;font-size:12px">Первый вариант резко снижает плотность записи и требует механизма высвобождения. Второй проще, но не решает задачу бизнеса. Нужно решение до проектирования.</td></tr><tr><td style="color:#8A94A3">23</td><td><span class="pill b">Матрица компетенций</span></td><td><b>Размерность матрицы</b><div style="margin-top:4px">5 442 врача × сколько услуг в прайсе × сколько единиц оборудования? Матрица заполняется поштучно или через шаблоны по специальности с исключениями?</div></td><td style="color:#5A6675;font-size:12px">При 5 442 врачах и, скажем, 3 000 услугах поштучное заполнение нереально. Нужны наследуемые шаблоны и правила по умолчанию — а это принципиально другая модель данных.</td></tr><tr><td style="color:#8A94A3">24</td><td><span class="pill b">Матрица компетенций</span></td><td><b>Третье измерение матрицы</b><div style="margin-top:4px">Допуск к оборудованию задаётся на уровне врача, или на уровне пары «врач + услуга»? Например, врач допущен к МРТ вообще, или только к МРТ определённых зон на конкретной модели аппарата?</div></td><td style="color:#5A6675;font-size:12px">Разница между двумерной и трёхмерной матрицей — это разные объёмы и по интерфейсу, и по алгоритму подбора.</td></tr><tr><td style="color:#8A94A3">25</td><td><span class="pill b">Длительность</span></td><td><b>Момент расчёта длительности</b><div style="margin-top:4px">Слоты нарезаются заранее фиксированной длины, а длительность услуги проверяется поверх них, или сетка строится динамически под каждый запрос с учётом всех модификаторов?</div></td><td style="color:#5A6675;font-size:12px">Это развилка архитектуры. Динамический расчёт при 200 RPS требует принципиально другого решения, чем предвычисленная сетка. Ответ на этот вопрос меняет оценку ядра в разы.</td></tr><tr><td style="color:#8A94A3">26</td><td><span class="pill b">Длительность</span></td><td><b>Слоты-интервалы для вызовов на дом</b><div style="margin-top:4px">Слот-интервал — это отдельный тип слота со своей моделью, или обычный слот увеличенной длительности, у которого скрыто точное время? Можно ли в такой интервал записать нескольких пациентов?</div></td><td style="color:#5A6675;font-size:12px">Отдельный тип слота тянет за собой изменения во всей цепочке: нарезка, подбор, отображение, уведомления, перенос.</td></tr><tr><td style="color:#8A94A3">27</td><td><span class="pill b">Личный кабинет</span></td><td><b>Правила самостоятельной отмены</b><div style="margin-top:4px">Есть ли ограничение на самостоятельный перенос и отмену — например, не позднее чем за сутки, не более двух раз, не для услуг с наркозом? Что происходит с предоплатой?</div></td><td style="color:#5A6675;font-size:12px">Каждое ограничение — отдельное правило с настройкой по группе услуг и категории пациента. Их состав надо зафиксировать до разработки.</td></tr><tr><td style="color:#8A94A3">28</td><td><span class="pill b">Личный кабинет</span></td><td><b>Обработка ответа из разных каналов</b><div style="margin-top:4px">Ответ приходит из push, из SMS, от голосового робота и из встраиваемого виджета. Кто рендерит страницу подтверждения для каждого канала и что делать с записью, которую пациент не подтвердил — снимать автоматически или помечать?</div></td><td style="color:#5A6675;font-size:12px">В FAQ есть ответ про рендеринг, но нет бизнес-правила для неподтверждённых записей. Автоснятие — это отдельный сценарий с уведомлениями и правами.</td></tr><tr><td style="color:#8A94A3">29</td><td><span class="pill b">Уведомления</span></td><td><b>Граница с сервисом уведомлений</b><div style="margin-top:4px">Мы строим собственный триггерный движок внутри Расписаний или только публикуем события, а движок правил и шаблонов живёт в отдельном сервисе заказчика? Если отдельный сервис ещё не существует — кто отвечает за интеграционный контракт?</div></td><td style="color:#5A6675;font-size:12px">Это разница примерно в 1 400 часов. И это классический источник взаимных ожиданий на приёмке: обе стороны думают, что движок делает другая.</td></tr><tr><td style="color:#8A94A3">30</td><td><span class="pill b">Уведомления</span></td><td><b>Настройка каскада</b><div style="margin-top:4px">«Гибко настраивать каскад на пользовательском уровне» — это настройка администратором по типу сценария, или сам пациент выбирает предпочтительный канал в личном кабинете?</div></td><td style="color:#5A6675;font-size:12px">Первое — таблица настроек. Второе — профиль коммуникационных предпочтений пациента, синхронизация с ЛКП и учёт согласий на обработку. Существенно разный объём.</td></tr><tr><td style="color:#8A94A3">31</td><td><span class="pill b">Уведомления</span></td><td><b>Управление шаблонами</b><div style="margin-top:4px">Кто ведёт тексты уведомлений и сколько их будет: события × каналы × языки × типы услуг? Нужен ли предпросмотр и согласование текстов до публикации?</div></td><td style="color:#5A6675;font-size:12px">Редактор шаблонов с версиями, предпросмотром и правами — это отдельный модуль, который обычно забывают в оценке.</td></tr></tbody></table></div></div></div></div></div></div><script>
+var Q={"sync": ["Синхронизация write → read", "5 секунд — это допустимое отставание модели чтения или максимальное время до того, как слот исчезнет из внешних каналов?", "Если это гарантия для внешних каналов, нужна синхронная инвалидация и подтверждение доставки. Разница в объёме работ — примерно вдвое по этому узлу."], "eqgrid": ["Оборудование в общей сетке", "Оборудование показываем в той же сетке, что и врачей, или отдельным представлением по кабинетам?", "В MVP MAP это два разных пункта: «Просмотр расписания с записями» в MUST HAVE и «представление в разрезе кабинета или оборудования» в MVP. Если нужны оба — это два интерфейса, а не один."], "eqdep": ["Зависимости оборудования в кабинете", "Правило «если занят аппарат А, то аппарат Б недоступен из-за отсутствия отдельного оператора» — это настраиваемое правило произвольной формы или фиксированный набор типов зависимости?", "Конфигурируемый движок правил и жёсткий справочник зависимостей отличаются по трудоёмкости в 3–4 раза."], "holiday": ["Праздничные дни", "Кто и на каком уровне управляет производственным календарём: единый календарь холдинга, календарь площадки, или оба с приоритетом?", "Это влияет на модель данных расписания и на инструмент массового пересчёта сетки."], "pair": ["Совместная доступность", "При записи на услугу, требующую двух специалистов, система должна предлагать только совместно доступные слоты. Что делать, если совместных слотов нет — предлагать ближайшие раздельные с ручным сведением или сразу заводить заявку в лист ожидания?", "Это разные алгоритмы подбора. Второй вариант требует связки подбора с листом ожидания и добавляет заметный объём."], "prereq": ["Предшествующие услуги", "Где источник истины по истории оказанных услуг — МИС или новый сервис? И на какую глубину нужно проверять срок годности анализов и справок?", "Если проверять придётся синхронным запросом в МИС на каждом подборе слота, требование «поиск слота ≤0,5 с» становится недостижимым. Нужна реплика или кеш."], "audit": ["Аудит и хранение", "2–3 года — это про историю изменений записей или про всю сетку расписания целиком? И нужен ли доступ к этим данным из интерфейса или достаточно выгрузки?", "Хранение всей сетки за 3 года при 850 тыс. записей в месяц — это заметный объём и отдельная стратегия партиционирования и архивации."], "quiz": ["Конструктор опросников", "В FAQ зафиксировано: нужен конфигурируемый конструктор опросников. Кто ведёт опросники после запуска — методолог заказчика в интерфейсе или это остаётся задачей разработки? Нужны ли версионирование опросников и ветвление вопросов по ответам?", "Полноценный конструктор с ветвлением, версиями и предпросмотром — это отдельный продукт внутри продукта. Фиксированный набор анкет дешевле в 3–4 раза."], "dur": ["Модификаторы длительности", "Длительность зависит от врача, клиники, типа приёма, оборудования, возраста и маломобильности пациента. Модификаторы складываются, перемножаются или действует приоритет? Что делать при конфликте двух правил?", "Это ядро расчёта. От ответа зависит модель данных и то, можно ли вообще предвычислять слоты, или длительность считается на каждый запрос — а это прямо бьёт в требование 0,5 с."], "search": ["Область поиска слота", "В каком радиусе ищем альтернативы: текущая площадка, связанные площадки, город, вся сеть? Может ли пациент или оператор расширять область поиска?", "От этого зависит стоимость запроса поиска. Поиск по всей сети из 46 клиник с проверкой совместной доступности двух специалистов и оборудования — это принципиально другая задача по производительности."], "cart": ["Корзина и блокировка слотов", "На какое время корзина удерживает слоты, пока пациент оформляет запись? Что происходит при частичном отказе — если один слот из четырёх уже занят, откатываем всю корзину или предлагаем замену внутри неё?", "Полный откат транзакции и частичная пересборка — это два разных механизма. Второй требует саги с компенсациями и удваивает объём по этому узлу."], "perf": ["Бюджет времени на подбор", "Требование — поиск свободного слота не более 0,5 секунды. Сколько из этих проверок должно выполняться синхронно в момент подбора, а что можно проверить только на этапе подтверждения записи?", "Это главный архитектурный вопрос всего проекта. Он определяет, что попадёт в модель чтения, а что останется синхронным запросом, и напрямую задаёт объём работ по производительности."], "wlauto": ["Степень автоматизации подбора", "В FAQ ответ: «автоматизированный подбор обсуждаемо с MVP». Что делает система при освобождении слота — сама переносит запись, отправляет предложение пациенту с таймаутом, или ставит задачу оператору?", "Автоперенос требует правил разрешения конфликтов между заявками, таймаутов, страховочных записей и отката. Это в 2–3 раза дороже, чем уведомление оператора."], "wltimeout": ["Таймаут и страховочная запись", "Сколько времени держим слот для пациента из листа ожидания и что происходит при отказе — предлагаем следующему по очереди или возвращаем слот в общий доступ? Страховочная запись всё это время блокирует ресурс.", "Двойная блокировка ресурса на время таймаута ощутимо влияет на плотность записи. Нужно понимать бизнес-правило, прежде чем проектировать."], "wlconf": ["Разрешение конфликтов", "Требование 3.3.4: при конфликте записать в первую очередь VIP или пациента с большей корзиной. Как сравниваются «VIP» и «корзина на 200 тысяч»? Нужна ли настраиваемая формула приоритета или порядок фиксированный?", "Настраиваемая формула — это отдельный конфигуратор правил. Фиксированный порядок реализуется за считанные дни."], "massrule": ["Правила выбора канала перезаписи", "В FAQ: автопредложение или обзвон настраивается «в зависимости от времени до приёма, клиники, группы услуг». Кто и где ведёт эти правила, и сколько их будет реально — 5 или 50?", "Если правил десятки и они меняются бизнесом, нужен конфигуратор с приоритетами и предпросмотром. Это отдельный модуль."], "masschain": ["Пересборка цепочек лечения", "При сносе расписания у пациента с многоэтапным лечением сдвигается один этап или пересобирается вся цепочка с контролем сроков между этапами?", "Пересборка цепочки с проверкой допустимых интервалов — это отдельный алгоритм планирования, а не просто перенос записи."], "docattr": ["Объём структурированных атрибутов", "Требование 1.4: вывести все настройки врача из текстовых комментариев в структурированные поля. В файле «Атрибуты для записи к врачу» — более 250 строк атрибутов по 7 сценариям записи. Сколько из них попадает в первую очередь и кто их будет заполнять для 5 442 врачей?", "Это самый недооценённый пункт. 250 атрибутов — это не только интерфейс, это ещё и миграция, и первичное заполнение. Заполнение 5 442 карточек — отдельный проект, который надо явно вынести из периметра разработки."], "docmigr": ["Разбор текстовых комментариев", "Кто и как разбирает текстовые комментарии из 1С в структурированные атрибуты для 5 442 врачей — вручную силами заказчика, полуавтоматически с нашей стороны, или это остаётся за периметром?", "Если разбор на нас, это тысячи часов. Нужно зафиксировать в договоре явно."], "docrule": ["Правила доступности во времени", "Требуется ли настройка доступности услуги или оборудования по дням недели и часам отдельно от расписания врача? Например, «наркоз только вт и чт», «МРТ детям только до 15:00».", "Это дополнительное измерение в модели доступности. Если его не заложить сразу, оно всплывёт на приёмке."], "eqbreak": ["Модель технологических перерывов", "Перерыв привязан к аппарату, к услуге, или к паре «услуга + аппарат»? Считается ли он от начала или от окончания процедуры, и попадает ли внутрь длительности слота или добавляется сверху?", "От этого зависит движок нарезки таймслотов. Переделывать его после запуска очень дорого."], "eqbook": ["Отложенное бронирование", "Как работает отложенное бронирование: слот аппарата держится «вслепую» на всю группу, или не держится вовсе и врач рискует не получить аппарат?", "Первый вариант резко снижает плотность записи и требует механизма высвобождения. Второй проще, но не решает задачу бизнеса. Нужно решение до проектирования."], "mxsize": ["Размерность матрицы", "5 442 врача × сколько услуг в прайсе × сколько единиц оборудования? Матрица заполняется поштучно или через шаблоны по специальности с исключениями?", "При 5 442 врачах и, скажем, 3 000 услугах поштучное заполнение нереально. Нужны наследуемые шаблоны и правила по умолчанию — а это принципиально другая модель данных."], "mx3d": ["Третье измерение матрицы", "Допуск к оборудованию задаётся на уровне врача, или на уровне пары «врач + услуга»? Например, врач допущен к МРТ вообще, или только к МРТ определённых зон на конкретной модели аппарата?", "Разница между двумерной и трёхмерной матрицей — это разные объёмы и по интерфейсу, и по алгоритму подбора."], "durcalc": ["Момент расчёта длительности", "Слоты нарезаются заранее фиксированной длины, а длительность услуги проверяется поверх них, или сетка строится динамически под каждый запрос с учётом всех модификаторов?", "Это развилка архитектуры. Динамический расчёт при 200 RPS требует принципиально другого решения, чем предвычисленная сетка. Ответ на этот вопрос меняет оценку ядра в разы."], "durvnd": ["Слоты-интервалы для вызовов на дом", "Слот-интервал — это отдельный тип слота со своей моделью, или обычный слот увеличенной длительности, у которого скрыто точное время? Можно ли в такой интервал записать нескольких пациентов?", "Отдельный тип слота тянет за собой изменения во всей цепочке: нарезка, подбор, отображение, уведомления, перенос."], "lkprule": ["Правила самостоятельной отмены", "Есть ли ограничение на самостоятельный перенос и отмену — например, не позднее чем за сутки, не более двух раз, не для услуг с наркозом? Что происходит с предоплатой?", "Каждое ограничение — отдельное правило с настройкой по группе услуг и категории пациента. Их состав надо зафиксировать до разработки."], "confirm": ["Обработка ответа из разных каналов", "Ответ приходит из push, из SMS, от голосового робота и из встраиваемого виджета. Кто рендерит страницу подтверждения для каждого канала и что делать с записью, которую пациент не подтвердил — снимать автоматически или помечать?", "В FAQ есть ответ про рендеринг, но нет бизнес-правила для неподтверждённых записей. Автоснятие — это отдельный сценарий с уведомлениями и правами."], "notifown": ["Граница с сервисом уведомлений", "Мы строим собственный триггерный движок внутри Расписаний или только публикуем события, а движок правил и шаблонов живёт в отдельном сервисе заказчика? Если отдельный сервис ещё не существует — кто отвечает за интеграционный контракт?", "Это разница примерно в 1 400 часов. И это классический источник взаимных ожиданий на приёмке: обе стороны думают, что движок делает другая."], "cascade": ["Настройка каскада", "«Гибко настраивать каскад на пользовательском уровне» — это настройка администратором по типу сценария, или сам пациент выбирает предпочтительный канал в личном кабинете?", "Первое — таблица настроек. Второе — профиль коммуникационных предпочтений пациента, синхронизация с ЛКП и учёт согласий на обработку. Существенно разный объём."], "templ": ["Управление шаблонами", "Кто ведёт тексты уведомлений и сколько их будет: события × каналы × языки × типы услуг? Нужен ли предпросмотр и согласование текстов до публикации?", "Редактор шаблонов с версиями, предпросмотром и правами — это отдельный модуль, который обычно забывают в оценке."], "demo": ["Пример вопроса", "Так выглядит открытый вопрос. Нажмите на любой фиолетовый значок в интерфейсе.", "Внизу — пояснение, что именно меняется в оценке в зависимости от ответа."]};
+function show(id){
+  document.querySelectorAll('.scr').forEach(function(e){e.classList.remove('on')});
+  document.querySelectorAll('.navi').forEach(function(e){e.classList.remove('on')});
+  var s=document.getElementById('s-'+id); if(!s)return;
+  s.classList.add('on');
+  var n=document.querySelector('.navi[data-s="'+id+'"]'); if(n)n.classList.add('on');
+  document.getElementById('tt').textContent=s.dataset.t;
+  document.getElementById('ts').textContent=s.dataset.sub;
+  window.scrollTo(0,0); hideQ();
+}
+document.querySelectorAll('.navi').forEach(function(e){e.onclick=function(){show(e.dataset.s)}});
+var pop=document.getElementById('qpop');
+function hideQ(){pop.style.display='none'}
+document.addEventListener('click',function(ev){
+  var t=ev.target;
+  if(t.classList&&t.classList.contains('q')&&t.dataset.q){
+    var d=Q[t.dataset.q]; if(!d){hideQ();return}
+    pop.innerHTML='<b>'+d[0]+'</b>'+d[1]+'<div class="why"><b style="display:inline;text-transform:none;letter-spacing:0;font-size:11.5px">На что влияет: </b>'+d[2]+'</div>';
+    pop.style.display='block';
+    var r=t.getBoundingClientRect(), w=pop.offsetWidth, h=pop.offsetHeight;
+    var L=Math.min(Math.max(8,r.left-w/2+9), window.innerWidth-w-8);
+    var T=r.bottom+9; if(T+h>window.innerHeight-8) T=Math.max(8,r.top-h-9);
+    pop.style.left=L+'px'; pop.style.top=T+'px';
+    ev.stopPropagation(); return;
+  }
+  if(!pop.contains(t)) hideQ();
+});
+document.addEventListener('keydown',function(e){if(e.key=='Escape')hideQ()});
+show('dash');
+</script></body></html>
