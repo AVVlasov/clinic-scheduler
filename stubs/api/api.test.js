@@ -236,7 +236,7 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(typeof first.specialty).toBe('string');
     });
 
-    test('directories services — массив >=6', async () => {
+    test('directories services — массив >=6 и у каждой есть цена', async () => {
       const res = await request(app).get('/services');
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.items)).toBe(true);
@@ -245,6 +245,123 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(typeof first.id).toBe('string');
       expect(typeof first.name).toBe('string');
       expect(typeof first.duration).toBe('number');
+      expect(typeof first.price).toBe('number');
+      expect(first.price).toBeGreaterThan(0);
+    });
+  });
+
+  describe('PATCH /appointments/:id — протокол приёма', () => {
+    test('записал → прочитал: complaints, diagnosis, visitType, performedServiceIds, recommendations, nextVisit сохраняются и видны в GET', async () => {
+      const create = await request(app)
+        .post('/appointments')
+        .send({
+          doctorId: 'd-001',
+          patientId: 'p-002',
+          start: '2030-09-01T09:00:00',
+          durationMin: 30,
+        });
+      expect(create.status).toBe(201);
+      const id = create.body.id;
+      expect(id).toMatch(/^a-\d{3}$/);
+
+      const patch = await request(app)
+        .patch(`/appointments/${id}`)
+        .send({
+          complaints: 'Боль в области 38 зуба третьи сутки',
+          diagnosis: 'K01.1 Ретенированный зуб',
+          visitType: 'first',
+          performedServiceIds: ['s-001', 's-003'],
+          recommendations: ['Контрольный осмотр через 7 дней'],
+          nextVisit: '2030-09-08',
+        });
+      expect(patch.status).toBe(200);
+      expect(patch.body.complaints).toBe('Боль в области 38 зуба третьи сутки');
+      expect(patch.body.diagnosis).toBe('K01.1 Ретенированный зуб');
+      expect(patch.body.visitType).toBe('first');
+      expect(patch.body.performedServiceIds).toEqual(['s-001', 's-003']);
+      expect(patch.body.recommendations).toEqual(['Контрольный осмотр через 7 дней']);
+      expect(patch.body.nextVisit).toBe('2030-09-08');
+
+      const single = await request(app).get(`/appointments/${id}`);
+      expect(single.status).toBe(200);
+      expect(single.body.complaints).toBe('Боль в области 38 зуба третьи сутки');
+      expect(single.body.diagnosis).toBe('K01.1 Ретенированный зуб');
+      expect(single.body.performedServiceIds).toEqual(['s-001', 's-003']);
+
+      const list = await request(app).get('/appointments');
+      const item = list.body.items.find((a) => a.id === id);
+      expect(item).toBeDefined();
+      expect(item.diagnosis).toBe('K01.1 Ретенированный зуб');
+      expect(item.recommendations).toEqual(['Контрольный осмотр через 7 дней']);
+    });
+
+    test('PATCH протокола с visitType="unknown" → 400 invalid_field (а не молчаливое сохранение)', async () => {
+      const create = await request(app)
+        .post('/appointments')
+        .send({
+          doctorId: 'd-001',
+          patientId: 'p-003',
+          start: '2030-09-02T10:00:00',
+          durationMin: 30,
+        });
+      expect(create.status).toBe(201);
+
+      const patch = await request(app)
+        .patch(`/appointments/${create.body.id}`)
+        .send({ visitType: 'unknown' });
+      expect(patch.status).toBe(400);
+      expect(patch.body.error).toBe('invalid_field');
+      expect(typeof patch.body.message).toBe('string');
+    });
+
+    test('PATCH протокола с performedServiceIds="не-массив" → 400 invalid_field', async () => {
+      const create = await request(app)
+        .post('/appointments')
+        .send({
+          doctorId: 'd-001',
+          patientId: 'p-004',
+          start: '2030-09-03T11:00:00',
+          durationMin: 30,
+        });
+      expect(create.status).toBe(201);
+
+      const patch = await request(app)
+        .patch(`/appointments/${create.body.id}`)
+        .send({ performedServiceIds: 's-001' });
+      expect(patch.status).toBe(400);
+      expect(patch.body.error).toBe('invalid_field');
+    });
+  });
+
+  describe('формат ошибок стаба', () => {
+    test('400 без обязательных полей возвращает {error: "validation", message: "..."} — код машиночитаемый, текст отдельно', async () => {
+      const res = await request(app)
+        .post('/appointments')
+        .send({ patientId: 'p-001' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('validation');
+      expect(typeof res.body.message).toBe('string');
+      expect(res.body.message.length).toBeGreaterThan(0);
+    });
+
+    test('404 возвращает {error: "not_found", message: "..."}', async () => {
+      const res = await request(app).patch('/appointments/a-9999').send({ start: '2030-09-10T09:00:00' });
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('not_found');
+      expect(typeof res.body.message).toBe('string');
+    });
+
+    test('409 занятого слота возвращает {error: "slot_taken", message: "..."}', async () => {
+      const a = await request(app)
+        .post('/appointments')
+        .send({ doctorId: 'd-006', patientId: 'p-001', start: '2030-10-01T09:00:00', durationMin: 30 });
+      expect(a.status).toBe(201);
+      const b = await request(app)
+        .post('/appointments')
+        .send({ doctorId: 'd-006', patientId: 'p-002', start: '2030-10-01T09:15:00', durationMin: 30 });
+      expect(b.status).toBe(409);
+      expect(b.body.error).toBe('slot_taken');
+      expect(typeof b.body.message).toBe('string');
     });
   });
 

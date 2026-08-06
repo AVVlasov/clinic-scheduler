@@ -64,11 +64,17 @@ const apiBody = (path: string): unknown => {
           patientPhone: '+7 900 000-00-00',
           patientBirthDate: '1980-01-01',
           patientUid: 'UID-1',
+          complaints: null,
+          diagnosis: null,
+          visitType: null,
+          performedServiceIds: [],
+          recommendations: [],
+          nextVisit: null,
         },
       ],
     }
   }
-  if (path.endsWith('/doctors')) return { items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201', type: 'doctor' as const }] }
+  if (path.endsWith('/doctors')) return { items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }] }
   if (path.endsWith('/services')) return { items: [] }
   if (path.endsWith('/doctor-cards')) return { items: [] }
   if (path.includes('/week-templates')) {

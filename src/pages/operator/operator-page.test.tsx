@@ -20,14 +20,14 @@ const mockedGetConfigValue = vi.mocked(getConfigValue)
 
 const doctorsPayload: DoctorList = {
   items: [
-    { id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201', type: 'doctor' },
-    { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305', type: 'doctor' },
+    { id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' },
+    { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' },
   ],
 }
 
 const servicesPayload: ServiceList = {
   items: [
-    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём' },
+    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
   ],
 }
 

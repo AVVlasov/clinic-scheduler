@@ -99,7 +99,6 @@ const publishPayload: PublishWeekResult = {
 }
 
 const card = (over: Partial<DoctorCard> & Pick<DoctorCard, 'id' | 'name'>): DoctorCard => ({
-  type: 'doctor',
   specialty: 'Терапевт',
   cabinet: '000',
   specialties: ['Терапевт'],
