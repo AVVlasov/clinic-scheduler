@@ -5,6 +5,40 @@ const { state, newId, overlaps } = require('./data');
 
 const router = Router();
 
+const PROTOCOL_FIELDS = ['complaints', 'diagnosis', 'visitType', 'performedServiceIds', 'recommendations', 'nextVisit'];
+
+const PROTOCOL_STRING_FIELDS = ['complaints', 'diagnosis', 'nextVisit'];
+const PROTOCOL_STRING_LIST_FIELDS = ['performedServiceIds', 'recommendations'];
+const PROTOCOL_VISIT_TYPES = new Set(['first', 'repeat']);
+
+const applyProtocolPatch = (record, body) => {
+  for (const field of PROTOCOL_STRING_FIELDS) {
+    if (body[field] !== undefined) {
+      if (typeof body[field] !== 'string') {
+        return { ok: false, field };
+      }
+      record[field] = body[field];
+    }
+  }
+  for (const field of PROTOCOL_STRING_LIST_FIELDS) {
+    if (body[field] !== undefined) {
+      if (!Array.isArray(body[field]) || !body[field].every((v) => typeof v === 'string')) {
+        return { ok: false, field };
+      }
+      record[field] = [...body[field]];
+    }
+  }
+  if (body.visitType !== undefined && body.visitType !== null) {
+    if (!PROTOCOL_VISIT_TYPES.has(body.visitType)) {
+      return { ok: false, field: 'visitType' };
+    }
+    record.visitType = body.visitType;
+  } else if (body.visitType === null) {
+    record.visitType = null;
+  }
+  return { ok: true };
+};
+
 const decorate = (a) => {
   const doctor = state.doctors.find((d) => d.id === a.doctorId);
   const patient = state.patients.find((p) => p.id === a.patientId);
@@ -41,18 +75,21 @@ router.post('/appointments', (req, res) => {
   const { doctorId, patientId, start, durationMin, status, paymentType, serviceId } = body;
 
   if (!doctorId || !patientId || !start || !durationMin) {
-    return res.status(400).json({ error: 'doctorId, patientId, start и durationMin обязательны' });
+    return res.status(400).json({
+      error: 'validation',
+      message: 'Поля doctorId, patientId, start и durationMin обязательны',
+    });
   }
   if (!state.doctors.find((d) => d.id === doctorId)) {
-    return res.status(400).json({ error: 'doctor_not_found' });
+    return res.status(400).json({ error: 'doctor_not_found', message: 'Врач не найден' });
   }
   if (!state.patients.find((p) => p.id === patientId)) {
-    return res.status(400).json({ error: 'patient_not_found' });
+    return res.status(400).json({ error: 'patient_not_found', message: 'Пациент не найден' });
   }
 
   const numericDuration = Number(durationMin);
   if (!Number.isFinite(numericDuration) || numericDuration <= 0) {
-    return res.status(400).json({ error: 'invalid_duration' });
+    return res.status(400).json({ error: 'invalid_duration', message: 'Длительность должна быть положительным числом' });
   }
 
   const collision = state.appointments.find((a) => overlaps(a, doctorId, start, numericDuration));
@@ -72,7 +109,20 @@ router.post('/appointments', (req, res) => {
     status: status || 'scheduled',
     paymentType: paymentType || 'cash',
     serviceId: serviceId || null,
+    complaints: null,
+    diagnosis: null,
+    visitType: null,
+    performedServiceIds: [],
+    recommendations: [],
+    nextVisit: null,
   };
+  const protocol = applyProtocolPatch(record, body);
+  if (!protocol.ok) {
+    return res.status(400).json({
+      error: 'invalid_field',
+      message: `Поле «${protocol.field}» имеет неверный формат`,
+    });
+  }
   state.appointments.push(record);
   res.status(201).json(decorate(record));
 });
@@ -80,7 +130,7 @@ router.post('/appointments', (req, res) => {
 router.patch('/appointments/:id', (req, res) => {
   const id = req.params.id;
   const a = state.appointments.find((x) => x.id === id);
-  if (!a) return res.status(404).json({ error: 'not_found' });
+  if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
 
   const body = req.body || {};
   const nextDoctorId = body.doctorId || a.doctorId;
@@ -88,10 +138,10 @@ router.patch('/appointments/:id', (req, res) => {
   const nextDuration = body.durationMin != null ? Number(body.durationMin) : a.durationMin;
 
   if (!Number.isFinite(nextDuration) || nextDuration <= 0) {
-    return res.status(400).json({ error: 'invalid_duration' });
+    return res.status(400).json({ error: 'invalid_duration', message: 'Длительность должна быть положительным числом' });
   }
   if (!state.doctors.find((d) => d.id === nextDoctorId)) {
-    return res.status(400).json({ error: 'doctor_not_found' });
+    return res.status(400).json({ error: 'doctor_not_found', message: 'Врач не найден' });
   }
 
   const collision = state.appointments.find((other) =>
@@ -110,6 +160,14 @@ router.patch('/appointments/:id', (req, res) => {
   if (body.status) a.status = body.status;
   if (body.paymentType) a.paymentType = body.paymentType;
   if (body.serviceId !== undefined) a.serviceId = body.serviceId;
+
+  const protocol = applyProtocolPatch(a, body);
+  if (!protocol.ok) {
+    return res.status(400).json({
+      error: 'invalid_field',
+      message: `Поле «${protocol.field}» имеет неверный формат`,
+    });
+  }
 
   res.status(200).json(decorate(a));
 });

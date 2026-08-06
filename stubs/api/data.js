@@ -23,13 +23,13 @@ const doctors = [
 ];
 
 const services = [
-  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём' },
-  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём' },
-  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика' },
-  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика' },
-  { id: 's-005', name: 'Анализ крови общий', duration: 10, category: 'Лаборатория' },
-  { id: 's-006', name: 'Биохимия крови', duration: 15, category: 'Лаборатория' },
-  { id: 's-007', name: 'Консультация по результатам', duration: 20, category: 'Приём' },
+  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 },
+  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 },
+  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 },
+  { id: 's-005', name: 'Анализ крови общий', duration: 10, category: 'Лаборатория', price: 650 },
+  { id: 's-006', name: 'Биохимия крови', duration: 15, category: 'Лаборатория', price: 1500 },
+  { id: 's-007', name: 'Консультация по результатам', duration: 20, category: 'Приём', price: 1700 },
 ];
 
 const patients = [
@@ -72,7 +72,16 @@ const seedAppointments = (date) => {
       status: 'no_show', paymentType: 'cash', serviceId: 's-001',
     },
   ];
-  return base.map((a, i) => ({ id: `a-${String(i + 1).padStart(3, '0')}`, ...a }));
+  return base.map((a, i) => ({
+    id: `a-${String(i + 1).padStart(3, '0')}`,
+    ...a,
+    complaints: null,
+    diagnosis: null,
+    visitType: null,
+    performedServiceIds: [],
+    recommendations: [],
+    nextVisit: null,
+  }));
 };
 
 // Карточки врачей справочника администратора. Часть карточек намеренно неполная:

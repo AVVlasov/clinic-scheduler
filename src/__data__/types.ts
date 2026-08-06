@@ -2,14 +2,14 @@ export type AppointmentStatus = 'scheduled' | 'arrived' | 'in_progress' | 'compl
 
 export type PaymentType = 'cash' | 'card' | 'insurance'
 
+export type VisitType = 'first' | 'repeat'
+
 export interface Resource {
   id: string
   name: string
-  type: 'doctor'
 }
 
 export interface Doctor extends Resource {
-  type: 'doctor'
   specialty: string
   cabinet: string
 }
@@ -96,6 +96,7 @@ export interface Service {
   name: string
   duration: number
   category: string
+  price: number
 }
 
 export interface SlotResource {
@@ -132,6 +133,12 @@ export interface Appointment {
   patientPhone: string | null
   patientBirthDate: string | null
   patientUid: string | null
+  complaints: string | null
+  diagnosis: string | null
+  visitType: VisitType | null
+  performedServiceIds: string[]
+  recommendations: string[]
+  nextVisit: string | null
 }
 
 export interface AppointmentList {
@@ -154,6 +161,12 @@ export interface CreateAppointmentInput {
   status?: AppointmentStatus
   paymentType?: PaymentType
   serviceId?: string | null
+  complaints?: string
+  diagnosis?: string
+  visitType?: VisitType
+  performedServiceIds?: string[]
+  recommendations?: string[]
+  nextVisit?: string
 }
 
 export interface RescheduleAppointmentInput {
@@ -163,4 +176,10 @@ export interface RescheduleAppointmentInput {
   status?: AppointmentStatus
   paymentType?: PaymentType
   serviceId?: string | null
+  complaints?: string
+  diagnosis?: string
+  visitType?: VisitType
+  performedServiceIds?: string[]
+  recommendations?: string[]
+  nextVisit?: string
 }

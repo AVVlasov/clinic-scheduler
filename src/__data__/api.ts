@@ -43,9 +43,19 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     const errorBody = body && typeof body === 'object' ? body as Record<string, unknown> : {}
     const code = typeof errorBody.error === 'string' ? errorBody.error : 'request_failed'
     const serverMessage = typeof errorBody.message === 'string' ? errorBody.message : undefined
-    const message = response.status === 409 && code === 'slot_taken'
-      ? serverMessage ?? 'Выбранный слот уже занят'
-      : serverMessage ?? 'Не удалось выполнить запрос'
+
+    let message = serverMessage
+    if (!message) {
+      if (response.status === 409 && code === 'slot_taken') {
+        message = 'Выбранный слот уже занят'
+      } else if (response.status === 400) {
+        message = 'Проверьте корректность данных'
+      } else if (response.status === 404) {
+        message = 'Не найдено'
+      } else {
+        message = 'Не удалось выполнить запрос'
+      }
+    }
 
     throw new ApiError(message, response.status, code)
   }

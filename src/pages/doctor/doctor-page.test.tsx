@@ -29,6 +29,12 @@ const baseAppointments: Appointment[] = [
     patientPhone: '+7 900 100-00-01',
     patientBirthDate: '1985-03-12',
     patientUid: 'UID 0001 4480',
+    complaints: null,
+    diagnosis: null,
+    visitType: null,
+    performedServiceIds: [],
+    recommendations: [],
+    nextVisit: null,
   },
   {
     id: 'a-002',
@@ -44,6 +50,12 @@ const baseAppointments: Appointment[] = [
     patientPhone: '+7 900 100-00-02',
     patientBirthDate: '1992-07-21',
     patientUid: 'UID 0002 4492',
+    complaints: null,
+    diagnosis: null,
+    visitType: null,
+    performedServiceIds: [],
+    recommendations: [],
+    nextVisit: null,
   },
   {
     id: 'a-003',
@@ -59,14 +71,20 @@ const baseAppointments: Appointment[] = [
     patientPhone: '+7 900 100-00-03',
     patientBirthDate: '1978-11-05',
     patientUid: 'UID 0003 4504',
+    complaints: null,
+    diagnosis: null,
+    visitType: null,
+    performedServiceIds: [],
+    recommendations: [],
+    nextVisit: null,
   },
 ]
 
 const baseServices: Service[] = [
-  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём' },
-  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём' },
-  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика' },
-  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика' },
+  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 },
+  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 },
+  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 },
 ]
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
