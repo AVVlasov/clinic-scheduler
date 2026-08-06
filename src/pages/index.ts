@@ -1,3 +1,2 @@
-import { lazy } from 'react'
-
-export const MainPage = lazy(() => import(/* webpackChunkName: 'main' */'./main'))
+export { MainPage } from './main/main'
+export { AppShell } from './app-shell'
