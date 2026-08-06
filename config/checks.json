@@ -36,5 +36,20 @@
   "TASK-09": [
     "npx --no-install vitest run src/pages/app-shell.test.tsx",
     "npm test"
+  ],
+
+  "_findings_comment": "TASK-10..13 — находки приёмки прогона g_20260806-151836: дефекты не экранов, а стыков между ними. Их не ловит ни tsc, ни линт, ни тесты задачи — все они были зелёными.",
+  "TASK-10": [
+    "npx --no-install vitest run stubs/api/api.test.js",
+    "npx --no-install vitest run src/__data__/api.test.ts"
+  ],
+  "TASK-11": [
+    "npx --no-install vitest run src/pages/doctor"
+  ],
+  "TASK-12": [
+    "npx --no-install vitest run src/pages/operator"
+  ],
+  "TASK-13": [
+    "npx --no-install vitest run src/pages/registrar"
   ]
 }
