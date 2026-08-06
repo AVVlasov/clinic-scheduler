@@ -8,6 +8,7 @@ import { OperatorPage } from './operator-page'
 import type {
   AppointmentList,
   DoctorList,
+  PatientList,
   Schedule,
   ServiceList,
 } from '../../__data__/types'
@@ -28,6 +29,13 @@ const doctorsPayload: DoctorList = {
 const servicesPayload: ServiceList = {
   items: [
     { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+  ],
+}
+
+const patientsPayload: PatientList = {
+  items: [
+    { id: 'p-002', name: 'Белова Татьяна Викторовна', phone: '+7 900 100-00-02', birthDate: '1992-07-21' },
+    { id: 'p-003', name: 'Григорьев Артём Дмитриевич', phone: '+7 900 100-00-03', birthDate: '1978-11-05' },
   ],
 }
 
@@ -112,6 +120,11 @@ const mockApiOk = (date: string) => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
+    if (url.endsWith('/patients')) {
+      return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+    }
     return Promise.resolve(new Response('not found', { status: 404 }))
   })
   return fetchMock
@@ -146,6 +159,11 @@ const mockApiConflict = (date: string) => {
     }
     if (url.endsWith('/services')) {
       return Promise.resolve(new Response(JSON.stringify(servicesPayload), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+    }
+    if (url.endsWith('/patients')) {
+      return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
@@ -212,7 +230,10 @@ describe('OperatorPage — сетка из данных стаба', () => {
     const freeSlot = await screen.findByTestId('slot-d-001-08:00')
     fireEvent.click(freeSlot)
 
+    fireEvent.click(await screen.findByTestId('patient-option-p-002'))
+
     const bookBtn = await screen.findByTestId('card-book')
+    await waitFor(() => expect(bookBtn).not.toBeDisabled())
     fireEvent.click(bookBtn)
 
     const err = await screen.findByTestId('card-error')
@@ -248,5 +269,103 @@ describe('OperatorPage — сетка из данных стаба', () => {
     expect(screen.getByText('Записей в смене')).toBeInTheDocument()
     expect(screen.getByText('Среднее время записи')).toBeInTheDocument()
     expect(screen.getByText('Требуют действия')).toBeInTheDocument()
+  })
+
+  it('кнопка «Записать» disabled без выбранного пациента и не уходит на p-001', async () => {
+    const date = new Date().toISOString().slice(0, 10)
+    mockApiOk(date)
+    renderWithProviders(<OperatorPage />)
+
+    fireEvent.click(await screen.findByTestId('slot-d-001-08:00'))
+
+    const bookBtn = await screen.findByTestId('card-book')
+    expect(bookBtn).toBeDisabled()
+
+    const posts: string[] = []
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const orig = fetchMock.getMockImplementation()
+    fetchMock.mockImplementation((input, init) => {
+      const url = typeof input === 'string' ? input : (input as Request).url
+      if (url.endsWith('/appointments') && init?.method === 'POST') {
+        posts.push(typeof init.body === 'string' ? init.body : '')
+        return Promise.resolve(new Response(JSON.stringify({
+          id: 'a-999', doctorId: 'd-001', patientId: 'p-999',
+          start: `${date}T08:00:00+03:00`, durationMin: 30,
+          status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+        }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return orig ? orig(input as Request | string, init) : Promise.resolve(new Response('not found', { status: 404 }))
+    })
+
+    fireEvent.click(bookBtn)
+
+    expect(posts).toEqual([])
+    expect(bookBtn).toBeDisabled()
+
+    fireEvent.click(screen.getByTestId('patient-option-p-003'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('card-book')).not.toBeDisabled()
+    })
+    expect(screen.getByTestId('patient-selected')).toHaveTextContent('Григорьев Артём Дмитриевич')
+
+    fireEvent.click(screen.getByTestId('card-book'))
+
+    await waitFor(() => {
+      expect(posts.length).toBe(1)
+    })
+    const body = JSON.parse(posts[0])
+    expect(body.patientId).toBe('p-003')
+    expect(body.patientId).not.toBe('p-001')
+    expect(body.doctorId).toBe('d-001')
+    expect(body.start).toBe(`${date}T08:00:00+03:00`)
+  })
+
+  it('перенос уходит в целевой свободный слот с его временем и календарной датой (смена суток)', async () => {
+    const date = '2030-03-09'
+    mockApiOk(date)
+    renderWithProviders(<OperatorPage />)
+
+    fireEvent.click(await screen.findByTestId('slot-d-001-08:15'))
+
+    const card = await screen.findByTestId('slot-card')
+    expect(card).toHaveAttribute('data-busy', 'true')
+
+    const rescheduleBtn = screen.getByTestId('card-reschedule')
+    expect(rescheduleBtn).toBeDisabled()
+
+    fireEvent.click(await screen.findByTestId('slot-d-002-08:45'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('card-reschedule')).not.toBeDisabled()
+    })
+
+    const patches: string[] = []
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const orig = fetchMock.getMockImplementation()
+    fetchMock.mockImplementation((input, init) => {
+      const url = typeof input === 'string' ? input : (input as Request).url
+      if (init?.method === 'PATCH' && url.includes('/appointments/')) {
+        patches.push(typeof init.body === 'string' ? init.body : '')
+        return Promise.resolve(new Response(JSON.stringify({
+          id: 'a-001', doctorId: 'd-002', patientId: 'p-001',
+          start: `${date}T08:45:00+03:00`, durationMin: 30,
+          status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      }
+      return orig ? orig(input as Request | string, init) : Promise.resolve(new Response('not found', { status: 404 }))
+    })
+
+    fireEvent.click(screen.getByTestId('card-reschedule'))
+
+    await waitFor(() => {
+      expect(patches.length).toBe(1)
+    })
+    const body = JSON.parse(patches[0])
+    expect(body.start).toBe('2030-03-09T08:45:00+03:00')
+    expect(body.doctorId).toBe('d-002')
+    expect(body.durationMin).toBe(30)
+    expect(body.start).not.toMatch(/T08:15/)
+    expect(body.start).not.toMatch(/Z$/)
   })
 })

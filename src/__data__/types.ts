@@ -91,6 +91,10 @@ export interface Patient {
   birthDate: string
 }
 
+export interface PatientList {
+  items: Patient[]
+}
+
 export interface Service {
   id: string
   name: string

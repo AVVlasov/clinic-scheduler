@@ -4,12 +4,14 @@ import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 import {
   getAppointments,
   getDoctors,
+  getPatients,
   getSchedule,
   getServices,
 } from '../../__data__/api'
 import type {
   Appointment,
   Doctor,
+  Patient,
   Schedule,
   ScheduleSlot,
   Service,
@@ -43,21 +45,25 @@ export const OperatorPage = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [services, setServices] = useState<Service[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
   const [selected, setSelected] = useState<SelectedSlot | null>(null)
+  const [rescheduleTarget, setRescheduleTarget] = useState<SelectedSlot | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const date = todayDate()
-    const [sched, appts, docs, svcs] = await Promise.all([
+    const [sched, appts, docs, svcs, pats] = await Promise.all([
       getSchedule(date),
       getAppointments(),
       getDoctors(),
       getServices(),
+      getPatients(),
     ])
     setSchedule(sched)
     setAppointments(appts.items)
     setDoctors(docs.items)
     setServices(svcs.items)
+    setPatients(pats.items)
   }, [])
 
   useEffect(() => {
@@ -86,15 +92,29 @@ export const OperatorPage = () => {
 
   const handleSlotClick = useCallback(
     (slot: ScheduleSlot, doctor: SlotResource) => {
+      if (selectedResource?.busy && !doctor.busy) {
+        setRescheduleTarget({ time: slot.time, doctorId: doctor.id })
+        return
+      }
+
+      setRescheduleTarget(null)
       setSelected({ time: slot.time, doctorId: doctor.id })
     },
-    [],
+    [selectedResource],
   )
 
   const handleBookingDone = useCallback(() => {
     setSelected(null)
+    setRescheduleTarget(null)
     load().catch(() => undefined)
   }, [load])
+
+  const handlePickRescheduleTarget = useCallback(
+    (time: string, doctorId: string) => {
+      setRescheduleTarget({ time, doctorId })
+    },
+    [],
+  )
 
   if (error) {
     return (
@@ -144,6 +164,15 @@ export const OperatorPage = () => {
             <Text fontSize="12px" color="textSecondary">
               {formatRangeTitle(schedule.date)} · шаг {schedule.stepMinutes} мин
             </Text>
+            {selectedResource?.busy && (
+              <Text
+                fontSize="12px"
+                color="textSecondary"
+                data-testid="reschedule-hint"
+              >
+                Клик по свободному слоту выберет его целью переноса.
+              </Text>
+            )}
           </Box>
           <ScheduleGrid
             schedule={schedule}
@@ -151,6 +180,8 @@ export const OperatorPage = () => {
             appointments={appointments}
             selectedTime={selected?.time ?? null}
             selectedDoctorId={selected?.doctorId ?? null}
+            rescheduleTargetTime={rescheduleTarget?.time ?? null}
+            rescheduleTargetDoctorId={rescheduleTarget?.doctorId ?? null}
             onSlotClick={handleSlotClick}
           />
           <ShiftOverview appointments={appointments} />
@@ -159,11 +190,16 @@ export const OperatorPage = () => {
         <Box w="320px" flex="none">
           {selected && selectedDoctor && selectedResource ? (
             <SlotCard
+              scheduleDate={schedule.date}
               time={selected.time}
               doctor={selectedDoctor}
               doctorResource={selectedResource}
               appointment={selectedAppointment}
               services={services}
+              patients={patients}
+              rescheduleTargetTime={rescheduleTarget?.time ?? null}
+              rescheduleTargetDoctorId={rescheduleTarget?.doctorId ?? null}
+              onSelectRescheduleTarget={handlePickRescheduleTarget}
               onBookingDone={handleBookingDone}
             />
           ) : (

@@ -248,6 +248,17 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(typeof first.price).toBe('number');
       expect(first.price).toBeGreaterThan(0);
     });
+
+    test('directories patients — массив >=2 и у каждого есть id/name/phone', async () => {
+      const res = await request(app).get('/patients');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(res.body.items.length).toBeGreaterThanOrEqual(2);
+      const first = res.body.items[0];
+      expect(typeof first.id).toBe('string');
+      expect(typeof first.name).toBe('string');
+      expect(typeof first.phone).toBe('string');
+    });
   });
 
   describe('PATCH /appointments/:id — протокол приёма', () => {
