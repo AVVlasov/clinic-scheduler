@@ -2,24 +2,34 @@
     "compilerOptions": {
         "lib": [
             "dom",
+            "dom.iterable",
             "es2017"
         ],
         "outDir": "./dist/",
         "sourceMap": true,
         "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
         "noImplicitAny": false,
         "module": "esnext",
-        "moduleResolution": "node",
-        "target": "es6",
-        "jsx": "react",
-        "typeRoots": ["node_modules/@types", "src/typings"],
-        "types" : ["webpack-env", "node"],
-        "resolveJsonModule": true
+        "moduleResolution": "bundler",
+        "target": "es2017",
+        "jsx": "react-jsx",
+        "typeRoots": ["node_modules/@types"],
+        "types" : ["node", "webpack-env"],
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+        "strict": false,
+        "isolatedModules": true,
+        "noEmit": true
     },
+    "include": [
+        "src",
+        "types.d.ts"
+    ],
     "exclude": [
         "node_modules",
+        "dist",
         "**/*.test.ts",
-        "**/*.test.tsx",
-        "node_modules/@types/jest"
-    ]        
+        "**/*.test.tsx"
+    ]
 }
