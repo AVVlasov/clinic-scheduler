@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 
-import { getAppointments, rescheduleAppointment } from '../../__data__/api'
-import type { Appointment, AppointmentStatus, PaymentType } from '../../__data__/types'
+import { getAppointments, getServices, rescheduleAppointment } from '../../__data__/api'
+import type { Appointment, AppointmentStatus, Service } from '../../__data__/types'
 
 import { QueueFilter, QueueTable } from './queue-table'
 import { VisitCard } from './visit-card'
-
-const SHIFT_CASH_LABEL = '284 700 ₽'
 
 const countByStatus = (items: Appointment[], status: AppointmentStatus): number =>
   items.reduce((acc, a) => (a.status === status ? acc + 1 : acc), 0)
@@ -17,8 +15,28 @@ const applyFilter = (items: Appointment[], filter: QueueFilter): Appointment[] =
   return items.filter((a) => a.status === filter)
 }
 
+const formatRub = (amount: number): string =>
+  `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`
+
+const buildPriceMap = (services: Service[]): Map<string, number> => {
+  const map = new Map<string, number>()
+  for (const s of services) map.set(s.id, s.price)
+  return map
+}
+
+const appointmentAmount = (a: Appointment, priceMap: Map<string, number>): number => {
+  const ids = a.performedServiceIds.length > 0 ? a.performedServiceIds : a.serviceId ? [a.serviceId] : []
+  let sum = 0
+  for (const id of ids) {
+    const price = priceMap.get(id)
+    if (typeof price === 'number') sum += price
+  }
+  return sum
+}
+
 export const RegistrarPage = () => {
   const [items, setItems] = useState<Appointment[]>([])
+  const [services, setServices] = useState<Service[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>('all')
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -26,11 +44,12 @@ export const RegistrarPage = () => {
 
   useEffect(() => {
     let cancelled = false
-    getAppointments()
-      .then((res) => {
+    Promise.all([getAppointments(), getServices()])
+      .then(([apptsRes, servicesRes]) => {
         if (cancelled) return
-        setItems(res.items)
-        if (res.items.length > 0) setSelectedId(res.items[0].id)
+        setItems(apptsRes.items)
+        setServices(servicesRes.items)
+        if (apptsRes.items.length > 0) setSelectedId(apptsRes.items[0].id)
         setLoadError(null)
       })
       .catch((err: unknown) => {
@@ -57,6 +76,8 @@ export const RegistrarPage = () => {
     }
   }, [])
 
+  const priceMap = useMemo(() => buildPriceMap(services), [services])
+
   const visibleItems = useMemo(() => applyFilter(items, filter), [items, filter])
   const selected = useMemo(
     () => items.find((a) => a.id === selectedId) ?? null,
@@ -69,8 +90,12 @@ export const RegistrarPage = () => {
   const completedCount = countByStatus(items, 'completed')
   const noShowCount = countByStatus(items, 'no_show')
 
-  const totals: Record<PaymentType, number> = { cash: 0, card: 0, insurance: 0 }
-  void totals
+  const shiftCash = useMemo(
+    () => items
+      .filter((a) => a.status === 'completed')
+      .reduce((acc, a) => acc + appointmentAmount(a, priceMap), 0),
+    [items, priceMap],
+  )
 
   return (
     <Stack h="100%" direction="column" gap="12px" p="12px" bg="surfaceLight">
@@ -106,7 +131,7 @@ export const RegistrarPage = () => {
           <Stack gap="0" align="flex-end">
             <Text fontSize="12px" color="textSecondary">Касса смены</Text>
             <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-cash">
-              {SHIFT_CASH_LABEL}
+              {formatRub(shiftCash)}
             </Text>
           </Stack>
           <Stack gap="0" align="flex-end">
@@ -145,6 +170,7 @@ export const RegistrarPage = () => {
         />
         <VisitCard
           visit={selected}
+          priceMap={priceMap}
           onMarkArrived={() => { if (selected) void updateStatus(selected.id, 'arrived') }}
           onMarkWaiting={() => { if (selected) void updateStatus(selected.id, 'scheduled') }}
           onMarkNoShow={() => { if (selected) void updateStatus(selected.id, 'no_show') }}
