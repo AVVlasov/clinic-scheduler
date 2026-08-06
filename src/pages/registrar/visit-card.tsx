@@ -5,6 +5,7 @@ import type { Appointment } from '../../__data__/types'
 
 export interface VisitCardProps {
   visit: Appointment | null
+  priceMap: Map<string, number>
   onMarkArrived: () => void
   onMarkWaiting: () => void
   onMarkNoShow: () => void
@@ -36,8 +37,25 @@ const paymentLabel = (p: Appointment['paymentType']): string => {
   }
 }
 
+const formatRub = (amount: number): string =>
+  `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`
+
+const visitAmount = (visit: Appointment, priceMap: Map<string, number>): number => {
+  const ids = visit.performedServiceIds.length > 0
+    ? visit.performedServiceIds
+    : visit.serviceId
+      ? [visit.serviceId]
+      : []
+  let sum = 0
+  for (const id of ids) {
+    const price = priceMap.get(id)
+    if (typeof price === 'number') sum += price
+  }
+  return sum
+}
+
 export const VisitCard = (props: VisitCardProps) => {
-  const { visit, onMarkArrived, onMarkWaiting, onMarkNoShow } = props
+  const { visit, priceMap, onMarkArrived, onMarkWaiting, onMarkNoShow } = props
 
   if (!visit) {
     return (
@@ -63,6 +81,9 @@ export const VisitCard = (props: VisitCardProps) => {
   const primaryAction =
     visit.status === 'arrived' ? onMarkWaiting : onMarkArrived
   const noShowDisabled = visit.status === 'no_show'
+
+  const amount = visitAmount(visit, priceMap)
+  const amountText = amount > 0 ? formatRub(amount) : '—'
 
   return (
     <Box
@@ -114,7 +135,9 @@ export const VisitCard = (props: VisitCardProps) => {
         </Flex>
         <Flex gap="10px" align="baseline">
           <Box w="104px" color="textSecondary" fontSize="12px">К оплате</Box>
-          <Box fontSize="13px" fontFamily="mono" fontWeight="700">—</Box>
+          <Box fontSize="13px" fontFamily="mono" fontWeight="700" data-testid="visit-amount">
+            {amountText}
+          </Box>
         </Flex>
       </Stack>
 

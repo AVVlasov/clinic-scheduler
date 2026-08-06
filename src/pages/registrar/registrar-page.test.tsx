@@ -17,16 +17,25 @@ vi.mock('../../__data__/api', () => ({
   },
 }))
 
-import { getAppointments, rescheduleAppointment } from '../../__data__/api'
+import { getAppointments, getServices, rescheduleAppointment } from '../../__data__/api'
 import { Provider } from '../../theme'
-import type { Appointment } from '../../__data__/types'
+import type { Appointment, Service } from '../../__data__/types'
 
 import { RegistrarPage } from './registrar-page'
 
 const renderPage = () => render(<Provider><RegistrarPage /></Provider>)
 
 const mockedGetAppointments = vi.mocked(getAppointments)
+const mockedGetServices = vi.mocked(getServices)
 const mockedRescheduleAppointment = vi.mocked(rescheduleAppointment)
+
+const baseServices: Service[] = [
+  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 },
+  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 },
+  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 },
+  { id: 's-007', name: 'Консультация по результатам', duration: 20, category: 'Приём', price: 1700 },
+]
 
 const makeAppointment = (overrides: Partial<Appointment>): Appointment => ({
   id: 'a-001',
@@ -39,6 +48,12 @@ const makeAppointment = (overrides: Partial<Appointment>): Appointment => ({
   serviceId: 's-001',
   doctorName: 'Иванова Е. С.',
   patientName: 'Алексеев Игорь',
+  complaints: null,
+  diagnosis: null,
+  visitType: null,
+  performedServiceIds: [],
+  recommendations: [],
+  nextVisit: null,
   ...overrides,
 })
 
@@ -62,11 +77,27 @@ const APPOINTMENTS: Appointment[] = [
     status: 'in_progress',
     paymentType: 'insurance',
   }),
+  makeAppointment({
+    id: 'a-004',
+    patientName: 'Дмитриева Анна',
+    doctorId: 'd-004',
+    doctorName: 'Кузнецов Д. О.',
+    start: '2026-08-06T14:00:00+03:00',
+    status: 'completed',
+    paymentType: 'card',
+    serviceId: 's-007',
+  }),
 ]
+
+const setupMocks = (appointments: Appointment[], services: Service[] = baseServices) => {
+  mockedGetAppointments.mockResolvedValue({ items: appointments })
+  mockedGetServices.mockResolvedValue({ items: services })
+}
 
 describe('RegistrarPage', () => {
   beforeEach(() => {
     mockedGetAppointments.mockReset()
+    mockedGetServices.mockReset()
     mockedRescheduleAppointment.mockReset()
   })
 
@@ -75,12 +106,13 @@ describe('RegistrarPage', () => {
   })
 
   it('загружает очередь из API и показывает строки с именами из данных', async () => {
-    mockedGetAppointments.mockResolvedValue({ items: APPOINTMENTS })
+    setupMocks(APPOINTMENTS)
 
     renderPage()
 
     await waitFor(() => {
       expect(mockedGetAppointments).toHaveBeenCalledTimes(1)
+      expect(mockedGetServices).toHaveBeenCalledTimes(1)
     })
 
     for (const a of APPOINTMENTS) {
@@ -93,7 +125,7 @@ describe('RegistrarPage', () => {
   })
 
   it('выбор строки меняет карточку визита', async () => {
-    mockedGetAppointments.mockResolvedValue({ items: APPOINTMENTS })
+    setupMocks(APPOINTMENTS)
 
     renderPage()
 
@@ -111,7 +143,7 @@ describe('RegistrarPage', () => {
   })
 
   it('«отметить приход» вызывает rescheduleAppointment и обновляет статус в UI', async () => {
-    mockedGetAppointments.mockResolvedValue({ items: APPOINTMENTS })
+    setupMocks(APPOINTMENTS)
     mockedRescheduleAppointment.mockImplementation(async (id, input) => {
       const original = APPOINTMENTS.find((a) => a.id === id)
       if (!original) throw new Error('not_found')
@@ -140,7 +172,7 @@ describe('RegistrarPage', () => {
   })
 
   it('фильтр по статусу сужает очередь', async () => {
-    mockedGetAppointments.mockResolvedValue({ items: APPOINTMENTS })
+    setupMocks(APPOINTMENTS)
 
     renderPage()
 
@@ -155,7 +187,7 @@ describe('RegistrarPage', () => {
   })
 
   it('не падает, когда API возвращает пустой список', async () => {
-    mockedGetAppointments.mockResolvedValue({ items: [] })
+    setupMocks([])
 
     renderPage()
 
@@ -165,16 +197,134 @@ describe('RegistrarPage', () => {
 
     expect(screen.getByTestId('counter-waiting')).toHaveTextContent('0')
     expect(screen.getByTestId('counter-arrived')).toHaveTextContent('0')
+    expect(screen.getByTestId('counter-cash')).toHaveTextContent('0 ₽')
     expect(screen.getByTestId('visit-card-empty')).toBeInTheDocument()
   })
 
   it('показывает сообщение об ошибке при сбое загрузки', async () => {
     mockedGetAppointments.mockRejectedValue(new Error('Сервер недоступен'))
+    mockedGetServices.mockResolvedValue({ items: baseServices })
 
     renderPage()
 
     await waitFor(() => {
       expect(screen.getByTestId('registrar-error')).toHaveTextContent('Сервер недоступен')
+    })
+  })
+
+  it('касса смены считается по выполненным визитам из справочника услуг', async () => {
+    setupMocks(APPOINTMENTS)
+
+    renderPage()
+
+    await screen.findByTestId('queue-row-a-004')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('counter-cash')).toHaveTextContent('1 700 ₽')
+    })
+  })
+
+  it('изменение набора записей в API меняет кассу смены', async () => {
+    const oneCompleted: Appointment[] = [
+      makeAppointment({
+        id: 'a-100',
+        patientName: 'Иванов Иван',
+        serviceId: 's-002',
+        status: 'completed',
+        paymentType: 'card',
+      }),
+    ]
+    setupMocks(oneCompleted)
+
+    const { unmount } = renderPage()
+    await screen.findByTestId('queue-row-a-100')
+    await waitFor(() => {
+      expect(screen.getByTestId('counter-cash')).toHaveTextContent('1 800 ₽')
+    })
+    unmount()
+
+    const extended: Appointment[] = [
+      ...oneCompleted,
+      makeAppointment({
+        id: 'a-101',
+        patientName: 'Петров Пётр',
+        serviceId: 's-003',
+        status: 'completed',
+        paymentType: 'cash',
+        start: '2026-08-06T15:00:00+03:00',
+      }),
+      makeAppointment({
+        id: 'a-102',
+        patientName: 'Сидоров Сидор',
+        serviceId: 's-001',
+        status: 'scheduled',
+        paymentType: 'cash',
+        start: '2026-08-06T16:00:00+03:00',
+      }),
+    ]
+    setupMocks(extended)
+
+    renderPage()
+    await screen.findByTestId('queue-row-a-101')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('counter-cash')).toHaveTextContent('3 000 ₽')
+    })
+  })
+
+  it('«К оплате» в карточке визита считается по справочнику услуг', async () => {
+    setupMocks(APPOINTMENTS)
+
+    renderPage()
+
+    await screen.findByTestId('queue-row-a-001')
+    const card = await screen.findByTestId('visit-card')
+
+    await waitFor(() => {
+      expect(within(card).getByTestId('visit-amount')).toHaveTextContent('2 500 ₽')
+    })
+  })
+
+  it('«К оплате» пересчитывается по performedServiceIds после приёма', async () => {
+    const withPerformed: Appointment[] = [
+      makeAppointment({
+        id: 'a-200',
+        patientName: 'Иванов Иван',
+        serviceId: 's-001',
+        status: 'completed',
+        performedServiceIds: ['s-001', 's-003'],
+      }),
+    ]
+    setupMocks(withPerformed)
+
+    renderPage()
+
+    await screen.findByTestId('queue-row-a-200')
+    const card = await screen.findByTestId('visit-card')
+
+    await waitFor(() => {
+      expect(within(card).getByTestId('visit-amount')).toHaveTextContent('3 700 ₽')
+    })
+  })
+
+  it('показывает «—» когда у визита нет услуги', async () => {
+    const noService: Appointment[] = [
+      makeAppointment({
+        id: 'a-300',
+        patientName: 'Без имени',
+        serviceId: null,
+        status: 'arrived',
+      }),
+    ]
+    setupMocks(noService)
+
+    renderPage()
+
+    await screen.findByTestId('queue-row-a-300')
+    const card = await screen.findByTestId('visit-card')
+
+    await waitFor(() => {
+      expect(within(card).getByTestId('visit-amount')).toHaveTextContent('—')
     })
   })
 })
