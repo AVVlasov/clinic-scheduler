@@ -51,5 +51,25 @@
   ],
   "TASK-13": [
     "npx --no-install vitest run src/pages/registrar"
+  ],
+
+  "_findings2_comment": "TASK-14..19 — второй круг приёмки (прогон g_20260806-195014): восемь семантических конфликтов, четыре P1, и два нечестных теста. Все задачи прошлого круга при этом были закрыты по гейтам.",
+  "TASK-14": [
+    "npx --no-install vitest run stubs/api/schedule.test.js"
+  ],
+  "TASK-15": [
+    "npx --no-install vitest run stubs/api/appointments.test.js"
+  ],
+  "TASK-16": [
+    "npx --no-install vitest run src/pages/doctor"
+  ],
+  "TASK-17": [
+    "npx --no-install vitest run src/pages/operator"
+  ],
+  "TASK-18": [
+    "npx --no-install vitest run src/pages/registrar"
+  ],
+  "TASK-19": [
+    "npx --no-install vitest run src/pages/admin"
   ]
 }
