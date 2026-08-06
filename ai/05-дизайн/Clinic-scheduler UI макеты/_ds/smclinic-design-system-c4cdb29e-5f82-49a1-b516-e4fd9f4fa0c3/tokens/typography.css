@@ -1,0 +1,31 @@
+/* smclinic — типографика. Golos Text на интерфейс: кириллица родная, цифры табличные, крупная высота строчных
+   держит 13px в плотной сетке. JetBrains Mono только идентификаторы. Ниже 11px не опускаться. Вес 300 не используется. */
+:root{
+  --font-sans:"Golos Text","Open Sans","Segoe UI",Arial,sans-serif;
+  --font-mono:"JetBrains Mono","Cascadia Mono",Consolas,monospace;
+  --font-ui:var(--font-sans);
+  --font-id:var(--font-mono);
+
+  --weight-regular:400;
+  --weight-medium:500;   /* выделение внутри плотных зон, где 700 слишком громко */
+  --weight-strong:600;   /* кнопки, вкладки, заголовки панелей */
+  --weight-bold:700;     /* заголовки экрана и раздела */
+
+  --size-screen-title:24px;   --lh-screen-title:32px;
+  --size-section-title:18px;  --lh-section-title:24px;
+  --size-subhead:16px;        --lh-subhead:22px;
+  --size-body:14px;           --lh-body:20px;
+  --size-dense:13px;          --lh-dense:18px;
+  --size-caption:12px;        --lh-caption:16px;
+  --size-micro:11px;          --lh-micro:14px;
+
+  /* Трекинг: крупное сжимается, мелкое остаётся как нарисовано */
+  --tracking-title:-0.018em;
+  --tracking-subhead:-0.011em;
+  --tracking-ui:-0.006em;
+  --tracking-micro:0;
+  --tracking-caps:0.04em;
+
+  /* Порог, за которым белый текст на брендовой заливке допустим без проверки */
+  --size-on-fill-min:18px;
+}

@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/colors.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/typography.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/shape.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/motion.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/base.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/components.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/print.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/styles.css">
+<script src="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/_ds_bundle.js"></script>
+<style>
+html,body{height:100%}
+body{margin:0;background:var(--n-100);overflow:hidden}
+a{color:var(--text-link);text-decoration:none}
+a:hover{color:var(--text-link-hover)}
+</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;height:100vh;min-height:0;background:var(--n-100)">
+
+<header style="height:var(--topbar-h);flex:none;display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-4)">
+<div style="width:calc(var(--sidebar-w) - var(--space-4));flex:none;display:flex;align-items:baseline;gap:8px">
+<span style="font-size:16px;font-weight:700;letter-spacing:-0.022em;color:var(--brand-green-700);white-space:nowrap">СМ-Клиника</span>
+<span style="font-size:12px;color:var(--text-meta);white-space:nowrap">АРМ администратора</span>
+</div>
+<span class="sm-chip" style="gap:6px;padding-left:10px;cursor:default">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="building-2" size="14" hint-size="14px,14px"></x-import>Динамо · 14 августа
+</span>
+<div class="sm-search--pill" style="flex:1;max-width:400px;margin-inline:auto">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.SearchInput" compact="{{ true }}" placeholder="Врач, услуга, аппарат" shortcut="/" hint-size="100%,28px"></x-import>
+</div>
+<div class="sm-seg" style="flex:none">
+<a class="sm-seg__item" href="ARM-operator.dc.html" style="text-decoration:none">Оператор</a>
+<a class="sm-seg__item" href="ARM-doctor.dc.html" style="text-decoration:none">Врач</a>
+<a class="sm-seg__item" href="ARM-registrar.dc.html" style="text-decoration:none">Регистратор</a>
+<a class="sm-seg__item" aria-selected="true" href="ARM-admin.dc.html" style="text-decoration:none">Администратор</a>
+</div>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.IconButton" icon="bell" label="Уведомления" hint-size="28px,28px"></x-import>
+<button type="button" class="sm-chip" style="gap:8px;padding-left:4px">
+<span style="width:24px;height:24px;border-radius:50%;background:var(--brand-green-tint);color:var(--brand-green-700);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500">ВГ</span>
+Вершинина Г. А.
+</button>
+</header>
+
+<div style="display:flex;flex:1;min-height:0">
+
+<nav style="width:var(--sidebar-w);flex:none;display:flex;flex-direction:column;gap:var(--space-4);padding:0 var(--space-3) var(--space-3) var(--space-4);overflow:auto">
+<div style="display:flex;flex-direction:column;gap:1px">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="6">
+<button type="button" class="sm-navitem" aria-current="{{ n.current }}" onClick="{{ n.go }}">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="{{ n.icon }}" size="15" hint-size="15px,15px"></x-import>
+{{ n.label }}<span class="sm-navitem__count">{{ n.count }}</span>
+</button>
+</sc-for>
+</div>
+<div style="background:var(--surface-card);border-radius:var(--radius-md);box-shadow:var(--elev-1);padding:10px 12px;display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--text-meta)">
+<div style="display:flex;justify-content:space-between;gap:8px"><span>Врачей на площадке</span><span class="sm-ident sm-ident--strong">118</span></div>
+<div style="display:flex;justify-content:space-between;gap:8px"><span>Открыто расписание до</span><span class="sm-ident sm-ident--strong">31.08</span></div>
+<div style="display:flex;justify-content:space-between;gap:8px"><span>Незаполненных карточек</span><span class="sm-ident sm-ident--strong">27</span></div>
+</div>
+<div style="margin-top:auto;padding:0 var(--space-3);font-size:12px;color:var(--text-meta);line-height:16px">Демонстрационные данные.<br>14 августа 2026</div>
+</nav>
+
+<main style="flex:1;min-width:0;display:flex;gap:var(--space-3);padding:0 var(--space-3) var(--space-3) 0">
+
+<sc-if value="{{ isTpl }}" hint-placeholder-val="{{ true }}">
+<section class="sm-surface" data-screen-label="Шаблоны приёма" style="flex:1;min-width:0">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle);flex-wrap:wrap">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Шаблоны приёма на неделю</h1>
+<span style="font-size:12px;color:var(--text-meta)">17 – 22 августа · применяется к сетке при публикации</span>
+<span style="flex:1"></span>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--secondary" onClick="{{ openBlock }}">Блокировка расписания</button>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--primary" onClick="{{ publish }}">Опубликовать неделю</button>
+</div>
+<sc-if value="{{ published }}" hint-placeholder-val="{{ false }}">
+<div style="flex:none;padding:var(--space-3) var(--space-4) 0">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="success" title="Неделя опубликована" hint-size="100%,56px">Нарезано 1 842 слота на 6 врачей и 5 единиц оборудования. Модель чтения обновится за 5 секунд.</x-import>
+</div>
+</sc-if>
+<div style="flex:1;overflow:auto;padding:var(--space-4)">
+<div style="display:flex;gap:var(--space-2);align-items:flex-end;padding-bottom:8px">
+<div style="width:220px;flex:none;font-size:11px;color:var(--text-meta)">Врач</div>
+<sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="6">
+<div style="flex:1 1 0;min-width:118px;display:flex;flex-direction:column;gap:1px">
+<span style="font-size:13px;line-height:17px;font-weight:500">{{ d.day }}</span>
+<span style="font-size:11px;line-height:14px;color:var(--n-500)">{{ d.date }}</span>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ tplRows }}" as="r" hint-placeholder-count="6">
+<div style="display:flex;gap:var(--space-2);align-items:stretch">
+<div style="width:220px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:1px;padding-right:8px;min-width:0">
+<span style="font-size:13px;line-height:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+<span style="font-size:11px;line-height:14px;color:var(--n-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</span>
+</div>
+<sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+<button type="button" onClick="{{ c.go }}" style="flex:1 1 0;min-width:118px;position:relative;height:52px;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 9px 0 11px;border:0;border-radius:var(--radius-sm);cursor:pointer;text-align:left;font-family:var(--font-sans);overflow:hidden;background:{{ c.bg }};background-image:{{ c.hatch }};box-shadow:inset 0 0 0 1px var(--border-light)">
+<span style="position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:0 2px 2px 0;background:{{ c.bar }}"></span>
+<span style="font-size:12px;line-height:15px;color:{{ c.ink }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.label }}</span>
+<span style="font-size:11px;line-height:14px;color:var(--text-meta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.sub }}</span>
+</button>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isDoc }}" hint-placeholder-val="{{ false }}">
+<section class="sm-surface" data-screen-label="Справочник врачей" style="width:320px;flex:none">
+<div style="flex:none;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:8px">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Справочник врачей</h1>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.SearchInput" compact="{{ true }}" placeholder="Фамилия или специальность" hint-size="100%,28px"></x-import>
+</div>
+<div style="flex:1;overflow:auto;padding:var(--space-2)">
+<sc-for list="{{ docList }}" as="d" hint-placeholder-count="6">
+<button type="button" onClick="{{ d.go }}" style="width:100%;display:flex;flex-direction:column;gap:3px;align-items:flex-start;padding:9px 10px;margin-bottom:2px;border:0;border-radius:var(--radius-sm);text-align:left;cursor:pointer;font-family:var(--font-sans);background:{{ d.bg }};box-shadow:{{ d.ring }}">
+<span style="font-size:13px;font-weight:500;letter-spacing:-0.006em">{{ d.name }}</span>
+<span style="font-size:12px;color:var(--text-meta)">{{ d.spec }}</span>
+</button>
+</sc-for>
+</div>
+</section>
+<section class="sm-surface" data-screen-label="Карточка врача" style="flex:1;min-width:0;overflow:auto">
+<div style="flex:none;padding:var(--space-4);border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+<h2 style="font-size:24px;line-height:32px;letter-spacing:-0.018em">{{ doc.name }}</h2>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.SpecialtyTag" specialty="{{ doc.tag }}" hint-size="auto,20px"></x-import>
+<span style="flex:1"></span>
+<span class="sm-ident">{{ doc.code }}</span>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--secondary">История изменений</button>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--primary">Сохранить</button>
+</div>
+<div style="padding:var(--space-4);display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:var(--space-6);align-items:start">
+<div class="sm-fieldgroup">
+<div class="sm-field">
+<span class="sm-field__label">Специальности</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ doc.specialties }}" as="s" hint-placeholder-count="3">
+<button type="button" class="sm-chip" aria-pressed="true">{{ s }}</button>
+</sc-for>
+<button type="button" class="sm-chip">+ добавить</button>
+</div>
+</div>
+<div class="sm-fieldrow">
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="d1">Основная площадка</label><input class="sm-input" id="d1" value="{{ doc.site }}"></div>
+<div class="sm-field" style="width:170px;flex:none"><label class="sm-field__label" for="d2">Кабинет</label><input class="sm-input" id="d2" value="{{ doc.room }}"></div>
+</div>
+<div class="sm-field"><label class="sm-field__label" for="d3">Временные площадки</label><input class="sm-input" id="d3" value="{{ doc.temp }}">
+<span class="sm-field__hint">Период действия учитывается при подборе слота.</span></div>
+<div class="sm-fieldrow">
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="d4">Возраст пациента</label><input class="sm-input" id="d4" value="{{ doc.age }}"></div>
+<div class="sm-field" style="width:190px;flex:none"><label class="sm-field__label" for="d5">Лимит льготных на смену</label><input class="sm-input sm-input--mono" id="d5" value="{{ doc.limit }}"></div>
+</div>
+<div class="sm-field">
+<span class="sm-field__label">Правила приёма</span>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ doc.rules }}" as="r" hint-placeholder-count="4">
+<label class="sm-check"><input type="checkbox" checked="{{ r.on }}" onChange="{{ r.go }}"><span class="sm-check__box">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="check" size="12" hint-size="12px,12px"></x-import></span>
+<span class="sm-check__text" style="font-size:13px">{{ r.label }}</span></label>
+</sc-for>
+</div>
+</div>
+</div>
+<div class="sm-fieldgroup">
+<div class="sm-field">
+<span class="sm-field__label">Допуски к оборудованию</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ doc.equipment }}" as="e" hint-placeholder-count="3">
+<button type="button" class="sm-chip" aria-pressed="{{ e.on }}" onClick="{{ e.go }}">{{ e.label }}</button>
+</sc-for>
+</div>
+</div>
+<div class="sm-field"><label class="sm-field__label" for="d6">Работа в паре</label><input class="sm-input" id="d6" value="{{ doc.pair }}"></div>
+<div class="sm-field">
+<span class="sm-field__label">Доступность услуг во времени</span>
+<table class="sm-table sm-table--compact" style="box-shadow:var(--ring-1);border-radius:var(--radius-sm);overflow:hidden">
+<thead><tr><th>Услуга или ресурс</th><th style="width:150px">Когда доступно</th></tr></thead>
+<tbody>
+<sc-for list="{{ doc.windows }}" as="w" hint-placeholder-count="3">
+<tr><td>{{ w.what }}</td><td style="color:var(--text-meta)">{{ w.when }}</td></tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<div class="sm-field"><label class="sm-field__label" for="d7">Теги специализации</label>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ doc.tags }}" as="t" hint-placeholder-count="2">
+<button type="button" class="sm-chip" aria-pressed="true">{{ t }}</button>
+</sc-for>
+</div>
+</div>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="attention" title="Было в поле «Дополнительная информация»" hint-size="100%,88px">{{ doc.legacy }}</x-import>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isEq }}" hint-placeholder-val="{{ false }}">
+<section class="sm-surface" data-screen-label="Оборудование и кабинеты" style="flex:1;min-width:0">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);flex-wrap:wrap">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Оборудование и кабинеты</h1>
+<span style="font-size:12px;color:var(--text-meta)">Пятница, 14 августа · отдельное представление по аппаратам</span>
+<span style="flex:1"></span>
+<div class="sm-seg">
+<sc-for list="{{ eqViews }}" as="v" hint-placeholder-count="2">
+<button type="button" class="sm-seg__item" aria-selected="{{ v.on }}" onClick="{{ v.go }}">{{ v.label }}</button>
+</sc-for>
+</div>
+</div>
+<sc-if value="{{ isEqDay }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;overflow:auto;padding:0 var(--space-4) var(--space-4);border-top:1px solid var(--border-subtle)">
+<div style="display:flex;gap:6px;padding:var(--space-3) 0;position:sticky;top:0;background:var(--surface-card);z-index:3">
+<sc-for list="{{ rooms }}" as="r" hint-placeholder-count="4">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.FilterChip" active="{{ r.on }}" count="{{ r.count }}" on-click="{{ r.go }}" hint-size="auto,26px">{{ r.label }}</x-import>
+</sc-for>
+</div>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.ScheduleGrid" times="{{ times }}" columns="{{ eqColumns }}" selected="{{ eqSel }}" now="11:20" on-slot-click="{{ onEqSlot }}" col-width="200" hint-size="100%,520px"></x-import>
+</div>
+</sc-if>
+<sc-if value="{{ isEqList }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow:auto;border-top:1px solid var(--border-subtle)">
+<table class="sm-table">
+<thead><tr><th>Аппарат</th><th style="width:120px">Тип</th><th style="width:90px">Кабинет</th><th style="width:130px">График</th><th style="width:180px">Техперерыв</th><th style="width:230px">Зависимости</th><th style="width:140px">Плановый ремонт</th></tr></thead>
+<tbody>
+<sc-for list="{{ equipment }}" as="e" hint-placeholder-count="7">
+<tr>
+<td><div style="font-weight:500">{{ e.name }}</div><div style="font-size:11px;color:var(--text-meta)"><span class="sm-ident">{{ e.code }}</span></div></td>
+<td style="color:var(--text-meta)">{{ e.type }}</td>
+<td><span class="sm-ident">{{ e.room }}</span></td>
+<td><span class="sm-ident">{{ e.hours }}</span></td>
+<td style="color:var(--text-meta)">{{ e.pause }}</td>
+<td><sc-if value="{{ e.hasDep }}" hint-placeholder-val="{{ false }}">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.StatusBadge" tone="attention" hint-size="auto,20px">{{ e.dep }}</x-import>
+</sc-if></td>
+<td style="color:var(--text-meta)">{{ e.repair }}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+<div style="padding:var(--space-4)">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="attention" title="Зависимость внутри кабинета 302" hint-size="100%,72px">Лазер Fotona и криолиполиз Zeltiq стоят в одном кабинете, но оператор один. Занятие лазера делает криолиполиз недоступным, хотя формально аппарат свободен.</x-import>
+</div>
+</div>
+</sc-if>
+</section>
+</sc-if>
+
+<sc-if value="{{ isMx }}" hint-placeholder-val="{{ false }}">
+<section class="sm-surface" data-screen-label="Матрица компетенций" style="flex:1;min-width:0">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle);flex-wrap:wrap">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Матрица компетенций</h1>
+<span style="font-size:12px;color:var(--text-meta)">Врач × услуга × допуск к аппарату</span>
+<span style="flex:1"></span>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--secondary">Шаблон по специальности</button>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--secondary">Выгрузить</button>
+</div>
+<div style="flex:1;overflow:auto;padding:var(--space-4)">
+<table class="sm-table" style="width:auto;min-width:100%">
+<thead>
+<tr>
+<th style="min-width:200px">Врач</th>
+<sc-for list="{{ mxCols }}" as="c" hint-placeholder-count="7">
+<th style="width:56px;height:132px;vertical-align:bottom;padding-bottom:10px"><span style="display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-size:11px">{{ c }}</span></th>
+</sc-for>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{ mxRows }}" as="r" hint-placeholder-count="6">
+<tr>
+<td style="font-weight:500;white-space:nowrap">{{ r.name }}<div style="font-size:11px;color:var(--text-meta);font-weight:400">{{ r.spec }}</div></td>
+<sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="7">
+<td style="text-align:center;padding:0"><button type="button" onClick="{{ c.go }}" title="{{ c.title }}" style="width:100%;height:36px;border:0;cursor:pointer;font-family:var(--font-sans);font-size:13px;background:{{ c.bg }};color:{{ c.ink }}">{{ c.mark }}</button></td>
+</sc-for>
+</tr>
+</sc-for>
+</tbody>
+</table>
+<div style="display:flex;gap:18px;flex-wrap:wrap;padding-top:14px;font-size:12px;color:var(--text-meta)">
+<span>✓ — выполняет</span><span>! — выполняет с ограничением</span><span>· — не выполняет</span><span>Клик по ячейке меняет значение</span>
+</div>
+<div style="padding-top:var(--space-4);max-width:760px">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="info" title="{{ mxNoteTitle }}" hint-size="100%,72px">{{ mxNote }}</x-import>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isDur }}" hint-placeholder-val="{{ false }}">
+<section class="sm-surface" data-screen-label="Правила длительности" style="flex:1;min-width:0;overflow:auto">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle);flex-wrap:wrap">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Правила длительности</h1>
+<span style="font-size:12px;color:var(--text-meta)">Модификаторы применяются по приоритету, сверху вниз</span>
+<span style="flex:1"></span>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--primary">Добавить правило</button>
+</div>
+<div style="padding:var(--space-4);display:grid;grid-template-columns:minmax(520px,1.4fr) minmax(340px,1fr);gap:var(--space-4);align-items:start">
+<table class="sm-table" style="box-shadow:var(--ring-1);border-radius:var(--radius-md);overflow:hidden">
+<thead><tr><th style="width:64px" class="sm-num">Приоритет</th><th style="width:180px">Условие</th><th>Фактор</th><th style="width:120px" class="sm-num">Эффект</th><th style="width:80px"></th></tr></thead>
+<tbody>
+<sc-for list="{{ durRules }}" as="r" hint-placeholder-count="7">
+<tr aria-selected="{{ r.on }}">
+<td class="sm-num">{{ r.prio }}</td>
+<td style="color:var(--text-meta)">{{ r.cond }}</td>
+<td>{{ r.factor }}</td>
+<td class="sm-num">{{ r.effect }}</td>
+<td><label class="sm-check"><input type="checkbox" checked="{{ r.enabled }}" onChange="{{ r.go }}"><span class="sm-check__box">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="check" size="12" hint-size="12px,12px"></x-import></span></label></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+<div style="display:flex;flex-direction:column;gap:var(--space-3)">
+<section class="sm-panel">
+<header class="sm-panel__head"><h2 class="sm-panel__title">Проверка расчёта</h2></header>
+<div class="sm-panel__body" style="display:flex;flex-direction:column;gap:var(--space-3)">
+<div class="sm-field">
+<label class="sm-field__label" for="dsrv">Услуга</label>
+<span class="sm-select"><select id="dsrv"><option>Сложное удаление третьего моляра</option><option>Консультация имплантолога</option></select>
+<span class="sm-select__chev"><x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="chevron-down" size="14" hint-size="14px,14px"></x-import></span></span>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ durPreview }}" as="p" hint-placeholder-count="5">
+<div style="display:flex;align-items:baseline;gap:10px;font-size:13px">
+<span style="flex:1;color:{{ p.ink }}">{{ p.label }}</span>
+<span class="sm-ident sm-ident--strong">{{ p.value }}</span>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;align-items:baseline;gap:10px;padding-top:10px;border-top:1px solid var(--border-subtle)">
+<span style="flex:1;font-size:13px;font-weight:600">Итоговая длительность</span>
+<span style="font-size:20px;font-weight:600;font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-0.02em">{{ durTotal }}</span>
+</div>
+</div>
+</section>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="attention" title="Ядро расчёта вызывается на каждом подборе" hint-size="100%,88px">До 200 обращений в секунду. Предвычислить нельзя: часть факторов зависит от пациента, который ещё не выбран. Отключение правила меняет нарезку слотов у всех врачей площадки.</x-import>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isNotif }}" hint-placeholder-val="{{ false }}">
+<section class="sm-surface" data-screen-label="Уведомления и каскад" style="flex:1;min-width:0;overflow:auto">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle)">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Уведомления и каскад</h1>
+<span style="font-size:12px;color:var(--text-meta)">Триггеры событий записи · push → WhatsApp → SMS → голосовой робот</span>
+</div>
+<div style="padding:var(--space-4);display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:var(--space-4);align-items:start">
+<section class="sm-panel" style="min-width:0">
+<header class="sm-panel__head"><h2 class="sm-panel__title">Триггеры</h2><span style="font-size:12px;color:var(--text-meta)">{{ trigOn }} из 8 включено</span></header>
+<table class="sm-table sm-table--compact">
+<thead><tr><th>Событие</th><th style="width:170px">Канал</th><th style="width:72px">Вкл.</th></tr></thead>
+<tbody>
+<sc-for list="{{ triggers }}" as="t" hint-placeholder-count="8">
+<tr>
+<td><div>{{ t.event }}</div><div style="font-size:11px;color:var(--text-meta)">{{ t.template }}</div></td>
+<td style="color:var(--text-meta)">{{ t.channel }}</td>
+<td><label class="sm-check"><input type="checkbox" checked="{{ t.on }}" onChange="{{ t.go }}"><span class="sm-check__box">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="check" size="12" hint-size="12px,12px"></x-import></span></label></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</section>
+<div style="display:flex;flex-direction:column;gap:var(--space-4);min-width:0">
+<section class="sm-panel">
+<header class="sm-panel__head"><h2 class="sm-panel__title">Каскад доставки</h2></header>
+<div class="sm-panel__body" style="display:flex;flex-direction:column;gap:0">
+<sc-for list="{{ cascade }}" as="c" hint-placeholder-count="4">
+<div style="display:flex;gap:14px;padding:11px 0;border-bottom:1px solid var(--border-subtle)">
+<span style="flex:none;width:26px;height:26px;border-radius:50%;background:var(--green-100);color:var(--green-700);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:600">{{ c.n }}</span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+<span style="font-size:13px;font-weight:500">{{ c.name }}</span>
+<span style="font-size:12px;color:var(--text-meta)">{{ c.rule }}</span>
+</span>
+<span class="sm-ident">{{ c.share }}</span>
+</div>
+</sc-for>
+</div>
+</section>
+<section class="sm-panel">
+<header class="sm-panel__head"><h2 class="sm-panel__title">Предпросмотр шаблона</h2><span style="font-size:12px;color:var(--text-meta)">Напоминание за сутки · SMS</span></header>
+<div class="sm-panel__body">
+<div style="background:var(--n-25);border-radius:var(--radius-md);box-shadow:var(--ring-1);padding:12px 14px;font-size:13px;line-height:20px">{{ preview }}</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:12px">
+<sc-for list="{{ vars }}" as="v" hint-placeholder-count="5">
+<span class="sm-chip sm-chip--sm" style="cursor:default;font-family:var(--font-mono)">{{ v }}</span>
+</sc-for>
+</div>
+</div>
+</section>
+</div>
+</div>
+</section>
+</sc-if>
+
+</main>
+</div>
+</div>
+
+<sc-if value="{{ blockOpen }}" hint-placeholder-val="{{ false }}">
+<div class="sm-scrim" style="position:fixed" onMouseDown="{{ closeBlock }}">
+<div class="sm-modal" role="dialog" aria-modal="true" onMouseDown="{{ stop }}">
+<div class="sm-modal__head">
+<h2 class="sm-modal__title">Блокировка расписания</h2>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.IconButton" icon="x" label="Закрыть" on-click="{{ closeBlock }}" hint-size="28px,28px"></x-import>
+</div>
+<div class="sm-modal__body">
+<div class="sm-fieldgroup">
+<div class="sm-field">
+<span class="sm-field__label">Ресурс</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ blockTargets }}" as="b" hint-placeholder-count="4">
+<button type="button" class="sm-chip" aria-pressed="{{ b.on }}" onClick="{{ b.go }}">{{ b.label }}</button>
+</sc-for>
+</div>
+</div>
+<div class="sm-fieldrow">
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="b1">С</label><input class="sm-input sm-input--mono" id="b1" value="17.08.2026 09:00"></div>
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="b2">По</label><input class="sm-input sm-input--mono" id="b2" value="19.08.2026 21:00"></div>
+</div>
+<div class="sm-field">
+<span class="sm-field__label">Причина</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ blockReasons }}" as="r" hint-placeholder-count="5">
+<button type="button" class="sm-chip" aria-pressed="{{ r.on }}" onClick="{{ r.go }}">{{ r.label }}</button>
+</sc-for>
+</div>
+</div>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="danger" title="{{ blockWarnTitle }}" hint-size="100%,72px">{{ blockWarn }}</x-import>
+</div>
+</div>
+<div class="sm-modal__foot sm-modal__foot--split">
+<span style="font-size:12px;color:var(--text-meta)">Записи не удаляются: они уходят в снос расписания к оператору</span>
+<div style="display:flex;gap:8px">
+<button type="button" class="sm-btn sm-btn--secondary" onClick="{{ closeBlock }}">Отмена</button>
+<button type="button" class="sm-btn sm-btn--attention" onClick="{{ closeBlock }}">Заблокировать</button>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const TIMES = (() => { const a = []; for (let m = 9 * 60; m <= 17 * 60; m += 15) a.push(String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')); return a; })();
+
+function track(spec) {
+  const a = TIMES.map(() => ({ state: 'free' }));
+  spec.forEach(s => {
+    const i = TIMES.indexOf(s[0]);
+    if (i < 0) return;
+    const len = s[3] || 1;
+    for (let k = 0; k < len; k++) a[i + k] = { state: s[1], patient: k === 0 ? s[2] : '', meta: k === 0 ? (s[4] || '') : '' };
+  });
+  return a;
+}
+
+const EQUIPMENT = [
+  { id: 'mri', name: 'МРТ Toshiba Vantage', code: 'EQ.MRI.02', type: 'МРТ', room: 'каб. 204', hours: '08:00–21:00', pause: '15 мин каждые 4 исследования', dep: '', repair: '12.09 – 14.09',
+    slots: track([['09:00','booked','Ерёмина Н. В.',3],['09:45','break','Техперерыв'],['10:00','booked','Латышев О. К.',3],['10:45','break','Техперерыв'],['11:00','booked','Пряхин В. С.',4],['12:00','booked','Ким В. С.',3],['13:00','break','Техперерыв',2],['13:30','booked','Гурьев П. А.',4],['14:30','booked','Шилова Е. П.',3],['15:30','booked','Сотников К. Д.',4]]) },
+  { id: 'ct', name: 'КТ Philips Incisive', code: 'EQ.CT.01', type: 'КТ', room: 'каб. 205', hours: '08:00–20:00', pause: '10 мин каждые 6 исследований', dep: '', repair: '—',
+    slots: track([['09:00','booked','Титова Р. А.',2],['09:30','booked','Смолин А. Р.',2],['10:30','booked','Мамедова Л. Т.',2],['11:00','booked','Байдаков С. Р.',2],['12:00','break','Техперерыв'],['13:00','blocked','Ремонт',8],['15:00','booked','Устинова Г. А.',2]]) },
+  { id: 'usg', name: 'УЗИ Mindray Resona', code: 'EQ.USG.04', type: 'УЗИ', room: 'каб. 118', hours: 'по графику врача', pause: '—', dep: '', repair: '—',
+    slots: track([['09:00','booked','Ерёмина Н. В.'],['09:15','booked','Сотников К. Д.'],['09:30','first','Ханина Р. Б.'],['10:00','booked','Лапина О. И.'],['10:15','booked','Дорохов А. М.'],['11:00','booked','Устинова Г. А.'],['11:30','booked','Ким В. С.'],['12:30','break','Обед',2],['13:30','booked','Байдаков С. Р.'],['14:00','booked','Пряхин В. С.'],['14:30','booked','Мамедова Л. Т.'],['15:00','booked','Гурьев П. А.'],['16:00','absent','Вызов на дом',4]]) },
+  { id: 'laser', name: 'Лазер Fotona SP', code: 'EQ.LSR.01', type: 'Косметология', room: 'каб. 302', hours: '10:00–19:00', pause: '20 мин охлаждение', dep: 'блокирует криолиполиз', repair: '—',
+    slots: track([['10:00','booked','Лапина О. И.',3],['11:00','break','Охлаждение',2],['11:30','first','Ким В. С.',3],['13:00','break','Обед',4],['14:00','booked','Шилова Е. П.',3],['15:00','break','Охлаждение',2],['15:30','booked','Сотникова А. В.',2]]) },
+  { id: 'cryo', name: 'Криолиполиз Zeltiq', code: 'EQ.CRY.01', type: 'Косметология', room: 'каб. 302', hours: '10:00–19:00', pause: '—', dep: 'блокируется лазером', repair: '—',
+    slots: track([['10:00','blocked','Занят лазер',6],['11:30','blocked','Занят лазер',6],['13:00','break','Обед',4],['14:00','blocked','Занят лазер',6],['15:30','blocked','Занят лазер',4],['16:30','booked','Устинова Г. А.',2]]) },
+  { id: 'micro', name: 'Микроскоп Zeiss Extaro', code: 'EQ.MIC.03', type: 'Стоматология', room: 'каб. 411', hours: 'по графику врача', pause: '—', dep: '', repair: '—',
+    slots: track([['09:00','booked','Смолин А. Р.',4],['11:00','booked','Байдаков С. Р.',6],['13:00','break','Обед',4],['14:00','booked','Орлова Н. С.',2],['16:00','booked','Гусев П. Н.',6]]) },
+  { id: 'anes', name: 'Наркозная стойка №3', code: 'EQ.ANS.03', type: 'Анестезия', room: 'каб. 411', hours: 'по графику анестезиолога', pause: '30 мин обработка', dep: 'требует анестезиолога', repair: '—',
+    slots: track([['11:00','booked','Байдаков С. Р.',6],['12:30','break','Обработка',2],['13:00','break','Обед',4],['15:00','blocked','Разбор стойки',8]]) }
+];
+
+const ROOMS = [['all', 'Все кабинеты'], ['204', 'каб. 204'], ['205', 'каб. 205'], ['118', 'каб. 118'], ['302', 'каб. 302'], ['411', 'каб. 411']];
+
+const DOCTORS = [
+  { id: 'nech', name: 'Нечаев Б. Л.', spec: 'Стоматолог-хирург, имплантолог', tag: 'dental', code: 'DOC.11482', site: 'Динамо', room: '411',
+    specialties: ['Стоматолог-хирург', 'Имплантолог'], temp: 'Курская (01.09.2026 – 31.10.2026)', age: 'от 18 до 99 лет', limit: '5',
+    equipment: ['Микроскоп Zeiss Extaro', 'Наркозная стойка №3', 'Седация'],
+    pair: 'требуется анестезиолог для услуг с седацией и наркозом',
+    windows: [{ what: 'Наркозная стойка №3', when: 'вт, чт' }, { what: 'Приём по ДМС', when: 'до 14:00' }, { what: 'Имплантация, этап 1', when: 'пн, ср, пт' }],
+    tags: ['ретинированные зубы', 'костная пластика'],
+    legacy: '«только сложные удаления, детей не берёт, по ДМС до 14:00, наркоз только по вторникам и четвергам, перед имплантацией обязательна консультация» — пять правил одним текстом, которые оператор должен был прочитать и не ошибиться.' },
+  { id: 'kov', name: 'Ковалёва И. С.', spec: 'Терапевт', tag: 'homecare', code: 'DOC.10394', site: 'Динамо', room: '112',
+    specialties: ['Терапевт'], temp: '—', age: 'от 18 до 99 лет', limit: '8',
+    equipment: ['Выезд на дом'], pair: 'не требуется',
+    windows: [{ what: 'Вызов на дом', when: 'интервал 13:00 – 15:00' }, { what: 'Приём по ДМС', when: 'весь день' }],
+    tags: ['больничный лист', 'диспансеризация'],
+    legacy: '«ВНД по вторникам и четвергам после обеда, больничные выдаёт, по ДМС весь день»' },
+  { id: 'yar', name: 'Ярцева Д. А.', spec: 'Анестезиолог', tag: 'surgery', code: 'DOC.12007', site: 'Динамо', room: '411',
+    specialties: ['Анестезиолог'], temp: '—', age: 'от 14 до 99 лет', limit: '3',
+    equipment: ['Наркозная стойка №3', 'Седация'], pair: 'работает только в паре с хирургом',
+    windows: [{ what: 'Наркоз', when: 'вт, чт' }, { what: 'Седация', when: 'пн – пт' }],
+    tags: ['седация', 'общий наркоз'],
+    legacy: '«наркоз только вт и чт, седация каждый день, детей от 14»' },
+  { id: 'glad', name: 'Гладков М. Ю.', spec: 'Врач УЗД', tag: 'oncology', code: 'DOC.10871', site: 'Динамо', room: '118',
+    specialties: ['Врач УЗД'], temp: '—', age: 'от 0 до 99 лет', limit: '6',
+    equipment: ['УЗИ Mindray Resona', 'МРТ Toshiba Vantage'], pair: 'не требуется',
+    windows: [{ what: 'УЗИ детям', when: 'до 15:00' }, { what: 'Вызов на дом', when: 'после 16:00' }],
+    tags: ['брюшная полость', 'щитовидная железа'],
+    legacy: '«детей смотрит до 15, после 16 уезжает на дом»' },
+  { id: 'tim', name: 'Тимошенко Р. В.', spec: 'Косметолог, дерматолог', tag: 'cosmetology', code: 'DOC.11930', site: 'Динамо', room: '302',
+    specialties: ['Косметолог', 'Дерматолог'], temp: '—', age: 'от 18 до 99 лет', limit: '4',
+    equipment: ['Лазер Fotona SP', 'Криолиполиз Zeltiq'], pair: 'не требуется',
+    windows: [{ what: 'Лазерные процедуры', when: '10:00 – 19:00' }, { what: 'Криолиполиз', when: 'когда свободен лазер' }],
+    tags: ['пигментация', 'курсовые процедуры'],
+    legacy: '«лазер и криолиполиз в одном кабинете, одновременно не работает»' },
+  { id: 'abr', name: 'Абрамян К. Г.', spec: 'Эндоскопист', tag: 'surgery', code: 'DOC.11255', site: 'Динамо', room: '209',
+    specialties: ['Эндоскопист'], temp: 'Молодёжная (по субботам)', age: 'от 16 до 99 лет', limit: '4',
+    equipment: ['Эндоскоп Olympus', 'Седация'], pair: 'для седации требуется анестезиолог',
+    windows: [{ what: 'Гастроскопия под седацией', when: 'пн, ср' }, { what: 'Колоноскопия', when: 'вт, чт' }],
+    tags: ['гастроскопия', 'колоноскопия'],
+    legacy: '«седация только когда есть анестезиолог, по субботам на Молодёжной»' }
+];
+
+const DOC_RULES = ['Работает по ДМС', 'Бесплатные консультации перед операцией', 'Выдаёт больничный лист', 'Принимает детей'];
+
+const MX_COLS = ['Консультация', 'Сложное удаление', 'Имплантация', 'УЗИ брюшной полости', 'Фотоомоложение', 'Криолиполиз', 'МРТ головного мозга', 'Гастроскопия'];
+const MX_ROWS = [
+  { name: 'Нечаев Б. Л.', spec: 'Стоматолог-хирург', v: [2, 2, 2, 0, 0, 0, 0, 0] },
+  { name: 'Ковалёва И. С.', spec: 'Терапевт', v: [2, 0, 0, 0, 0, 0, 0, 0] },
+  { name: 'Ярцева Д. А.', spec: 'Анестезиолог', v: [1, 0, 0, 0, 0, 0, 0, 0] },
+  { name: 'Гладков М. Ю.', spec: 'Врач УЗД', v: [2, 0, 0, 2, 0, 0, 1, 0] },
+  { name: 'Тимошенко Р. В.', spec: 'Косметолог', v: [2, 0, 0, 0, 2, 2, 0, 0] },
+  { name: 'Абрамян К. Г.', spec: 'Эндоскопист', v: [2, 0, 0, 0, 0, 0, 0, 2] }
+];
+
+const DUR_RULES = [
+  { prio: 'база', cond: 'Базовая длительность', factor: 'Сложное удаление третьего моляра', effect: '60 мин', locked: true },
+  { prio: '1', cond: 'Врач', factor: 'Нечаев Б. Л.', effect: '−10 мин' },
+  { prio: '2', cond: 'Тип приёма', factor: 'Первичный', effect: '+15 мин' },
+  { prio: '3', cond: 'Оборудование', factor: 'Микроскоп Zeiss Extaro', effect: '+10 мин' },
+  { prio: '4', cond: 'Возраст пациента', factor: 'старше 70 лет', effect: '+15 мин' },
+  { prio: '5', cond: 'Маломобильность', factor: 'да', effect: '+1 слот' },
+  { prio: '6', cond: 'Клиника', factor: 'Динамо', effect: 'без изменений' }
+];
+
+const TRIGGERS = [
+  { id: 't1', event: 'Запись создана', template: 'подтверждение и памятка по подготовке', channel: 'push → WhatsApp → SMS' },
+  { id: 't2', event: 'Напоминание за сутки', template: 'время, адрес, кабинет, памятка', channel: 'push → WhatsApp → SMS' },
+  { id: 't3', event: 'Подтверждение визита', template: 'подтвердить, перенести, отменить', channel: 'push' },
+  { id: 't4', event: 'Отмена по форс-мажору', template: 'альтернативы для перезаписи', channel: 'push → SMS + обзвон' },
+  { id: 't5', event: 'Слот из листа ожидания освободился', template: 'предложение с таймаутом 30 минут', channel: 'push → SMS' },
+  { id: 't6', event: 'Истёк срок рекомендации врача', template: 'приглашение на повторный визит', channel: 'push' },
+  { id: 't7', event: 'Изменение графика по празднику', template: 'уведомление об изменении расписания', channel: 'push → SMS' },
+  { id: 't8', event: 'Результаты анализов готовы', template: 'вне периметра, отдельный сервис', channel: '—' }
+];
+
+class Component extends DCLogic {
+  state = {
+    screen: 'tpl', doc: 'nech', eqView: 'day', room: 'all', eqSel: null,
+    published: false, blockOpen: false, blockTarget: 'Нечаев Б. Л.', blockReason: 'Отпуск',
+    mx: {}, durOff: [], trigOff: ['t8'], docRules: ['Работает по ДМС', 'Бесплатные консультации перед операцией'],
+    docEq: ['Микроскоп Zeiss Extaro', 'Наркозная стойка №3', 'Седация']
+  };
+
+  go = (screen) => () => this.setState({ screen });
+  stop = (e) => e.stopPropagation();
+
+  renderVals() {
+    const st = this.state;
+    const doc = DOCTORS.find(d => d.id === st.doc) || DOCTORS[0];
+
+    const WEEK_DAYS = [{ day: 'Пн', date: '17 авг' }, { day: 'Вт', date: '18 авг' }, { day: 'Ср', date: '19 авг' }, { day: 'Чт', date: '20 авг' }, { day: 'Пт', date: '21 авг' }, { day: 'Сб', date: '22 авг' }];
+    const TPL = [
+      { name: 'Ковалёва И. С.', sub: 'Терапевт · каб. 112', c: [['Полный день', '09:00 – 18:00'], ['Полный день', '09:00 – 18:00'], ['Полный день', '09:00 – 18:00'], ['Вызовы на дом', '13:00 – 18:00'], ['Полный день', '09:00 – 18:00'], ['Короткий день', '09:00 – 14:00']] },
+      { name: 'Нечаев Б. Л.', sub: 'Стоматолог-хирург · каб. 411', c: [['Хирургия', '09:00 – 18:00'], ['Хирургия и наркоз', '09:00 – 18:00'], ['Отпуск', 'заявка от 04.08'], ['Хирургия и наркоз', '09:00 – 18:00'], ['Хирургия', '09:00 – 18:00'], ['Не работает', '']] },
+      { name: 'Ярцева Д. А.', sub: 'Анестезиолог · каб. 411', c: [['Седация', '10:00 – 17:00'], ['Наркоз', '09:00 – 18:00'], ['Отпуск', 'до 24.08'], ['Наркоз', '09:00 – 18:00'], ['Седация', '10:00 – 17:00'], ['Не работает', '']] },
+      { name: 'Гладков М. Ю.', sub: 'Врач УЗД · каб. 118', c: [['УЗИ, полный день', '08:00 – 16:00'], ['УЗИ, полный день', '08:00 – 16:00'], ['УЗИ, полный день', '08:00 – 16:00'], ['УЗИ и выезды', '08:00 – 20:00'], ['УЗИ, полный день', '08:00 – 16:00'], ['Короткий день', '09:00 – 14:00']] },
+      { name: 'Тимошенко Р. В.', sub: 'Косметолог · каб. 302', c: [['Косметология', '10:00 – 19:00'], ['Косметология', '10:00 – 19:00'], ['Косметология', '10:00 – 19:00'], ['Больничный', 'до 22.08'], ['Косметология', '10:00 – 19:00'], ['Косметология', '10:00 – 16:00']] },
+      { name: 'Абрамян К. Г.', sub: 'Эндоскопист · каб. 209', c: [['Гастроскопия', '09:00 – 17:00'], ['Колоноскопия', '09:00 – 17:00'], ['Гастроскопия', '09:00 – 17:00'], ['Колоноскопия', '09:00 – 17:00'], ['Гастроскопия', '09:00 – 17:00'], ['Молодёжная', 'выезд']] }
+    ];
+
+    const eqVisible = EQUIPMENT.filter(e => st.room === 'all' || e.room === 'каб. ' + st.room);
+
+    const MARKS = [['·', 'не выполняет'], ['!', 'выполняет с ограничением'], ['✓', 'выполняет']];
+
+    const durActive = DUR_RULES.filter(r => r.locked || st.durOff.indexOf(r.prio) < 0);
+    let total = 60;
+    durActive.forEach(r => {
+      if (r.effect.indexOf('−') === 0) total -= parseInt(r.effect.slice(1), 10);
+      else if (r.effect.indexOf('+') === 0 && r.effect.indexOf('слот') < 0) total += parseInt(r.effect.slice(1), 10);
+      else if (r.effect.indexOf('слот') >= 0) total += 15;
+    });
+
+    return {
+      nav: [
+        { id: 'tpl', label: 'Шаблоны приёма', icon: 'calendar-days', count: 6 },
+        { id: 'doc', label: 'Справочник врачей', icon: 'stethoscope', count: 118 },
+        { id: 'eq', label: 'Оборудование и кабинеты', icon: 'monitor', count: 7 },
+        { id: 'mx', label: 'Матрица компетенций', icon: 'layout-grid', count: '' },
+        { id: 'dur', label: 'Правила длительности', icon: 'clock', count: 7 },
+        { id: 'notif', label: 'Уведомления', icon: 'bell', count: 8 }
+      ].map(n => ({ label: n.label, icon: n.icon, count: n.count, current: st.screen === n.id ? 'page' : undefined, go: this.go(n.id) })),
+      isTpl: st.screen === 'tpl', isDoc: st.screen === 'doc', isEq: st.screen === 'eq',
+      isMx: st.screen === 'mx', isDur: st.screen === 'dur', isNotif: st.screen === 'notif',
+
+      weekDays: WEEK_DAYS,
+      tplRows: TPL.map(r => ({
+        name: r.name, sub: r.sub,
+        cells: r.c.map(c => {
+          const off = c[0] === 'Не работает';
+          const away = c[0] === 'Отпуск' || c[0] === 'Больничный';
+          return {
+            label: c[0], sub: c[1],
+            bg: off ? 'var(--n-25)' : away ? 'var(--n-50)' : 'var(--green-50)',
+            hatch: away ? 'var(--hatch-45)' : 'none',
+            bar: off || away ? 'var(--n-300)' : 'var(--green-500)',
+            ink: off || away ? 'var(--text-meta)' : 'var(--text-body)',
+            go: this.openBlock
+          };
+        })
+      })),
+      published: st.published,
+      publish: () => this.setState({ published: true }),
+      openBlock: () => this.setState({ blockOpen: true }),
+      closeBlock: () => this.setState({ blockOpen: false }),
+      blockOpen: st.blockOpen,
+      blockTargets: ['Нечаев Б. Л.', 'Ярцева Д. А.', 'Кабинет 411', 'Наркозная стойка №3'].map(b => ({ label: b, on: String(st.blockTarget === b), go: () => this.setState({ blockTarget: b }) })),
+      blockReasons: ['Отпуск', 'Больничный', 'Учёба', 'ТО оборудования', 'Праздничный день'].map(r => ({ label: r, on: String(st.blockReason === r), go: () => this.setState({ blockReason: r }) })),
+      blockWarnTitle: 'Под блокировку попадают 34 записи',
+      blockWarn: st.blockTarget + ' · ' + st.blockReason + ' · 17 – 19 августа. Освободятся 34 слота врача, 22 слота микроскопа и 9 слотов наркозной стойки. Записи уйдут оператору в снос расписания.',
+      stop: this.stop,
+
+      docList: DOCTORS.map(d => ({
+        name: d.name, spec: d.spec,
+        bg: st.doc === d.id ? 'var(--green-50)' : 'transparent',
+        ring: st.doc === d.id ? 'inset 0 0 0 1px var(--green-200)' : 'none',
+        go: () => this.setState({ doc: d.id })
+      })),
+      doc: {
+        name: doc.name, tag: doc.tag, code: doc.code, site: doc.site, room: doc.room,
+        specialties: doc.specialties, temp: doc.temp, age: doc.age, limit: doc.limit,
+        pair: doc.pair, windows: doc.windows, tags: doc.tags, legacy: doc.legacy,
+        rules: DOC_RULES.map(r => ({
+          label: r, on: st.docRules.indexOf(r) >= 0,
+          go: () => this.setState(x => ({ docRules: x.docRules.indexOf(r) >= 0 ? x.docRules.filter(y => y !== r) : x.docRules.concat([r]) }))
+        })),
+        equipment: doc.equipment.map(e => ({
+          label: e, on: String(st.docEq.indexOf(e) >= 0),
+          go: () => this.setState(x => ({ docEq: x.docEq.indexOf(e) >= 0 ? x.docEq.filter(y => y !== e) : x.docEq.concat([e]) }))
+        }))
+      },
+
+      eqViews: [['day', 'Расписание дня'], ['list', 'Справочник аппаратов']].map(([id, label]) => ({ label, on: String(st.eqView === id), go: () => this.setState({ eqView: id }) })),
+      isEqDay: st.eqView === 'day', isEqList: st.eqView === 'list',
+      rooms: ROOMS.map(([id, label]) => ({
+        label, on: st.room === id,
+        count: id === 'all' ? EQUIPMENT.length : EQUIPMENT.filter(e => e.room === 'каб. ' + id).length,
+        go: () => this.setState({ room: id })
+      })),
+      times: TIMES,
+      eqColumns: eqVisible.map(e => ({ id: e.id, doctor: e.name, spec: e.room + ' · ' + e.code, slots: e.slots })),
+      eqSel: st.eqSel,
+      onEqSlot: (id) => this.setState({ eqSel: id }),
+      equipment: EQUIPMENT.map(e => ({ ...e, hasDep: !!e.dep })),
+
+      mxCols: MX_COLS,
+      mxRows: MX_ROWS.map((r, ri) => ({
+        name: r.name, spec: r.spec,
+        cells: r.v.map((v0, ci) => {
+          const key = ri + ':' + ci;
+          const v = st.mx[key] === undefined ? v0 : st.mx[key];
+          return {
+            mark: MARKS[v][0], title: r.name + ' — ' + MX_COLS[ci] + ': ' + MARKS[v][1],
+            bg: v === 2 ? 'var(--green-50)' : v === 1 ? 'var(--orange-50)' : 'transparent',
+            ink: v === 2 ? 'var(--green-700)' : v === 1 ? 'var(--orange-700)' : 'var(--n-400)',
+            go: () => this.setState(x => ({ mx: Object.assign({}, x.mx, { [key]: (v + 1) % 3 }) }))
+          };
+        })
+      })),
+      mxNoteTitle: 'Ограничение — это правило, а не комментарий',
+      mxNote: 'Ярцева Д. А. ведёт консультацию только совместно с хирургом; Гладков М. Ю. допущен к МРТ головного мозга без контраста. В прежней системе это был текст в поле комментария, здесь — условие, которое применяется при подборе автоматически.',
+
+      durRules: DUR_RULES.map(r => ({
+        prio: r.prio, cond: r.cond, factor: r.factor, effect: r.effect,
+        enabled: r.locked || st.durOff.indexOf(r.prio) < 0,
+        on: r.locked ? 'true' : undefined,
+        go: () => { if (r.locked) return; this.setState(x => ({ durOff: x.durOff.indexOf(r.prio) >= 0 ? x.durOff.filter(y => y !== r.prio) : x.durOff.concat([r.prio]) })); }
+      })),
+      durPreview: durActive.map(r => ({ label: r.cond + ' · ' + r.factor, value: r.effect, ink: r.locked ? 'var(--text-body)' : 'var(--text-meta)' })),
+      durTotal: total + ' мин · ' + Math.ceil(total / 15) + ' слота',
+
+      triggers: TRIGGERS.map(t => ({
+        event: t.event, template: t.template, channel: t.channel,
+        on: st.trigOff.indexOf(t.id) < 0,
+        go: () => this.setState(x => ({ trigOff: x.trigOff.indexOf(t.id) >= 0 ? x.trigOff.filter(y => y !== t.id) : x.trigOff.concat([t.id]) }))
+      })),
+      trigOn: TRIGGERS.length - st.trigOff.length,
+      cascade: [
+        { n: '1', name: 'Push через внутренний Gateway', rule: 'сразу, если есть личный кабинет', share: '61 %' },
+        { n: '2', name: 'WhatsApp', rule: 'через 10 минут, если не доставлено', share: '24 %' },
+        { n: '3', name: 'SMS', rule: 'через 20 минут, если не доставлено', share: '12 %' },
+        { n: '4', name: 'Голосовой робот', rule: 'за 24 часа до приёма, если нет ответа', share: '3 %' }
+      ],
+      preview: 'Завтра, 15 августа в 11:00 вас ждёт Нечаев Б. Л. Динамо, каб. 411. Не есть за 6 часов до приёма, возьмите паспорт и результаты КТ. Перенести или отменить: sm-clinic.ru/v/8842',
+      vars: ['{дата}', '{время}', '{врач}', '{клиника}', '{кабинет}', '{памятка}', '{ссылка}']
+    };
+  }
+}
+
+</script>
+</body>
+</html>

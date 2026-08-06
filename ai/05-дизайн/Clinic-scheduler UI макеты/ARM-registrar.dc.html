@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/colors.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/typography.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/shape.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/tokens/motion.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/base.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/components.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/print.css">
+<link rel="stylesheet" href="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/styles.css">
+<script src="_ds/smclinic-design-system-c4cdb29e-5f82-49a1-b516-e4fd9f4fa0c3/_ds_bundle.js"></script>
+<style>
+html,body{height:100%}
+body{margin:0;background:var(--n-100);overflow:hidden}
+a{color:var(--text-link);text-decoration:none}
+a:hover{color:var(--text-link-hover)}
+</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;height:100vh;min-height:0;background:var(--n-100)">
+
+<header style="height:var(--topbar-h);flex:none;display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-4)">
+<div style="width:calc(var(--sidebar-w) - var(--space-4));flex:none;display:flex;align-items:baseline;gap:8px">
+<span style="font-size:16px;font-weight:700;letter-spacing:-0.022em;color:var(--brand-green-700);white-space:nowrap">СМ-Клиника</span>
+<span style="font-size:12px;color:var(--text-meta);white-space:nowrap">АРМ регистратора</span>
+</div>
+<span class="sm-chip" style="gap:6px;padding-left:10px;cursor:default">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="building-2" size="14" hint-size="14px,14px"></x-import>Динамо · стойка 2 · 14 августа
+</span>
+<div class="sm-search--pill" style="flex:1;max-width:420px;margin-inline:auto">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.SearchInput" compact="{{ true }}" placeholder="Фамилия, телефон или номер карты" shortcut="/" hint-size="100%,28px"></x-import>
+</div>
+<div class="sm-seg" style="flex:none">
+<a class="sm-seg__item" href="ARM-operator.dc.html" style="text-decoration:none">Оператор</a>
+<a class="sm-seg__item" href="ARM-doctor.dc.html" style="text-decoration:none">Врач</a>
+<a class="sm-seg__item" aria-selected="true" href="ARM-registrar.dc.html" style="text-decoration:none">Регистратор</a>
+<a class="sm-seg__item" href="ARM-admin.dc.html" style="text-decoration:none">Администратор</a>
+</div>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.IconButton" icon="printer" label="Печать" hint-size="28px,28px"></x-import>
+<button type="button" class="sm-chip" style="gap:8px;padding-left:4px">
+<span style="width:24px;height:24px;border-radius:50%;background:var(--brand-green-tint);color:var(--brand-green-700);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500">ЛС</span>
+Ларина С. В.
+</button>
+</header>
+
+<div style="display:flex;flex:1;min-height:0">
+
+<nav style="width:var(--sidebar-w);flex:none;display:flex;flex-direction:column;gap:var(--space-4);padding:0 var(--space-3) var(--space-3) var(--space-4);overflow:auto">
+<div style="display:flex;flex-direction:column;gap:1px">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="3">
+<button type="button" class="sm-navitem" aria-current="{{ n.current }}" onClick="{{ n.go }}">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="{{ n.icon }}" size="15" hint-size="15px,15px"></x-import>
+{{ n.label }}<span class="sm-navitem__count">{{ n.count }}</span>
+</button>
+</sc-for>
+</div>
+<div style="background:var(--surface-card);border-radius:var(--radius-md);box-shadow:var(--elev-1);padding:10px 12px;display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--text-meta)">
+<div style="display:flex;justify-content:space-between;gap:8px"><span>Ожидают приёма</span><span class="sm-ident sm-ident--strong">{{ waitingCount }}</span></div>
+<div style="display:flex;justify-content:space-between;gap:8px"><span>Отмечено приходов</span><span class="sm-ident sm-ident--strong">{{ arrivedCount }}</span></div>
+<div style="display:flex;justify-content:space-between;gap:8px"><span>Касса за смену</span><span class="sm-ident sm-ident--strong">{{ cash }}</span></div>
+</div>
+<div style="margin-top:auto;padding:0 var(--space-3);font-size:12px;color:var(--text-meta);line-height:16px">Демонстрационные данные.<br>14 августа 2026</div>
+</nav>
+
+<main style="flex:1;min-width:0;display:flex;gap:var(--space-3);padding:0 var(--space-3) var(--space-3) 0">
+
+<sc-if value="{{ isQueue }}" hint-placeholder-val="{{ true }}">
+<section class="sm-surface" data-screen-label="Приём смены" style="flex:1;min-width:0">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle);flex-wrap:wrap">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Приём смены</h1>
+<span style="font-size:12px;color:var(--text-meta)">{{ queueMeta }}</span>
+<span style="flex:1"></span>
+<sc-for list="{{ queueFilters }}" as="f" hint-placeholder-count="4">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.FilterChip" count="{{ f.count }}" active="{{ f.on }}" on-click="{{ f.go }}" hint-size="auto,26px">{{ f.label }}</x-import>
+</sc-for>
+</div>
+<div style="flex:1;overflow:auto">
+<table class="sm-table">
+<thead><tr><th style="width:76px">Время</th><th>Пациент</th><th>Врач и услуга</th><th style="width:130px">Оплата</th><th style="width:150px">Статус</th><th style="width:190px"></th></tr></thead>
+<tbody>
+<sc-for list="{{ queue }}" as="q" hint-placeholder-count="8">
+<tr aria-selected="{{ q.on }}" onClick="{{ q.pick }}" style="cursor:pointer">
+<td><span class="sm-ident sm-ident--strong">{{ q.time }}</span></td>
+<td><div style="font-weight:500">{{ q.patient }}</div><div style="font-size:11px;color:var(--text-meta)">{{ q.uid }}</div></td>
+<td><div>{{ q.doctor }}</div><div style="font-size:11px;color:var(--text-meta)">{{ q.service }}</div></td>
+<td><x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.StatusBadge" tone="{{ q.payTone }}" hint-size="auto,20px">{{ q.pay }}</x-import></td>
+<td><x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.StatusBadge" tone="{{ q.tone }}" hint-size="auto,20px">{{ q.status }}</x-import></td>
+<td><div style="display:flex;gap:6px;justify-content:flex-end">
+<button type="button" class="sm-btn sm-btn--dense sm-btn--secondary" onClick="{{ q.print }}">Талон</button>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--primary" onClick="{{ q.arrive }}">{{ q.action }}</button>
+</div></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+
+<aside class="sm-surface" data-screen-label="Карточка визита" style="width:340px;flex:none">
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+<div style="padding:14px var(--space-4);display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border-subtle)">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="font-size:20px;line-height:26px;font-weight:600;letter-spacing:-0.022em">{{ cur.patient }}</span>
+<span style="flex:1"></span>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.StatusBadge" tone="{{ cur.tone }}" hint-size="auto,20px">{{ cur.status }}</x-import>
+</div>
+<div style="font-size:12px;color:var(--text-meta)">{{ cur.born }} · <span class="sm-ident">{{ cur.uid }}</span></div>
+</div>
+<dl style="margin:0;padding:14px var(--space-4);display:grid;grid-template-columns:104px 1fr;row-gap:9px;column-gap:10px;align-items:baseline;border-bottom:1px solid var(--border-subtle)">
+<dt style="color:var(--text-meta);font-size:12px">Время</dt><dd style="margin:0;font-size:13px">{{ cur.time }}</dd>
+<dt style="color:var(--text-meta);font-size:12px">Врач</dt><dd style="margin:0;font-size:13px">{{ cur.doctor }}</dd>
+<dt style="color:var(--text-meta);font-size:12px">Кабинет</dt><dd style="margin:0;font-size:13px">{{ cur.room }}</dd>
+<dt style="color:var(--text-meta);font-size:12px">Услуга</dt><dd style="margin:0;font-size:13px">{{ cur.service }}</dd>
+<dt style="color:var(--text-meta);font-size:12px">Плательщик</dt><dd style="margin:0;font-size:13px">{{ cur.payer }}</dd>
+<dt style="color:var(--text-meta);font-size:12px">К оплате</dt><dd style="margin:0;font-size:13px"><span class="sm-ident sm-ident--strong">{{ cur.total }}</span></dd>
+</dl>
+<sc-if value="{{ cur.hasWarn }}" hint-placeholder-val="{{ false }}">
+<div style="padding:12px var(--space-4);border-bottom:1px solid var(--border-subtle)">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="attention" title="{{ cur.warnTitle }}" hint-size="100%,56px">{{ cur.warn }}</x-import>
+</div>
+</sc-if>
+<div style="padding:14px var(--space-4);display:flex;flex-direction:column;gap:8px">
+<div style="font-size:12px;color:var(--text-meta)">Документы на визит</div>
+<sc-for list="{{ cur.docs }}" as="d" hint-placeholder-count="3">
+<label class="sm-check"><input type="checkbox" checked="{{ d.on }}" onChange="{{ d.go }}"><span class="sm-check__box">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="check" size="12" hint-size="12px,12px"></x-import></span>
+<span class="sm-check__text" style="font-size:13px">{{ d.label }}</span></label>
+</sc-for>
+</div>
+</div>
+<div style="flex:none;padding:var(--space-3) var(--space-4);border-top:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:6px">
+<button type="button" class="sm-btn sm-btn--primary sm-btn--lg sm-btn--block" onClick="{{ cur.arrive }}">{{ cur.action }}</button>
+<div style="display:flex;gap:6px">
+<button type="button" class="sm-btn sm-btn--dense sm-btn--secondary sm-btn--block" onClick="{{ goPay }}">Оплата</button>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--secondary sm-btn--block">Печать талона</button>
+</div>
+<button type="button" class="sm-btn sm-btn--dense sm-btn--danger sm-btn--block" onClick="{{ cur.noshow }}">Отметить неявку</button>
+</div>
+</aside>
+</sc-if>
+
+<sc-if value="{{ isPay }}" hint-placeholder-val="{{ false }}">
+<section class="sm-surface" data-screen-label="Оплата" style="flex:1;min-width:0;overflow:auto">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle)">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Оплата визита</h1>
+<span style="font-size:12px;color:var(--text-meta)">{{ cur.patient }} · {{ cur.time }} · {{ cur.doctor }}</span>
+</div>
+<div style="padding:var(--space-4);display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:var(--space-4);align-items:start">
+<div style="display:flex;flex-direction:column;gap:var(--space-3)">
+<table class="sm-table sm-table--compact" style="box-shadow:var(--ring-1);border-radius:var(--radius-md);overflow:hidden">
+<thead><tr><th>Услуга</th><th style="width:110px">Код</th><th style="width:110px" class="sm-num">Сумма</th></tr></thead>
+<tbody>
+<sc-for list="{{ payItems }}" as="p" hint-placeholder-count="3">
+<tr><td>{{ p.name }}</td><td><span class="sm-ident">{{ p.code }}</span></td><td class="sm-num">{{ p.sum }}</td></tr>
+</sc-for>
+<tr style="background:var(--n-25)"><td style="font-weight:600">Итого</td><td></td><td class="sm-num" style="font-weight:600">{{ payTotal }}</td></tr>
+</tbody>
+</table>
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="info" title="Часть суммы покрывает ДМС" hint-size="100%,56px">По полису «Ингосстрах» покрыто 12 000 ₽. К оплате в кассе — остаток.</x-import>
+</div>
+<div class="sm-fieldgroup">
+<div class="sm-field">
+<span class="sm-field__label">Способ оплаты</span>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<sc-for list="{{ payMethods }}" as="m" hint-placeholder-count="4">
+<button type="button" class="sm-chip" aria-pressed="{{ m.on }}" onClick="{{ m.go }}">{{ m.label }}</button>
+</sc-for>
+</div>
+</div>
+<div class="sm-fieldrow">
+<div class="sm-field" style="flex:1">
+<label class="sm-field__label" for="pay-sum">Внесено</label>
+<input class="sm-input sm-input--mono" id="pay-sum" value="{{ paid }}" onChange="{{ onPaid }}">
+</div>
+<div class="sm-field" style="width:180px;flex:none">
+<label class="sm-field__label" for="pay-disc">Скидка</label>
+<span class="sm-select"><select id="pay-disc">
+<option>Нет</option><option>Постоянный пациент, 5%</option><option>Акция «Второй этап», 10%</option>
+</select><span class="sm-select__chev"><x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="chevron-down" size="14" hint-size="14px,14px"></x-import></span></span>
+</div>
+</div>
+<div class="sm-field">
+<label class="sm-field__label" for="pay-mail">Чек отправить</label>
+<input class="sm-input" id="pay-mail" value="+7 985 330-44-12">
+<span class="sm-field__hint">Электронный чек уходит в СМС и в личный кабинет пациента.</span>
+</div>
+<div style="display:flex;gap:8px">
+<button type="button" class="sm-btn sm-btn--primary sm-btn--lg" onClick="{{ doPay }}">Провести оплату</button>
+<button type="button" class="sm-btn sm-btn--secondary sm-btn--lg" onClick="{{ goQueue }}">Вернуться к смене</button>
+</div>
+<sc-if value="{{ paidDone }}" hint-placeholder-val="{{ false }}">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="success" title="Оплата проведена" hint-size="100%,56px">{{ paidText }}</x-import>
+</sc-if>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}">
+<section class="sm-surface" data-screen-label="Новая карта" style="flex:1;min-width:0;overflow:auto">
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border-subtle)">
+<h1 style="font-size:18px;line-height:24px;letter-spacing:-0.022em">Новая карта пациента</h1>
+<span style="font-size:12px;color:var(--text-meta)">Заводится на стойке, уходит в картотеку МИС</span>
+</div>
+<div style="padding:var(--space-4)">
+<div class="sm-fieldgroup">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="attention" title="Похожая карта уже есть" hint-size="100%,72px">Мамедова Л. Т., 1990 г. р., телефон совпадает по последним четырём цифрам. Проверьте, прежде чем заводить дубль.</x-import>
+<div class="sm-fieldrow">
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="n1">Фамилия<span class="sm-field__req">*</span></label><input class="sm-input" id="n1" value="Мамедова"></div>
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="n2">Имя<span class="sm-field__req">*</span></label><input class="sm-input" id="n2" value="Лейла"></div>
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="n3">Отчество</label><input class="sm-input" id="n3" value="Тофиковна"></div>
+</div>
+<div class="sm-fieldrow">
+<div class="sm-field" style="width:190px;flex:none"><label class="sm-field__label" for="n4">Дата рождения<span class="sm-field__req">*</span></label><input class="sm-input sm-input--mono" id="n4" value="18.05.1990"></div>
+<div class="sm-field" style="width:220px;flex:none"><label class="sm-field__label" for="n5">Телефон<span class="sm-field__req">*</span></label><input class="sm-input sm-input--mono" id="n5" value="+7 916 402-19-73"></div>
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="n6">Электронная почта</label><input class="sm-input" id="n6" placeholder="Необязательно"></div>
+</div>
+<div class="sm-fieldrow">
+<div class="sm-field" style="flex:1"><label class="sm-field__label" for="n7">Документ</label>
+<span class="sm-select"><select id="n7"><option>Паспорт РФ</option><option>Свидетельство о рождении</option><option>Иностранный документ</option></select>
+<span class="sm-select__chev"><x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="chevron-down" size="14" hint-size="14px,14px"></x-import></span></span></div>
+<div class="sm-field" style="width:220px;flex:none"><label class="sm-field__label" for="n8">Серия и номер</label><input class="sm-input sm-input--mono" id="n8" value="4519 220483"></div>
+</div>
+<div class="sm-field">
+<span class="sm-field__label">Согласия</span>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ consents }}" as="c" hint-placeholder-count="3">
+<label class="sm-check"><input type="checkbox" checked="{{ c.on }}" onChange="{{ c.go }}"><span class="sm-check__box">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.Icon" name="check" size="12" hint-size="12px,12px"></x-import></span>
+<span class="sm-check__text" style="font-size:13px">{{ c.label }}</span></label>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;gap:8px">
+<button type="button" class="sm-btn sm-btn--primary sm-btn--lg" onClick="{{ createCard }}">Завести карту</button>
+<button type="button" class="sm-btn sm-btn--secondary sm-btn--lg">Открыть найденную карту</button>
+</div>
+<sc-if value="{{ cardDone }}" hint-placeholder-val="{{ false }}">
+<x-import component-from-global-scope="SmclinicDesignSystem_c4cdb2.InlineNotice" tone="success" title="Карта заведена" hint-size="100%,56px">Мамедова Л. Т. · UID 9147 6620 · передана в картотеку МИС, репликация до 5 секунд.</x-import>
+</sc-if>
+</div>
+</div>
+</section>
+</sc-if>
+
+</main>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const QUEUE = [
+  { id: 'q1', time: '09:00', patient: 'Смолин А. Р.', uid: 'UID 7719 4402', doctor: 'Нечаев Б. Л.', room: 'каб. 411', service: 'Санация полости рта', pay: 'Оплачено', payTone: 'booked', payer: 'Наличные', total: '9 600 ₽', status: 'arrived', born: '1988 г. р.' },
+  { id: 'q2', time: '09:15', patient: 'Шилова Е. П.', uid: 'UID 4408 1120', doctor: 'Ковалёва И. С.', room: 'каб. 112', service: 'Приём терапевта, повторный', pay: 'Оплачено', payTone: 'booked', payer: 'ДМС «Согласие»', total: '0 ₽', status: 'arrived', born: '1974 г. р.' },
+  { id: 'q3', time: '10:00', patient: 'Титова Р. А.', uid: 'UID 5502 8831', doctor: 'Нечаев Б. Л.', room: 'каб. 411', service: 'Консультация имплантолога', pay: 'ДМС', payTone: 'neutral', payer: 'ДМС «Ингосстрах»', total: '4 200 ₽', status: 'arrived', born: '1991 г. р.' },
+  { id: 'q4', time: '11:00', patient: 'Байдаков С. Р.', uid: 'UID 8842 1573', doctor: 'Нечаев Б. Л.', room: 'каб. 411', service: 'Имплантация, этап 1 · седация', pay: 'Не оплачено', payTone: 'attention', payer: 'Наличные · VIP', total: '96 500 ₽', status: 'waiting', born: '1979 г. р.',
+    warnTitle: 'VIP и подготовка к седации', warn: 'Проверьте согласие на седацию и отсутствие приёма пищи за 6 часов. Сопровождающий обязателен.' },
+  { id: 'q5', time: '11:30', patient: 'Ким В. С.', uid: 'UID 2274 9915', doctor: 'Гладков М. Ю.', room: 'каб. 118', service: 'УЗИ брюшной полости', pay: 'Не оплачено', payTone: 'attention', payer: 'Наличные', total: '4 900 ₽', status: 'waiting', born: '2001 г. р.' },
+  { id: 'q6', time: '12:00', patient: 'Латышев О. К.', uid: 'UID 6031 4487', doctor: 'Абрамян К. Г.', room: 'каб. 209', service: 'Гастроскопия', pay: 'Предоплата', payTone: 'booked', payer: 'Наличные', total: '3 100 ₽', status: 'waiting', born: '1969 г. р.',
+    warnTitle: 'Подготовка к исследованию', warn: 'Натощак, последний приём пищи не позднее 20:00 накануне. Уточните у пациента.' },
+  { id: 'q7', time: '13:30', patient: 'Пряхин В. С.', uid: 'UID 1140 7752', doctor: 'Гладков М. Ю.', room: 'каб. 118', service: 'УЗИ щитовидной железы', pay: 'Не оплачено', payTone: 'attention', payer: 'Наличные', total: '3 400 ₽', status: 'waiting', born: '1958 г. р.' },
+  { id: 'q8', time: '14:00', patient: 'Орлова Н. С.', uid: 'UID 3311 7024', doctor: 'Нечаев Б. Л.', room: 'каб. 411', service: 'Осмотр после удаления', pay: 'Бесплатно', payTone: 'neutral', payer: '—', total: '0 ₽', status: 'waiting', born: '1996 г. р.' }
+];
+
+const STATUS = { waiting: ['neutral', 'Ожидается'], arrived: ['booked', 'Пришёл'], noshow: ['danger', 'Не пришёл'] };
+
+class Component extends DCLogic {
+  state = {
+    screen: 'queue', sel: 'q4', filter: 'all',
+    rows: QUEUE.map(q => ({ id: q.id, status: q.status })),
+    docs: ['Согласие на обработку персональных данных'],
+    method: 'Карта', paid: '96 500', paidDone: false, cardDone: false,
+    consents: ['Обработка персональных данных', 'Информирование по СМС и push']
+  };
+
+  go = (screen) => () => this.setState({ screen });
+  setStatus = (id, status) => () => this.setState(st => ({ rows: st.rows.map(r => r.id === id ? { id, status } : r) }));
+
+  renderVals() {
+    const st = this.state;
+    const statusOf = id => (st.rows.find(r => r.id === id) || {}).status || 'waiting';
+    const cur = QUEUE.find(q => q.id === st.sel) || QUEUE[0];
+    const curStatus = statusOf(cur.id);
+    const arrived = st.rows.filter(r => r.status === 'arrived').length;
+    const waiting = st.rows.filter(r => r.status === 'waiting').length;
+
+    const visible = QUEUE.filter(q => st.filter === 'all' || statusOf(q.id) === st.filter);
+
+    const DOCS = ['Согласие на обработку персональных данных', 'Информированное согласие на седацию', 'Договор на оказание услуг'];
+    const CONSENTS = ['Обработка персональных данных', 'Информирование по СМС и push', 'Передача данных страховой компании'];
+
+    return {
+      nav: [
+        { id: 'queue', label: 'Приём смены', icon: 'users', count: waiting },
+        { id: 'pay', label: 'Оплата', icon: 'file-text', count: '' },
+        { id: 'new', label: 'Новая карта', icon: 'user', count: '' }
+      ].map(n => ({ label: n.label, icon: n.icon, count: n.count, current: st.screen === n.id ? 'page' : undefined, go: this.go(n.id) })),
+      isQueue: st.screen === 'queue', isPay: st.screen === 'pay', isNew: st.screen === 'new',
+      goPay: this.go('pay'), goQueue: this.go('queue'),
+
+      waitingCount: waiting, arrivedCount: arrived, cash: '284 700 ₽',
+      queueMeta: waiting + ' ожидают · ' + arrived + ' отмечено',
+      queueFilters: [['all', 'Все', QUEUE.length], ['waiting', 'Ожидают', waiting], ['arrived', 'Пришли', arrived], ['noshow', 'Неявки', st.rows.filter(r => r.status === 'noshow').length]]
+        .map(([id, label, count]) => ({ label, count, on: st.filter === id, go: () => this.setState({ filter: id }) })),
+
+      queue: visible.map(q => {
+        const s = statusOf(q.id);
+        return {
+          time: q.time, patient: q.patient, uid: q.uid, doctor: q.doctor, service: q.service,
+          pay: q.pay, payTone: q.payTone,
+          tone: STATUS[s][0], status: STATUS[s][1],
+          action: s === 'arrived' ? 'Отменить приход' : 'Отметить приход',
+          on: st.sel === q.id ? 'true' : undefined,
+          pick: () => this.setState({ sel: q.id }),
+          arrive: this.setStatus(q.id, s === 'arrived' ? 'waiting' : 'arrived'),
+          print: () => this.setState({ sel: q.id })
+        };
+      }),
+
+      cur: {
+        patient: cur.patient, born: cur.born, uid: cur.uid, time: cur.time, doctor: cur.doctor,
+        room: cur.room, service: cur.service, payer: cur.payer, total: cur.total,
+        tone: STATUS[curStatus][0], status: STATUS[curStatus][1],
+        hasWarn: !!cur.warn, warnTitle: cur.warnTitle || '', warn: cur.warn || '',
+        action: curStatus === 'arrived' ? 'Отменить приход' : 'Отметить приход',
+        arrive: this.setStatus(cur.id, curStatus === 'arrived' ? 'waiting' : 'arrived'),
+        noshow: this.setStatus(cur.id, 'noshow'),
+        docs: DOCS.map(d => ({
+          label: d, on: st.docs.indexOf(d) >= 0,
+          go: () => this.setState(x => ({ docs: x.docs.indexOf(d) >= 0 ? x.docs.filter(y => y !== d) : x.docs.concat([d]) }))
+        }))
+      },
+
+      payItems: [
+        { name: 'Установка импланта, 1 этап', code: 'STOM.220', sum: '84 500 ₽' },
+        { name: 'Седация внутривенная, 90 мин', code: 'ANES.031', sum: '12 000 ₽' },
+        { name: 'Расходные материалы', code: 'MAT.006', sum: '0 ₽' }
+      ],
+      payTotal: '96 500 ₽',
+      payMethods: ['Карта', 'Наличные', 'Рассрочка', 'Счёт юрлицу'].map(m => ({ label: m, on: String(st.method === m), go: () => this.setState({ method: m }) })),
+      paid: st.paid,
+      onPaid: e => this.setState({ paid: e.target.value }),
+      doPay: () => this.setState({ paidDone: true }),
+      paidDone: st.paidDone,
+      paidText: 'Байдаков С. Р. · 96 500 ₽ · ' + st.method + ' · чек отправлен на +7 985 330-44-12',
+
+      consents: CONSENTS.map(c => ({
+        label: c, on: st.consents.indexOf(c) >= 0,
+        go: () => this.setState(x => ({ consents: x.consents.indexOf(c) >= 0 ? x.consents.filter(y => y !== c) : x.consents.concat([c]) }))
+      })),
+      createCard: () => this.setState({ cardDone: true }),
+      cardDone: st.cardDone
+    };
+  }
+}
+
+</script>
+</body>
+</html>

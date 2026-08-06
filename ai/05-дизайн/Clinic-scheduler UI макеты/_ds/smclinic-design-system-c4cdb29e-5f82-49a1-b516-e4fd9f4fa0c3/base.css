@@ -1,0 +1,32 @@
+/* smclinic — базовый слой. Светлая рабочая тема, тёмной темы в рабочей области нет. */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--font-sans);font-size:var(--size-body);line-height:var(--lh-body);font-weight:var(--weight-regular);letter-spacing:var(--tracking-ui);color:var(--text-body);background:var(--surface-page);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4{margin:0;font-weight:var(--weight-bold)}
+h1{font-size:var(--size-screen-title);line-height:var(--lh-screen-title);letter-spacing:var(--tracking-title)}
+h2{font-size:var(--size-section-title);line-height:var(--lh-section-title);letter-spacing:var(--tracking-subhead)}
+h3{font-size:var(--size-subhead);line-height:var(--lh-subhead);letter-spacing:var(--tracking-subhead);font-weight:var(--weight-strong)}
+h4{font-size:var(--size-body);line-height:var(--lh-body);font-weight:var(--weight-strong)}
+p{margin:0 0 var(--space-3);text-wrap:pretty}
+p:last-child{margin-bottom:0}
+a{color:var(--text-link);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px;text-decoration-color:oklch(0.470 0.098 163 / 0.4);transition:var(--transition-state)}
+a:hover{color:var(--text-link-hover);text-decoration-color:currentColor}
+a:active{color:var(--green-900)}
+small{font-size:var(--size-caption);line-height:var(--lh-caption);color:var(--text-meta)}
+code,kbd,samp,pre,.sm-id{font-family:var(--font-mono);font-variant-ligatures:none}
+.sm-id{font-size:var(--size-dense);line-height:var(--lh-dense);letter-spacing:0}
+button,input,select,textarea{font:inherit;letter-spacing:inherit;color:inherit}
+::placeholder{color:var(--text-placeholder);opacity:1}
+::selection{background:var(--green-200);color:var(--n-900)}
+:focus-visible{outline:var(--focus-ring-w) solid var(--focus-ring);outline-offset:-2px}
+table{border-collapse:collapse;border-spacing:0}
+th{font-weight:var(--weight-regular);text-align:left}
+hr{border:0;border-top:var(--border-hairline);margin:var(--space-4) 0}
+[hidden]{display:none!important}
+/* Полосы прокрутки: тонкие, в тон нейтралей. За смену их видно чаще, чем что-либо ещё. */
+*{scrollbar-width:thin;scrollbar-color:var(--n-300) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--n-300);border:3px solid transparent;background-clip:content-box;border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:var(--n-400);border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-corner{background:transparent}

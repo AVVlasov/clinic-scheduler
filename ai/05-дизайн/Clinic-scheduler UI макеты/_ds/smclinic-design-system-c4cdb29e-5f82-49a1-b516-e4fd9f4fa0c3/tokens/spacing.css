@@ -1,0 +1,36 @@
+/* smclinic — сетка 4px и плотность. Все отступы кратны 4. */
+:root{
+  --unit:4px;
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:20px;
+  --space-6:24px;
+  --space-8:32px;
+  --space-10:40px;
+  --space-12:48px;
+
+  /* Высоты */
+  --row-h-compact:32px;
+  --row-h:40px;
+  --slot-h:28px;          /* шаг 15 минут */
+  --input-h:34px;
+  --btn-h-compact:28px;
+  --btn-h:34px;
+  --chip-h:26px;
+  --hit-min:24px;         /* минимальная цель нажатия даже в компактном режиме */
+
+  /* Отступы */
+  --cell-pad-x:8px;
+  --cell-pad-y:4px;
+  --field-gap:24px;       /* между группами полей */
+  --panel-pad:16px;
+
+  /* Раскладка */
+  --sidebar-w:280px;
+  --form-max-w:640px;
+  --time-col-w:56px;
+  --toolbar-h:48px;
+  --topbar-h:56px;
+}

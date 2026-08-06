@@ -1,0 +1,43 @@
+/* smclinic — форма и глубина. Радиус растёт с размером поверхности: 6px элемент, 8px кнопка, 12px панель.
+   Пилюля осталась там, где она и была характером бренда — на мелких скруглённых метках и чипах. Сетка встык, 0. */
+:root{
+  --radius-xs:4px;      /* внутри строки таблицы, флажок */
+  --radius-sm:6px;      /* поля, списки, пункты меню, плотные кнопки */
+  --radius-md:8px;      /* кнопки, поповеры, уведомления */
+  --radius-lg:12px;     /* панели, карточки, модальные окна */
+  --radius-pill:999px;  /* чипы, статусные плашки, метки направлений */
+  --radius-grid:0;      /* ячейки сетки расписания стыкуются встык */
+  --radius-round:50%;
+  --radius-dense:var(--radius-sm);  /* прежнее имя */
+
+  --border-w:1px;
+  --border-hairline:1px solid var(--border-light);
+  --border-field-w:1px;
+  --focus-ring-w:2px;
+  --slot-bar-w:3px;
+
+  /* Граница как слой тени, а не как рамка блока: box-shadow с нулевым смещением и размытием.
+     Линия не занимает места в модели блока, не рвётся на скруглениях и весит визуально меньше рамки. */
+  --ring-1:0 0 0 1px oklch(0.30 0.02 170 / 0.09);
+  --ring-strong:0 0 0 1px oklch(0.30 0.02 170 / 0.16);
+  --field-ring:oklch(0.30 0.02 170 / 0.16);
+  --field-ring-hover:oklch(0.30 0.02 170 / 0.26);
+
+  /* Глубина набирается слоями: кольцо, мягкая тень вблизи, тень на расстоянии.
+     Один drop-shadow даёт «наклейку», три слоя — собранную поверхность. */
+  --elev-1:0 0 0 1px oklch(0.30 0.02 170 / 0.07),0 1px 2px oklch(0.30 0.02 170 / 0.05);
+  --elev-2:0 0 0 1px oklch(0.30 0.02 170 / 0.07),0 2px 4px oklch(0.30 0.02 170 / 0.04),0 8px 16px oklch(0.30 0.02 170 / 0.06);
+  --elev-3:0 0 0 1px oklch(0.30 0.02 170 / 0.07),0 8px 16px oklch(0.30 0.02 170 / 0.06),0 24px 48px oklch(0.30 0.02 170 / 0.12);
+
+  /* Прежние имена */
+  --shadow-none:none;
+  --shadow-xs:0 1px 2px oklch(0.30 0.02 170 / 0.06);
+  --shadow-sm:0 1px 2px oklch(0.30 0.02 170 / 0.05),0 2px 6px oklch(0.30 0.02 170 / 0.05);
+  --shadow-md:0 2px 4px oklch(0.30 0.02 170 / 0.04),0 8px 24px oklch(0.30 0.02 170 / 0.10);
+  --shadow-lg:0 4px 8px oklch(0.30 0.02 170 / 0.05),0 24px 56px oklch(0.30 0.02 170 / 0.16);
+  --shadow-overlay:var(--shadow-md);   /* прежнее имя */
+  --ring-hairline:inset 0 0 0 1px var(--border-light);
+  --focus-halo:0 0 0 3px var(--focus-halo-color);
+
+  --hatch-45:repeating-linear-gradient(45deg,transparent 0 5px,var(--slot-hatch) 5px 6px);
+}

@@ -1,0 +1,23 @@
+/* smclinic — печать: расписание врача, расписание оборудования, сменные задания.
+   Чёрным по белому, без заливок и штриховок, статусы подписями, шапка повторяется, день врача не рассекается. */
+@media print{
+  :root{--surface-page:#FFF;--surface-card:#FFF;--surface-panel:#FFF;--surface-table-head:#FFF;--text-body:#000;--text-meta:#000;--border-light:#000;--border-dark:#000;--shadow-overlay:none;--transition-state:0ms /* @kind other */}
+  body{background:#FFF;color:#000;font-size:11px;line-height:14px}
+  a{color:#000;text-decoration:none}
+  a[href^="http"]::after{content:" (" attr(href) ")";font-size:9px}
+  /* Никаких цветных заливок, штриховок и планок */
+  [class*="slot"],[class*="badge"],[class*="tag"],[class*="chip"]{background:#FFF!important;color:#000!important;box-shadow:none!important}
+  [data-hatch],[data-bar]{background-image:none!important}
+  /* Статус подписью, а не цветом */
+  [data-print-label]::before{content:attr(data-print-label) " · ";font-weight:700}
+  /* Служебный хром не печатается */
+  [data-print="hide"],nav[data-chrome],aside[data-chrome],.sm-no-print{display:none!important}
+  /* Шапка таблицы на каждой странице, разрывы не рассекают день врача */
+  thead{display:table-header-group}
+  tfoot{display:table-footer-group}
+  tr,[data-print-group]{break-inside:avoid;page-break-inside:avoid}
+  table{width:100%;border:1px solid #000}
+  th,td{border:1px solid #000;padding:2px 4px}
+  h1,h2,h3{break-after:avoid}
+  @page{margin:12mm}
+}

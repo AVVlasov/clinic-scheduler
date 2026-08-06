@@ -1,0 +1,17 @@
+/* smclinic — движение. До 150 мс, только на состояниях, только transform, opacity и цвет. На раскладке движения нет. */
+:root{
+  --duration-instant:0ms; /* @kind other */
+  --duration-fast:100ms; /* @kind other */
+  --duration-state:140ms; /* @kind other */
+  --ease-out:cubic-bezier(0.2,0,0,1); /* @kind other */
+  --ease-in-out:cubic-bezier(0.4,0,0.2,1); /* @kind other */
+  --transition-state:var(--duration-state) var(--ease-out); /* @kind other */
+  --transition-overlay:var(--duration-fast) var(--ease-out); /* @kind other */
+  --skeleton-pulse:1200ms; /* @kind other */
+}
+@media (prefers-reduced-motion:reduce){:root{
+  --duration-fast:0ms; /* @kind other */
+  --duration-state:0ms; /* @kind other */
+  --skeleton-pulse:0ms; /* @kind other */
+}}
+@keyframes sm-skeleton{0%{opacity:1}50%{opacity:0.55}100%{opacity:1}}

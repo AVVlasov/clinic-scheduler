@@ -86,12 +86,14 @@
   "taskIdPrefix": "TASK",
   "backpressure": {
     "$comment": "Быстрая проверка после КАЖДОЙ итерации, до верификации. Пустой массив = пропустить. Тяжёлым прогонам здесь не место. Команда, которой не существует, делает гейт красным всегда — и агент начинает чинить несуществующее.",
-    "typecheck": []
+    "typecheck": [
+      "npx --no-install tsc --noEmit"
+    ]
   },
   "tests": {
     "$comment": "Чем доказывается закрытая задача. runner: cargo|vitest|jest|pytest|go|custom. Пресеты команд и разбора вывода — в harness/require-tests.ps1; здесь можно переопределить любое поле. Без runner гейт «фича доказана тестами» не работает: общий прогон тестов зелен и на пустом месте.",
-    "runner": "",
-    "command": "",
+    "runner": "vitest",
+    "command": "npx --no-install vitest run --reporter=dot",
     "packageFlag": "",
     "passedPattern": "",
     "failedPattern": ""
@@ -129,7 +131,7 @@
   },
   "features": {
     "$comment": "Опциональные подсистемы. Выключены по умолчанию, чтобы цикл ехал без внешних зависимостей. memory требует pgvector + сервер эмбеддингов (bcf memory init). vision требует визуальный харнесс и дизайн-эталон: включать её без них значит получить зелёный гейт на пустоте.",
-    "memory": false,
+    "memory": true,
     "bugSupervisor": false,
     "hardCap": false,
     "fanout": false,
