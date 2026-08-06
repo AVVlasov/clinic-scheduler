@@ -75,14 +75,176 @@ const seedAppointments = (date) => {
   return base.map((a, i) => ({ id: `a-${String(i + 1).padStart(3, '0')}`, ...a }));
 };
 
+// Карточки врачей справочника администратора. Часть карточек намеренно неполная:
+// счётчик «Незаполненных карточек» в АРМ администратора обязан считаться по данным,
+// и на полностью заполненном наборе его нечем было бы проверить.
+const doctorCards = [
+  {
+    id: 'd-001',
+    specialties: ['Терапевт', 'Врач общей практики'],
+    site: 'Площадка на Ленина, 15',
+    temporarySites: ['Филиал на Гагарина, 3 — до 31 августа'],
+    admissionRules: ['Приём по записи', 'Детей не принимает'],
+    equipmentAccess: ['ЭКГ-аппарат', 'Тонометр суточный'],
+  },
+  {
+    id: 'd-002',
+    specialties: ['Кардиолог'],
+    site: 'Площадка на Ленина, 15',
+    temporarySites: [],
+    admissionRules: ['Приём по записи', 'Первичный приём 40 минут'],
+    equipmentAccess: ['ЭКГ-аппарат', 'УЗИ сердца'],
+  },
+  {
+    id: 'd-003',
+    specialties: ['Педиатр'],
+    site: 'Площадка на Ленина, 15',
+    temporarySites: [],
+    admissionRules: ['Приём по записи'],
+    equipmentAccess: [],
+  },
+  // Незаполненные карточки: без основной площадки и без специальностей.
+  { id: 'd-004', specialties: [], site: '', temporarySites: [], admissionRules: [], equipmentAccess: [] },
+  { id: 'd-005', specialties: ['Эндокринолог'], site: '', temporarySites: [], admissionRules: [], equipmentAccess: [] },
+  { id: 'd-006', specialties: [], site: '', temporarySites: [], admissionRules: [], equipmentAccess: [] },
+];
+
+// Шаблоны приёма на неделю: интервалы «врач × день». Часть дней намеренно не рабочая
+// (block/absent/off) — иначе итог публикации был бы равен простому произведению
+// врачей на дни и не доказывал бы, что число посчитано по шаблонам.
+const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+
+const weekTemplateSeed = {
+  'd-001': [
+    [{ start: '08:00', end: '14:00', kind: 'work' }],
+    [{ start: '08:00', end: '14:00', kind: 'work' }],
+    [{ start: '14:00', end: '20:00', kind: 'work' }],
+    [{ start: '08:00', end: '12:00', kind: 'break' }],
+    [{ start: '08:00', end: '14:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+  ],
+  'd-002': [
+    [{ start: '09:00', end: '15:00', kind: 'work' }],
+    [{ start: '09:00', end: '15:00', kind: 'work' }],
+    [{ start: '09:00', end: '15:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'absent' }],
+    [{ start: '09:00', end: '15:00', kind: 'work' }],
+    [{ start: '10:00', end: '13:00', kind: 'work' }],
+  ],
+  'd-003': [
+    [{ start: '08:00', end: '13:00', kind: 'work' }],
+    [{ start: '13:00', end: '18:00', kind: 'work' }],
+    [{ start: '08:00', end: '13:00', kind: 'work' }],
+    [{ start: '13:00', end: '18:00', kind: 'work' }],
+    [{ start: '08:00', end: '11:00', kind: 'break' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+  ],
+  'd-004': [
+    [{ start: '10:00', end: '16:00', kind: 'work' }],
+    [{ start: '10:00', end: '16:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'block' }],
+    [{ start: '10:00', end: '16:00', kind: 'work' }],
+    [{ start: '10:00', end: '16:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+  ],
+  'd-005': [
+    [{ start: '08:30', end: '12:30', kind: 'work' }],
+    [{ start: '08:30', end: '12:30', kind: 'work' }],
+    [{ start: '08:30', end: '12:30', kind: 'work' }],
+    [{ start: '08:30', end: '12:30', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'absent' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+  ],
+  'd-006': [
+    [{ start: '08:00', end: '20:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '08:00', end: '20:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '08:00', end: '20:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+  ],
+};
+
+const toMinutes = (hhmm) => {
+  const [hh, mm] = String(hhmm).split(':').map(Number);
+  return hh * 60 + mm;
+};
+
+const addDays = (date, n) => {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Понедельник недели, в которую попадает date.
+const weekStartOf = (date) => {
+  const d = new Date(`${date}T00:00:00`);
+  const shift = (d.getDay() + 6) % 7;
+  return addDays(date, -shift);
+};
+
+const buildWeekTemplates = (weekStart) => {
+  const days = WEEKDAYS.map((weekday, i) => ({ date: addDays(weekStart, i), weekday }));
+  const rows = state.doctors.map((doc) => ({
+    doctorId: doc.id,
+    doctorName: doc.name,
+    specialty: doc.specialty,
+    days: days.map((day, i) => ({
+      date: day.date,
+      weekday: day.weekday,
+      intervals: (weekTemplateSeed[doc.id] || [])[i] || [],
+    })),
+  }));
+  return {
+    weekStart,
+    weekEnd: addDays(weekStart, WEEKDAYS.length - 1),
+    days,
+    rows,
+    published: state.publishedWeeks.includes(weekStart),
+  };
+};
+
+// Итог публикации: слоты нарезаются шагом сетки только из рабочих интервалов.
+// Число слотов и число затронутых врачей считаются здесь, а не на экране.
+const countWeekSlots = (weekStart) => {
+  const { rows } = buildWeekTemplates(weekStart);
+  let slotsCreated = 0;
+  const doctors = new Set();
+
+  for (const row of rows) {
+    for (const day of row.days) {
+      for (const interval of day.intervals) {
+        if (interval.kind !== 'work') continue;
+        const span = toMinutes(interval.end) - toMinutes(interval.start);
+        if (span <= 0) continue;
+        slotsCreated += Math.floor(span / stepMinutes);
+        doctors.add(row.doctorId);
+      }
+    }
+  }
+
+  return { slotsCreated, doctorsAffected: doctors.size };
+};
+
 const buildState = () => {
   const date = today();
   return {
     doctors: doctors.map((d) => ({ ...d })),
+    doctorCards: doctorCards.map((c) => ({
+      ...c,
+      specialties: [...c.specialties],
+      temporarySites: [...c.temporarySites],
+      admissionRules: [...c.admissionRules],
+      equipmentAccess: [...c.equipmentAccess],
+    })),
     services: services.map((s) => ({ ...s })),
     patients: patients.map((p) => ({ ...p })),
     date,
     appointments: seedAppointments(date),
+    publishedWeeks: [],
     seq: 7,
   };
 };
@@ -146,4 +308,7 @@ module.exports = {
   dayEnd,
   overlaps,
   isoAt,
+  weekStartOf,
+  buildWeekTemplates,
+  countWeekSlots,
 };

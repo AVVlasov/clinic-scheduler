@@ -4,10 +4,15 @@ import type {
   Appointment,
   AppointmentList,
   CreateAppointmentInput,
+  DoctorCard,
+  DoctorCardList,
   DoctorList,
+  PublishWeekResult,
   RescheduleAppointmentInput,
+  SaveDoctorCardInput,
   Schedule,
   ServiceList,
+  WeekTemplates,
 } from './types'
 
 export class ApiError extends Error {
@@ -59,6 +64,27 @@ export const getAppointments = () => request<AppointmentList>('/appointments')
 export const getDoctors = () => request<DoctorList>('/doctors')
 
 export const getServices = () => request<ServiceList>('/services')
+
+export const getDoctorCards = () => request<DoctorCardList>('/doctor-cards')
+
+export const saveDoctorCard = (id: string, input: SaveDoctorCardInput) => request<DoctorCard>(
+  `/doctor-cards/${encodeURIComponent(id)}`,
+  {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  },
+)
+
+export const getWeekTemplates = (weekStart: string) => request<WeekTemplates>(
+  `/week-templates?weekStart=${encodeURIComponent(weekStart)}`,
+)
+
+export const publishWeek = (weekStart: string) => request<PublishWeekResult>('/week-templates/publish', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ weekStart }),
+})
 
 export const createAppointment = (input: CreateAppointmentInput) => request<Appointment>('/appointments', {
   method: 'POST',
