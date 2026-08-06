@@ -12,7 +12,18 @@ const decorate = (a) => {
     ...a,
     doctorName: doctor ? doctor.name : null,
     patientName: patient ? patient.name : null,
+    patientPhone: patient ? patient.phone : null,
+    patientBirthDate: patient ? patient.birthDate : null,
+    patientUid: patient ? `UID ${patient.id.replace(/^[a-z]-/, '').padStart(4, '0')} ${Math.abs(hashCode(patient.id)).toString().padStart(4, '0')}` : null,
   };
+};
+
+const hashCode = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return h;
 };
 
 router.get('/appointments', (req, res) => {

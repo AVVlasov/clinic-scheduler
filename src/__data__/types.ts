@@ -59,6 +59,9 @@ export interface Appointment {
   serviceId: string | null
   doctorName: string | null
   patientName: string | null
+  patientPhone: string | null
+  patientBirthDate: string | null
+  patientUid: string | null
 }
 
 export interface AppointmentList {
