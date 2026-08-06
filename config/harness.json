@@ -93,7 +93,7 @@
   "tests": {
     "$comment": "Чем доказывается закрытая задача. runner: cargo|vitest|jest|pytest|go|custom. Пресеты команд и разбора вывода — в harness/require-tests.ps1; здесь можно переопределить любое поле. Без runner гейт «фича доказана тестами» не работает: общий прогон тестов зелен и на пустом месте.",
     "runner": "vitest",
-    "command": "npx --no-install vitest run --reporter=dot",
+    "command": "",
     "packageFlag": "",
     "passedPattern": "",
     "failedPattern": ""
