@@ -65,4 +65,8 @@ router.get('/services', (req, res) => {
   res.json({ items: state.services });
 });
 
+router.get('/patients', (req, res) => {
+  res.json({ items: state.patients });
+});
+
 module.exports = router;

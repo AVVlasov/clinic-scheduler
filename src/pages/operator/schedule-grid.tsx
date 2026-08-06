@@ -19,6 +19,8 @@ interface ScheduleGridProps {
   appointments: Appointment[]
   selectedTime: string | null
   selectedDoctorId: string | null
+  rescheduleTargetTime?: string | null
+  rescheduleTargetDoctorId?: string | null
   onSlotClick: (slot: ScheduleSlot, doctor: SlotResource) => void
 }
 
@@ -36,17 +38,23 @@ const SlotCell = ({
   doctor,
   appointment,
   selected,
+  isRescheduleTarget,
   onClick,
 }: {
   slot: ScheduleSlot
   doctor: SlotResource
   appointment?: Appointment
   selected: boolean
+  isRescheduleTarget: boolean
   onClick: () => void
 }) => {
   const isBusy = doctor.busy
   const bg = isBusy ? 'brandGreenTint' : 'white'
-  const barColor = isBusy ? 'brandGreen' : 'transparent'
+  const barColor = isRescheduleTarget
+    ? 'brandOrange'
+    : isBusy
+      ? 'brandGreen'
+      : 'transparent'
   const label = isBusy && appointment ? appointment.patientName ?? doctor.name : ''
   const ariaLabel = `${slot.time} ${doctor.name}${isBusy ? ' занят' : ' свободен'}`
 
@@ -79,6 +87,7 @@ const SlotCell = ({
       alignItems="center"
       px="2"
       overflow="hidden"
+      data-reschedule-target={isRescheduleTarget ? 'true' : 'false'}
       _hover={{ bg: 'brandGreenFaint' }}
       _focusVisible={{
         outline: '2px solid',
@@ -107,6 +116,8 @@ export const ScheduleGrid = ({
   appointments,
   selectedTime,
   selectedDoctorId,
+  rescheduleTargetTime,
+  rescheduleTargetDoctorId,
   onSlotClick,
 }: ScheduleGridProps) => {
   const slots = schedule.slots
@@ -205,6 +216,9 @@ export const ScheduleGrid = ({
               const appt = appointmentFor(appointments, doc.id, doc.appointmentId)
               const selected =
                 selectedTime === slot.time && selectedDoctorId === doc.id
+              const isRescheduleTarget =
+                rescheduleTargetTime === slot.time &&
+                rescheduleTargetDoctorId === doc.id
               return (
                 <SlotCell
                   key={`${slot.time}-${doc.id}`}
@@ -212,6 +226,7 @@ export const ScheduleGrid = ({
                   doctor={doc}
                   appointment={appt}
                   selected={selected}
+                  isRescheduleTarget={isRescheduleTarget}
                   onClick={() => onSlotClick(slot, doc)}
                 />
               )

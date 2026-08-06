@@ -7,6 +7,7 @@ import type {
   DoctorCard,
   DoctorCardList,
   DoctorList,
+  PatientList,
   PublishWeekResult,
   RescheduleAppointmentInput,
   SaveDoctorCardInput,
@@ -74,6 +75,8 @@ export const getAppointments = () => request<AppointmentList>('/appointments')
 export const getDoctors = () => request<DoctorList>('/doctors')
 
 export const getServices = () => request<ServiceList>('/services')
+
+export const getPatients = () => request<PatientList>('/patients')
 
 export const getDoctorCards = () => request<DoctorCardList>('/doctor-cards')
 
