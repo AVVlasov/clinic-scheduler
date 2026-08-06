@@ -100,7 +100,15 @@ export const DoctorPage = () => {
     if (!isVisitFormValid(state) || selected.status === 'completed') return
     setIsSubmitting(true)
     try {
-      const updated = await rescheduleAppointment(selected.id, { status: 'completed' })
+      const updated = await rescheduleAppointment(selected.id, {
+        status: 'completed',
+        complaints: state.complaints,
+        diagnosis: state.diagnosis,
+        visitType: state.visitType,
+        performedServiceIds: state.selectedServiceIds,
+        recommendations: state.recommendations,
+        nextVisit: state.nextVisit || null,
+      })
       setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Не удалось завершить приём')

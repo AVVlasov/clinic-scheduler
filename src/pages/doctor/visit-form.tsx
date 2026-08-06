@@ -40,10 +40,7 @@ const FOLLOW_UP_PRESETS = [
   'Повторная консультация',
 ]
 
-const formatPrice = (s: Service): string => {
-  const sum = s.name.length + s.duration
-  return `${sum * 250} ₽`
-}
+const formatPrice = (s: Service): string => `${s.price} ₽`
 
 const formatCode = (s: Service): string => {
   const prefix = s.category === 'Приём' ? 'PRM' : s.category === 'Диагностика' ? 'DGN' : 'LAB'
@@ -271,7 +268,7 @@ export const VisitForm = ({
                   fontVariantNumeric="tabular-nums"
                 >
                   {chosenServices
-                    .reduce((acc, s) => acc + (s.name.length + s.duration) * 250, 0)
+                    .reduce((acc, s) => acc + s.price, 0)
                     .toString()
                     .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}{' '}
                   ₽

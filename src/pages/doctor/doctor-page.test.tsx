@@ -196,6 +196,12 @@ describe('DoctorPage', () => {
     fireEvent.change(screen.getByTestId('visit-diagnosis'), {
       target: { value: 'K01.1 Ретенированный зуб' },
     })
+    fireEvent.click(screen.getByTestId('visit-type-repeat'))
+    fireEvent.click(screen.getByTestId('visit-service-s-001'))
+    fireEvent.click(screen.getByTestId('visit-rec-Контрольный осмотр через 7 дней'))
+    fireEvent.change(screen.getByTestId('visit-next'), {
+      target: { value: 'через 14 дней' },
+    })
 
     const finish = screen.getByTestId('visit-finish') as HTMLButtonElement
     expect(finish.disabled).toBe(false)
@@ -207,7 +213,15 @@ describe('DoctorPage', () => {
     })
 
     expect(patchedId).toBe('a-001')
-    expect(JSON.parse(String(patchedBody))).toEqual({ status: 'completed' })
+    expect(JSON.parse(String(patchedBody))).toEqual({
+      status: 'completed',
+      complaints: 'Боль в области 38 зуба третьи сутки',
+      diagnosis: 'K01.1 Ретенированный зуб',
+      visitType: 'repeat',
+      performedServiceIds: ['s-001'],
+      recommendations: ['Контрольный осмотр через 7 дней'],
+      nextVisit: 'через 14 дней',
+    })
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/appointments/a-001'),
       expect.objectContaining({ method: 'PATCH' }),
@@ -216,6 +230,104 @@ describe('DoctorPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('visit-status-badge').textContent).toBe('Завершён')
     })
+  })
+
+  it('протокол переживает перезагрузку: после PATCH следующий GET /appointments возвращает все поля протокола', async () => {
+    let patchedBody: unknown = null
+    const storedAppointments: Appointment[] = [...baseAppointments]
+    const refetchedLists: Appointment[][] = []
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      if (method === 'GET' && url.endsWith('/appointments')) {
+        const list = storedAppointments.map((a) => ({ ...a }))
+        refetchedLists.push(list)
+        return jsonResponse({ items: list })
+      }
+      if (method === 'GET' && url.endsWith('/services')) {
+        return jsonResponse({ items: baseServices })
+      }
+      if (method === 'PATCH' && url.includes('/appointments/')) {
+        const match = url.match(/\/appointments\/([^/?]+)/)
+        const id = match?.[1] ?? ''
+        patchedBody = init?.body
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>
+        const target = storedAppointments.find((a) => a.id === id) as Appointment
+        const updated: Appointment = {
+          ...target,
+          status: 'completed',
+          complaints: typeof body.complaints === 'string' ? body.complaints : target.complaints,
+          diagnosis: typeof body.diagnosis === 'string' ? body.diagnosis : target.diagnosis,
+          visitType: body.visitType === 'first' || body.visitType === 'repeat' ? body.visitType : target.visitType,
+          performedServiceIds: Array.isArray(body.performedServiceIds)
+            ? body.performedServiceIds.filter((v): v is string => typeof v === 'string')
+            : target.performedServiceIds,
+          recommendations: Array.isArray(body.recommendations)
+            ? body.recommendations.filter((v): v is string => typeof v === 'string')
+            : target.recommendations,
+          nextVisit: typeof body.nextVisit === 'string' ? body.nextVisit : target.nextVisit,
+        }
+        const idx = storedAppointments.findIndex((a) => a.id === id)
+        storedAppointments[idx] = updated
+        return jsonResponse(updated)
+      }
+      throw new Error(`Unexpected fetch: ${method} ${url}`)
+    })
+
+    const { unmount } = renderPage()
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Алексеев Игорь Николаевич').length).toBeGreaterThan(0)
+    })
+
+    fireEvent.change(screen.getByTestId('visit-complaints'), {
+      target: { value: 'Головная боль в височной области третьи сутки' },
+    })
+    fireEvent.change(screen.getByTestId('visit-diagnosis'), {
+      target: { value: 'G44.1 Сосудистая головная боль' },
+    })
+    fireEvent.click(screen.getByTestId('visit-type-repeat'))
+    fireEvent.click(screen.getByTestId('visit-service-s-003'))
+    fireEvent.click(screen.getByTestId('visit-rec-КТ контрольная через 14 дней'))
+    fireEvent.click(screen.getByTestId('visit-rec-Снятие швов через 10 дней'))
+    fireEvent.change(screen.getByTestId('visit-next'), {
+      target: { value: 'через 7 дней' },
+    })
+
+    fireEvent.click(screen.getByTestId('visit-finish'))
+
+    await waitFor(() => {
+      expect(patchedBody).not.toBeNull()
+    })
+
+    unmount()
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(refetchedLists.length).toBeGreaterThan(1)
+    })
+
+    const afterReload = refetchedLists[refetchedLists.length - 1]
+    const persisted = afterReload.find((a) => a.id === 'a-001') as Appointment
+
+    expect(persisted.status).toBe('completed')
+    expect(persisted.complaints).toBe('Головная боль в височной области третьи сутки')
+    expect(persisted.diagnosis).toBe('G44.1 Сосудистая головная боль')
+    expect(persisted.visitType).toBe('repeat')
+    expect(persisted.performedServiceIds).toEqual(['s-003'])
+    expect(persisted.recommendations).toEqual([
+      'КТ контрольная через 14 дней',
+      'Снятие швов через 10 дней',
+    ])
+    expect(persisted.nextVisit).toBe('через 7 дней')
+
+    expect(screen.getByTestId('visit-status-badge').textContent).toBe('Завершён')
+    const getAppointmentCalls = fetchMock.mock.calls.filter(
+      (c) => String(c[0]).endsWith('/appointments') && (c[1]?.method ?? 'GET') === 'GET',
+    )
+    expect(getAppointmentCalls.length).toBeGreaterThan(1)
   })
 
   it('«Завершить приём» заблокирована, пока жалобы или диагноз пусты', async () => {
