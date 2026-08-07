@@ -33,17 +33,27 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(dt).toBeGreaterThanOrEqual(TIMER_MS - TIMER_TOLERANCE_MS);
     });
 
-    test('schedule — отдаёт непустую сетку слотов с >=5 врачами и шагом 15 минут', async () => {
+    test('schedule — отдаёт непустую сетку слотов, шаг 15 минут, слоты привязаны к опубликованным шаблонам', async () => {
       const res = await request(app).get(`/schedule?date=${stateRef.date}`);
       expect(res.status).toBe(200);
       expect(res.body.date).toBe(stateRef.date);
       expect(res.body.stepMinutes).toBe(15);
       expect(Array.isArray(res.body.slots)).toBe(true);
-      expect(res.body.slots.length).toBeGreaterThanOrEqual(48);
+      expect(res.body.slots.length).toBeGreaterThan(0);
+      const times = res.body.slots.map((s) => s.time);
+      const sorted = [...times].sort();
+      expect(times).toEqual(sorted);
+      for (let i = 1; i < res.body.slots.length; i++) {
+        const prev = res.body.slots[i - 1].time;
+        const cur = res.body.slots[i].time;
+        const [ph, pm] = prev.split(':').map(Number);
+        const [ch, cm] = cur.split(':').map(Number);
+        expect(ch * 60 + cm - (ph * 60 + pm)).toBe(15);
+      }
       const first = res.body.slots[0];
       expect(typeof first.time).toBe('string');
       expect(Array.isArray(first.doctors)).toBe(true);
-      expect(first.doctors.length).toBeGreaterThanOrEqual(5);
+      expect(first.doctors.length).toBeGreaterThanOrEqual(1);
       expect(typeof first.doctors[0].busy).toBe('boolean');
     });
 
@@ -53,12 +63,11 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(anyBusy).toBe(true);
     });
 
-    test('schedule — пустая дата возвращает сетку без busy (нет коллизий)', async () => {
+    test('schedule — неопубликованная неделя возвращает пустую сетку (нет слотов без врачей)', async () => {
       const res = await request(app).get('/schedule/2099-01-01');
       expect(res.status).toBe(200);
-      expect(res.body.slots.length).toBeGreaterThanOrEqual(48);
-      const anyBusy = res.body.slots.some((s) => s.doctors.some((d) => d.busy));
-      expect(anyBusy).toBe(false);
+      expect(Array.isArray(res.body.slots)).toBe(true);
+      expect(res.body.slots.length).toBe(0);
     });
   });
 
