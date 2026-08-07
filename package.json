@@ -11,8 +11,9 @@
         "clean": "rimraf dist",
         "compile": "brojs compile",
         "prom": "npm run compile && brojs prom-server --port=8099",
-        "eslint": "npx eslint ./src/**/*",
-        "eslint:fix": "npx eslint ./src/**/* --fix"
+        "eslint": "eslint ./src --max-warnings=0",
+        "eslint:fix": "eslint ./src --fix",
+        "typecheck": "tsc --noEmit"
     },
     "repository": {
         "type": "git",
