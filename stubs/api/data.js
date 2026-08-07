@@ -218,21 +218,32 @@ const buildWeekTemplates = (weekStart) => {
 
 // Итог публикации: слоты нарезаются шагом сетки только из рабочих интервалов.
 // Число слотов и число затронутых врачей считаются здесь, а не на экране.
+// slotsCreated = суммарное количество временных слотов за неделю
+// (каждый (день, время) — отдельный слот), совпадает с sum(slots.length) по дням из GET /schedule.
 const countWeekSlots = (weekStart) => {
   const { rows } = buildWeekTemplates(weekStart);
   let slotsCreated = 0;
   const doctors = new Set();
 
-  for (const row of rows) {
-    for (const day of row.days) {
-      for (const interval of day.intervals) {
+  for (let dayIdx = 0; dayIdx < WEEKDAYS.length; dayIdx++) {
+    const dayTimes = new Set();
+    for (const row of rows) {
+      const intervals = (row.days[dayIdx] && row.days[dayIdx].intervals) || [];
+      for (const interval of intervals) {
         if (interval.kind !== 'work') continue;
         const span = toMinutes(interval.end) - toMinutes(interval.start);
         if (span <= 0) continue;
-        slotsCreated += Math.floor(span / stepMinutes);
         doctors.add(row.doctorId);
+        const workStart = toMinutes(interval.start);
+        const workEnd = workStart + Math.floor(span / stepMinutes) * stepMinutes;
+        for (let m = workStart; m < workEnd; m += stepMinutes) {
+          const hh = String(Math.floor(m / 60)).padStart(2, '0');
+          const mm = String(m % 60).padStart(2, '0');
+          dayTimes.add(`${hh}:${mm}`);
+        }
       }
     }
+    slotsCreated += dayTimes.size;
   }
 
   return { slotsCreated, doctorsAffected: doctors.size };
@@ -253,7 +264,7 @@ const buildState = () => {
     patients: patients.map((p) => ({ ...p })),
     date,
     appointments: seedAppointments(date),
-    publishedWeeks: [],
+    publishedWeeks: [weekStartOf(date)],
     seq: 7,
   };
 };
@@ -269,31 +280,88 @@ const stepMinutes = 15;
 const dayStart = '08:00';
 const dayEnd = '20:00';
 
+const dayIndex = (date) => {
+  const d = new Date(`${date}T00:00:00`);
+  const js = d.getDay();
+  return js === 0 ? 6 : js - 1;
+};
+
 const buildSlots = (date) => {
-  const startTotal = 8 * 60;
-  const endTotal = 20 * 60;
-  const slots = [];
-  for (let m = startTotal; m < endTotal; m += stepMinutes) {
-    const hh = String(Math.floor(m / 60)).padStart(2, '0');
-    const mm = String(m % 60).padStart(2, '0');
-    const slotStart = new Date(`${date}T${hh}:${mm}:00`);
+  const weekStart = weekStartOf(date);
+  if (!state.publishedWeeks.includes(weekStart)) {
+    return [];
+  }
+  const di = dayIndex(date);
+  if (di < 0 || di > 5) {
+    return [];
+  }
+
+  const intervalsByDoctor = new Map();
+  for (const doc of state.doctors) {
+    const dayIntervals = (weekTemplateSeed[doc.id] || [])[di] || [];
+    intervalsByDoctor.set(doc.id, dayIntervals);
+  }
+
+  const slotMap = new Map();
+  const addSlot = (hh, mm) => {
+    const key = `${hh}:${mm}`;
+    if (!slotMap.has(key)) {
+      slotMap.set(key, { time: key, doctors: [] });
+    }
+    return slotMap.get(key);
+  };
+
+  for (const doc of state.doctors) {
+    const intervals = intervalsByDoctor.get(doc.id) || [];
+    for (const interval of intervals) {
+      if (interval.kind !== 'work') continue;
+      const span = toMinutes(interval.end) - toMinutes(interval.start);
+      if (span <= 0) continue;
+      const workStart = toMinutes(interval.start);
+      const workEnd = workStart + Math.floor(span / stepMinutes) * stepMinutes;
+      for (let m = workStart; m < workEnd; m += stepMinutes) {
+        const hh = String(Math.floor(m / 60)).padStart(2, '0');
+        const mm = String(m % 60).padStart(2, '0');
+        addSlot(hh, mm);
+      }
+    }
+  }
+
+  const slots = Array.from(slotMap.values()).sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+
+  for (const slot of slots) {
+    const slotStart = new Date(`${date}T${slot.time}:00`);
     const slotEnd = new Date(slotStart.getTime() + stepMinutes * 60000);
-    const doctorsForSlot = state.doctors.map((doc) => {
+    for (const doc of state.doctors) {
+      const intervals = intervalsByDoctor.get(doc.id) || [];
+      let inWork = false;
+      for (const interval of intervals) {
+        if (interval.kind !== 'work') continue;
+        const span = toMinutes(interval.end) - toMinutes(interval.start);
+        if (span <= 0) continue;
+        const wStart = new Date(`${date}T${interval.start}:00`).getTime();
+        const wEnd = new Date(`${date}T${interval.end}:00`).getTime();
+        if (slotStart.getTime() >= wStart && slotEnd.getTime() <= wEnd) {
+          inWork = true;
+          break;
+        }
+      }
+      if (!inWork) continue;
       const collision = state.appointments.find((a) => {
         if (a.doctorId !== doc.id) return false;
         const aStart = new Date(a.start).getTime();
         const aEnd = aStart + a.durationMin * 60000;
         return aStart < slotEnd.getTime() && aEnd > slotStart.getTime();
       });
-      return {
+      slot.doctors.push({
         id: doc.id,
         name: doc.name,
         busy: Boolean(collision),
         appointmentId: collision ? collision.id : undefined,
-      };
-    });
-    slots.push({ time: `${hh}:${mm}`, doctors: doctorsForSlot });
+      });
+    }
   }
+
   return slots;
 };
 
@@ -315,9 +383,11 @@ module.exports = {
   stepMinutes,
   dayStart,
   dayEnd,
+  dayIndex,
   overlaps,
   isoAt,
   weekStartOf,
   buildWeekTemplates,
   countWeekSlots,
+  weekTemplateSeed,
 };
