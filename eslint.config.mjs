@@ -20,7 +20,7 @@ export default [
   { files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'] },
   { languageOptions: { globals: globals.browser } },
   {
-    ignores: ['stubs/', 'bro.config.js'],
+    ignores: ['bro.config.js'],
   },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
@@ -52,6 +52,22 @@ export default [
       ],
       semi: ['error', 'never'],
       '@stylistic/indent': ['error', 2],
+    },
+  },
+  {
+    files: ['stubs/**/*.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.jest } },
+    rules: {
+      semi: 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-unused-vars': 'off',
+    },
+  },
+  {
+    files: ['stubs/**/*.test.js'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
 ]
