@@ -19,9 +19,13 @@ describe('stubs/api — express-стабы расписания, записей 
   let app;
   let stateRef;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     app = buildApp();
     stateRef = require('./data').state;
+    for (const weekStart of ['2030-04-15', '2030-04-22', '2030-04-29', '2030-05-27', '2030-06-03', '2030-07-01', '2030-08-26', '2030-09-02', '2030-09-09', '2030-09-30']) {
+      const res = await request(app).post('/week-templates/publish').send({ weekStart });
+      expect([200, 409]).toContain(res.status);
+    }
   });
 
   describe('GET /schedule', () => {
@@ -123,7 +127,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-006',
           patientId: 'p-002',
-          start: '2030-04-16T09:00:00',
+          start: '2030-04-15T09:00:00',
           durationMin: 30,
         });
       expect(first.status).toBe(201);
@@ -133,7 +137,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-006',
           patientId: 'p-003',
-          start: '2030-04-16T09:15:00',
+          start: '2030-04-15T09:15:00',
           durationMin: 30,
         });
       expect(dup.status).toBe(409);
@@ -146,7 +150,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-001',
           patientId: 'p-003',
-          start: '2030-04-17T09:00:00',
+          start: '2030-04-15T09:00:00',
           durationMin: 30,
         });
       const resB = await request(app)
@@ -154,7 +158,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-002',
           patientId: 'p-003',
-          start: '2030-04-17T09:00:00',
+          start: '2030-04-15T09:00:00',
           durationMin: 30,
         });
       expect(resA.status).toBe(201);
@@ -169,16 +173,16 @@ describe('stubs/api — express-стабы расписания, записей 
       const res = await request(app)
         .post('/appointments')
         .send({
-          doctorId: 'd-005',
+          doctorId: 'd-002',
           patientId: 'p-004',
-          start: '2030-05-01T09:00:00',
+          start: '2030-04-29T09:00:00',
           durationMin: 30,
         });
       createdId = res.body.id;
     });
 
     test('patch appointment — перенос времени → 200, изменения видны в /appointments', async () => {
-      const newStart = new Date('2030-05-01T11:30:00Z').toISOString();
+      const newStart = new Date('2030-04-29T11:30:00Z').toISOString();
       const patch = await request(app)
         .patch(`/appointments/${createdId}`)
         .send({ start: newStart });
@@ -193,7 +197,7 @@ describe('stubs/api — express-стабы расписания, записей 
     test('patch appointment — перенос на другой врач и время → 200', async () => {
       const patch = await request(app)
         .patch(`/appointments/${createdId}`)
-        .send({ doctorId: 'd-002', start: '2030-05-01T14:00:00' });
+        .send({ doctorId: 'd-002', start: '2030-04-29T13:00:00' });
       expect(patch.status).toBe(200);
       expect(patch.body.doctorId).toBe('d-002');
     });
@@ -204,7 +208,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-004',
           patientId: 'p-001',
-          start: '2030-06-01T09:00:00',
+          start: '2030-06-04T10:00:00',
           durationMin: 30,
         });
       const b = await request(app)
@@ -212,7 +216,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-004',
           patientId: 'p-002',
-          start: '2030-06-01T10:00:00',
+          start: '2030-06-04T11:00:00',
           durationMin: 30,
         });
       expect(a.status).toBe(201);
@@ -220,7 +224,7 @@ describe('stubs/api — express-стабы расписания, записей 
 
       const patch = await request(app)
         .patch(`/appointments/${b.body.id}`)
-        .send({ start: '2030-06-01T09:15:00' });
+        .send({ start: '2030-06-04T10:15:00' });
       expect(patch.status).toBe(409);
       expect(patch.body.error).toBe('slot_taken');
     });
@@ -228,7 +232,7 @@ describe('stubs/api — express-стабы расписания, записей 
     test('patch not found — неизвестный id → 404', async () => {
       const res = await request(app)
         .patch('/appointments/a-9999')
-        .send({ start: '2030-06-01T15:00:00' });
+        .send({ start: '2030-06-04T15:00:00' });
       expect(res.status).toBe(404);
     });
   });
@@ -277,7 +281,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-001',
           patientId: 'p-002',
-          start: '2030-09-01T09:00:00',
+          start: '2030-09-02T09:00:00',
           durationMin: 30,
         });
       expect(create.status).toBe(201);
@@ -374,11 +378,11 @@ describe('stubs/api — express-стабы расписания, записей 
     test('409 занятого слота возвращает {error: "slot_taken", message: "..."}', async () => {
       const a = await request(app)
         .post('/appointments')
-        .send({ doctorId: 'd-006', patientId: 'p-001', start: '2030-10-01T09:00:00', durationMin: 30 });
+        .send({ doctorId: 'd-006', patientId: 'p-001', start: '2030-09-04T09:00:00', durationMin: 30 });
       expect(a.status).toBe(201);
       const b = await request(app)
         .post('/appointments')
-        .send({ doctorId: 'd-006', patientId: 'p-002', start: '2030-10-01T09:15:00', durationMin: 30 });
+        .send({ doctorId: 'd-006', patientId: 'p-002', start: '2030-09-04T09:15:00', durationMin: 30 });
       expect(b.status).toBe(409);
       expect(b.body.error).toBe('slot_taken');
       expect(typeof b.body.message).toBe('string');
@@ -392,7 +396,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-003',
           patientId: 'p-001',
-          start: '2030-07-01T13:00:00',
+          start: '2030-07-02T13:00:00',
           durationMin: 15,
         });
       const dup = await request(app)
@@ -400,7 +404,7 @@ describe('stubs/api — express-стабы расписания, записей 
         .send({
           doctorId: 'd-003',
           patientId: 'p-002',
-          start: '2030-07-01T13:00:00',
+          start: '2030-07-02T13:00:00',
           durationMin: 15,
         });
       expect(first.status).toBe(201);

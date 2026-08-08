@@ -37,9 +37,13 @@ describe('stubs/api — атомарность PATCH /appointments/:id', () => {
   let app;
   let stateRef;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     app = buildApp();
     stateRef = require('./data').state;
+    for (const weekStart of ['2030-11-04', '2030-11-11', '2030-12-01', '2030-12-08']) {
+      const res = await request(app).post('/week-templates/publish').send({ weekStart });
+      expect([200, 409]).toContain(res.status);
+    }
   });
 
   test('PATCH с невалидным протоколом (visitType=unknown) не оставляет следов в записи', async () => {
@@ -48,7 +52,7 @@ describe('stubs/api — атомарность PATCH /appointments/:id', () => {
       .send({
         doctorId: 'd-001',
         patientId: 'p-001',
-        start: '2030-11-10T09:00:00',
+        start: '2030-11-11T09:00:00',
         durationMin: 30,
         status: 'scheduled',
       });
@@ -61,7 +65,7 @@ describe('stubs/api — атомарность PATCH /appointments/:id', () => {
       .patch(`/appointments/${id}`)
       .send({
         doctorId: 'd-002',
-        start: '2030-11-10T10:30:00',
+        start: '2030-11-11T10:30:00',
         visitType: 'unknown',
       });
     expect(patch.status).toBe(400);
@@ -77,7 +81,7 @@ describe('stubs/api — атомарность PATCH /appointments/:id', () => {
       .send({
         doctorId: 'd-001',
         patientId: 'p-002',
-        start: '2030-11-11T09:00:00',
+        start: '2030-11-11T10:00:00',
         durationMin: 30,
         status: 'arrived',
       });
@@ -142,7 +146,7 @@ describe('stubs/api — атомарность PATCH /appointments/:id', () => {
       .send({
         doctorId: 'd-001',
         patientId: 'p-001',
-        start: '2030-11-13T09:00:00',
+        start: '2030-11-11T13:00:00',
         durationMin: 30,
       });
     expect(create.status).toBe(201);
@@ -169,8 +173,12 @@ describe('stubs/api — атомарность PATCH /appointments/:id', () => {
 describe('stubs/api — машина состояний статуса записи', () => {
   let app;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     app = buildApp();
+    for (const weekStart of ['2030-12-01', '2030-12-08']) {
+      const res = await request(app).post('/week-templates/publish').send({ weekStart });
+      expect([200, 409]).toContain(res.status);
+    }
   });
 
   const createAt = async (start, patient = 'p-001', doctor = 'd-001') => {
@@ -187,7 +195,7 @@ describe('stubs/api — машина состояний статуса запи�
   };
 
   test('completed → arrived отклоняется (409 invalid_state_transition)', async () => {
-    const id = await createAt('2030-12-01T09:00:00');
+    const id = await createAt('2030-11-25T09:00:00');
 
     const toArrived = await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
     expect(toArrived.status).toBe(200);
@@ -242,7 +250,7 @@ describe('stubs/api — машина состояний статуса запи�
   });
 
   test('scheduled → arrived → completed: разрешённая цепочка работает', async () => {
-    const id = await createAt('2030-12-04T09:00:00', 'p-004', 'd-001');
+    const id = await createAt('2030-12-03T10:00:00', 'p-004', 'd-001');
 
     const r1 = await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
     expect(r1.status).toBe(200);
@@ -254,7 +262,7 @@ describe('stubs/api — машина состояний статуса запи�
   });
 
   test('scheduled → in_progress → completed: разрешённая цепочка работает', async () => {
-    const id = await createAt('2030-12-05T09:00:00', 'p-001', 'd-003');
+    const id = await createAt('2030-12-02T09:00:00', 'p-001', 'd-003');
 
     const r1 = await request(app).patch(`/appointments/${id}`).send({ status: 'in_progress' });
     expect(r1.status).toBe(200);
@@ -266,12 +274,12 @@ describe('stubs/api — машина состояний статуса запи�
   });
 
   test('scheduled → no_show допустим, completed → no_show отклоняется', async () => {
-    const idA = await createAt('2030-12-06T09:00:00', 'p-002', 'd-004');
+    const idA = await createAt('2030-11-25T10:00:00', 'p-002', 'd-004');
     const r1 = await request(app).patch(`/appointments/${idA}`).send({ status: 'no_show' });
     expect(r1.status).toBe(200);
     expect(r1.body.status).toBe('no_show');
 
-    const idB = await createAt('2030-12-07T09:00:00', 'p-003', 'd-005');
+    const idB = await createAt('2030-11-25T09:00:00', 'p-003', 'd-005');
     await request(app).patch(`/appointments/${idB}`).send({ status: 'arrived' });
     await request(app).patch(`/appointments/${idB}`).send({ status: 'completed' });
 
@@ -281,7 +289,7 @@ describe('stubs/api — машина состояний статуса запи�
   });
 
   test('неизвестный статус → 400 invalid_status (а не молчаливое принятие)', async () => {
-    const id = await createAt('2030-12-08T09:00:00', 'p-004', 'd-006');
+    const id = await createAt('2030-11-29T09:00:00', 'p-004', 'd-006');
 
     const before = await fetchAppointment(app, id);
     const patch = await request(app).patch(`/appointments/${id}`).send({ status: 'super_done' });
@@ -293,7 +301,7 @@ describe('stubs/api — машина состояний статуса запи�
   });
 
   test('PATCH без поля status на завершённой записи не меняет её (допустимо редактировать протокол, статус остаётся completed)', async () => {
-    const id = await createAt('2030-12-09T09:00:00', 'p-001', 'd-001');
+    const id = await createAt('2030-12-02T10:00:00', 'p-001', 'd-001');
     await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
     await request(app).patch(`/appointments/${id}`).send({ status: 'completed' });
 

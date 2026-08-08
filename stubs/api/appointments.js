@@ -1,7 +1,15 @@
 'use strict';
 
 const { Router } = require('express');
-const { state, newId, overlaps } = require('./data');
+const { state, newId, overlaps, weekStartOf, weekTemplateSeed } = require('./data');
+const {
+  APPOINTMENT_STATUSES,
+  PAYMENT_TYPES,
+  isStatusTransitionAllowed,
+  isAppointmentStatus,
+  isPaymentType,
+  isWithinPublishedShift,
+} = require('./lifecycle');
 
 const router = Router();
 
@@ -9,20 +17,27 @@ const PROTOCOL_STRING_FIELDS = ['complaints', 'diagnosis', 'nextVisit'];
 const PROTOCOL_STRING_LIST_FIELDS = ['performedServiceIds', 'recommendations'];
 const PROTOCOL_VISIT_TYPES = new Set(['first', 'repeat']);
 
-const APPOINTMENT_STATUSES = ['scheduled', 'arrived', 'in_progress', 'completed', 'cancelled', 'no_show'];
-
-const STATUS_TRANSITIONS = {
-  scheduled:    new Set(['arrived', 'in_progress', 'cancelled', 'no_show']),
-  arrived:      new Set(['in_progress', 'completed', 'cancelled', 'no_show']),
-  in_progress:  new Set(['completed', 'cancelled', 'no_show']),
-  completed:    new Set(),
-  cancelled:    new Set(),
-  no_show:      new Set(),
-};
-
-const isStatusTransitionAllowed = (from, to) => {
-  if (!STATUS_TRANSITIONS[from]) return false;
-  return STATUS_TRANSITIONS[from].has(to);
+const checkShift = (doctorId, start, durationMin) => {
+  const date = String(start).slice(0, 10);
+  const weekStart = weekStartOf(date);
+  if (!isWithinPublishedShift(
+    date,
+    start,
+    durationMin,
+    doctorId,
+    weekStart,
+    weekTemplateSeed,
+    state.publishedWeeks,
+  )) {
+    return {
+      ok: false,
+      body: {
+        error: 'outside_shift',
+        message: `Интервал ${start}+${durationMin}м не попадает в опубликованный рабочий шаблон врача ${doctorId}`,
+      },
+    };
+  }
+  return { ok: true };
 };
 
 const tryApplyProtocolPatch = (draft, body) => {
@@ -106,6 +121,28 @@ router.post('/appointments', (req, res) => {
     return res.status(400).json({ error: 'invalid_duration', message: 'Длительность должна быть положительным числом' });
   }
 
+  if (status !== undefined && status !== null) {
+    if (!isAppointmentStatus(status)) {
+      return res.status(400).json({
+        error: 'invalid_status',
+        message: `Статус «${status}» не поддерживается`,
+      });
+    }
+  }
+  if (paymentType !== undefined && paymentType !== null) {
+    if (!isPaymentType(paymentType)) {
+      return res.status(400).json({
+        error: 'invalid_payment_type',
+        message: `Тип оплаты «${paymentType}» не поддерживается`,
+      });
+    }
+  }
+
+  const shift = checkShift(doctorId, start, numericDuration);
+  if (!shift.ok) {
+    return res.status(409).json(shift.body);
+  }
+
   const collision = state.appointments.find((a) => overlaps(a, doctorId, start, numericDuration));
   if (collision) {
     return res.status(409).json({
@@ -163,6 +200,18 @@ router.patch('/appointments/:id', (req, res) => {
     return res.status(400).json({ error: 'doctor_not_found', message: 'Врач не найден' });
   }
 
+  const timeChanged = (
+    nextDoctorId !== a.doctorId
+    || nextStart !== a.start
+    || nextDuration !== a.durationMin
+  );
+  if (timeChanged) {
+    const shift = checkShift(nextDoctorId, nextStart, nextDuration);
+    if (!shift.ok) {
+      return res.status(409).json(shift.body);
+    }
+  }
+
   const collision = state.appointments.find((other) =>
     overlaps(other, nextDoctorId, nextStart, nextDuration, id),
   );
@@ -174,7 +223,7 @@ router.patch('/appointments/:id', (req, res) => {
   }
 
   if (body.status !== undefined && body.status !== null) {
-    if (!APPOINTMENT_STATUSES.includes(body.status)) {
+    if (!isAppointmentStatus(body.status)) {
       return res.status(400).json({
         error: 'invalid_status',
         message: `Статус «${body.status}» не поддерживается`,
@@ -189,10 +238,19 @@ router.patch('/appointments/:id', (req, res) => {
     draft.status = body.status;
   }
 
+  if (body.paymentType !== undefined && body.paymentType !== null) {
+    if (!isPaymentType(body.paymentType)) {
+      return res.status(400).json({
+        error: 'invalid_payment_type',
+        message: `Тип оплаты «${body.paymentType}» не поддерживается`,
+      });
+    }
+    draft.paymentType = body.paymentType;
+  }
+
   draft.doctorId = nextDoctorId;
   draft.start = nextStart;
   draft.durationMin = nextDuration;
-  if (body.paymentType) draft.paymentType = body.paymentType;
   if (body.serviceId !== undefined) draft.serviceId = body.serviceId;
 
   const protocol = tryApplyProtocolPatch(draft, body);
