@@ -60,6 +60,9 @@ const paymentPalette = (p: PaymentType): { bg: string; fg: string } => {
   }
 }
 
+const isTerminalForRegistrar = (status: AppointmentStatus): boolean =>
+  status === 'completed' || status === 'in_progress'
+
 const FILTERS: Array<{ id: QueueFilter; label: string }> = [
   { id: 'all', label: 'Все' },
   { id: 'scheduled', label: 'Ожидают' },
@@ -179,108 +182,131 @@ export const QueueTable = (props: QueueTableProps) => {
                     </Table.Cell>
                     <Table.Cell>
                       <Flex gap="6px" justify="flex-end">
-                        <Box
-                          as="button"
-                          aria-disabled
-                          data-disabled
-                          title="Печать талона недоступна"
-                          px="10px"
-                          h="26px"
-                          borderRadius="compact"
-                          borderWidth="1px"
-                          borderColor="borderLight"
-                          color="textSecondary"
-                          bg="white"
-                          fontSize="12px"
-                          opacity="0.5"
-                          cursor="not-allowed"
-                        >
-                          Талон
-                        </Box>
-                        {a.status === 'arrived' ? (
+                        {isTerminalForRegistrar(a.status) ? (
                           <Box
                             as="button"
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation()
-                              onMarkWaiting(a.id)
-                            }}
+                            aria-disabled
+                            data-disabled
+                            title="Печать талона недоступна"
                             px="10px"
                             h="26px"
                             borderRadius="compact"
-                            bg="white"
-                            color="brandGreen700"
                             borderWidth="1px"
-                            borderColor="brandGreen"
-                            fontSize="12px"
-                            fontWeight="600"
-                            cursor="pointer"
-                            data-testid={`mark-waiting-${a.id}`}
-                          >
-                            Отменить приход
-                          </Box>
-                        ) : a.status === 'no_show' ? (
-                          <Box
-                            as="button"
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation()
-                              onMarkWaiting(a.id)
-                            }}
-                            px="10px"
-                            h="26px"
-                            borderRadius="compact"
+                            borderColor="borderLight"
+                            color="textSecondary"
                             bg="white"
-                            color="brandGreen700"
-                            borderWidth="1px"
-                            borderColor="brandGreen"
                             fontSize="12px"
-                            fontWeight="600"
-                            cursor="pointer"
+                            opacity="0.5"
+                            cursor="not-allowed"
                           >
-                            Восстановить
+                            Талон
                           </Box>
                         ) : (
-                          <Box
-                            as="button"
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation()
-                              onMarkArrived(a.id)
-                            }}
-                            px="10px"
-                            h="26px"
-                            borderRadius="compact"
-                            bg="brandGreen"
-                            color="white"
-                            fontSize="12px"
-                            fontWeight="600"
-                            cursor="pointer"
-                            data-testid={`mark-arrived-${a.id}`}
-                          >
-                            Отметить приход
-                          </Box>
+                          <>
+                            <Box
+                              as="button"
+                              aria-disabled
+                              data-disabled
+                              title="Печать талона недоступна"
+                              px="10px"
+                              h="26px"
+                              borderRadius="compact"
+                              borderWidth="1px"
+                              borderColor="borderLight"
+                              color="textSecondary"
+                              bg="white"
+                              fontSize="12px"
+                              opacity="0.5"
+                              cursor="not-allowed"
+                            >
+                              Талон
+                            </Box>
+                            {a.status === 'arrived' ? (
+                              <Box
+                                as="button"
+                                onClick={(e: React.MouseEvent) => {
+                                  e.stopPropagation()
+                                  onMarkWaiting(a.id)
+                                }}
+                                px="10px"
+                                h="26px"
+                                borderRadius="compact"
+                                bg="white"
+                                color="brandGreen700"
+                                borderWidth="1px"
+                                borderColor="brandGreen"
+                                fontSize="12px"
+                                fontWeight="600"
+                                cursor="pointer"
+                                data-testid={`mark-waiting-${a.id}`}
+                              >
+                                Отменить приход
+                              </Box>
+                            ) : a.status === 'no_show' ? (
+                              <Box
+                                as="button"
+                                onClick={(e: React.MouseEvent) => {
+                                  e.stopPropagation()
+                                  onMarkWaiting(a.id)
+                                }}
+                                px="10px"
+                                h="26px"
+                                borderRadius="compact"
+                                bg="white"
+                                color="brandGreen700"
+                                borderWidth="1px"
+                                borderColor="brandGreen"
+                                fontSize="12px"
+                                fontWeight="600"
+                                cursor="pointer"
+                              >
+                                Восстановить
+                              </Box>
+                            ) : (
+                              <Box
+                                as="button"
+                                onClick={(e: React.MouseEvent) => {
+                                  e.stopPropagation()
+                                  onMarkArrived(a.id)
+                                }}
+                                px="10px"
+                                h="26px"
+                                borderRadius="compact"
+                                bg="brandGreen"
+                                color="white"
+                                fontSize="12px"
+                                fontWeight="600"
+                                cursor="pointer"
+                                data-testid={`mark-arrived-${a.id}`}
+                              >
+                                Отметить приход
+                              </Box>
+                            )}
+                            <Box
+                              as="button"
+                              onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation()
+                                onMarkNoShow(a.id)
+                              }}
+                              px="10px"
+                              h="26px"
+                              borderRadius="compact"
+                              bg="white"
+                              color="danger"
+                              borderWidth="1px"
+                              borderColor="danger"
+                              fontSize="12px"
+                              fontWeight="600"
+                              cursor="pointer"
+                              opacity={a.status === 'no_show' ? '0.4' : '1'}
+                              aria-disabled={a.status === 'no_show'}
+                              data-disabled={a.status === 'no_show' ? true : undefined}
+                              title="Отметить неявку"
+                            >
+                              Не пришёл
+                            </Box>
+                          </>
                         )}
-                        <Box
-                          as="button"
-                          onClick={(e: React.MouseEvent) => {
-                            e.stopPropagation()
-                            onMarkNoShow(a.id)
-                          }}
-                          px="10px"
-                          h="26px"
-                          borderRadius="compact"
-                          bg="white"
-                          color="danger"
-                          borderWidth="1px"
-                          borderColor="danger"
-                          fontSize="12px"
-                          fontWeight="600"
-                          cursor="pointer"
-                          opacity={a.status === 'no_show' ? '0.4' : '1'}
-                          aria-disabled={a.status === 'no_show'}
-                          data-disabled={a.status === 'no_show' ? true : undefined}
-                          title="Отметить неявку"
-                        >
-                          Не пришёл
-                        </Box>
                       </Flex>
                     </Table.Cell>
                   </Table.Row>

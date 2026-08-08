@@ -40,6 +40,9 @@ const paymentLabel = (p: Appointment['paymentType']): string => {
 const formatRub = (amount: number): string =>
   `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`
 
+const isTerminalForRegistrar = (status: Appointment['status']): boolean =>
+  status === 'completed' || status === 'in_progress'
+
 const visitAmount = (visit: Appointment, priceMap: Map<string, number>): number => {
   const ids = visit.performedServiceIds.length > 0
     ? visit.performedServiceIds
@@ -75,6 +78,8 @@ export const VisitCard = (props: VisitCardProps) => {
       </Box>
     )
   }
+
+  const isTerminalForRegistrarVisit = isTerminalForRegistrar(visit.status)
 
   const primaryLabel =
     visit.status === 'arrived' ? 'Отменить приход' : 'Отметить приход'
@@ -142,56 +147,74 @@ export const VisitCard = (props: VisitCardProps) => {
       </Stack>
 
       <Box p="14px 16px" display="flex" flexDirection="column" gap="6px" borderTopWidth="1px" borderColor="borderLight" mt="auto">
-        <Button
-          colorPalette="green"
-          bg="brandGreen"
-          color="white"
-          _hover={{ bg: 'brandGreenDark' }}
-          size="lg"
-          width="100%"
-          onClick={primaryAction}
-          data-testid="visit-primary-action"
-        >
-          {primaryLabel}
-        </Button>
-        <Flex gap="6px">
-          <Button
-            variant="outline"
-            flex="1"
-            size="sm"
-            disabled
-            aria-disabled
-            title="Оплата недоступна"
-            data-testid="visit-pay-button"
-          >
-            К оплате
-          </Button>
-          <Button
-            variant="outline"
-            flex="1"
-            size="sm"
-            disabled
-            aria-disabled
-            title="Печать талона недоступна"
-            data-testid="visit-print-button"
-          >
-            Талон
-          </Button>
-        </Flex>
-        <Button
-          variant="outline"
-          color="danger"
-          borderColor="danger"
-          _hover={{ bg: 'danger', color: 'white' }}
-          size="sm"
-          width="100%"
-          onClick={onMarkNoShow}
-          disabled={noShowDisabled}
-          aria-disabled={noShowDisabled}
-          data-testid="visit-noshow-button"
-        >
-          Не пришёл
-        </Button>
+        {isTerminalForRegistrarVisit ? (
+          <Flex gap="6px">
+            <Button
+              variant="outline"
+              flex="1"
+              size="sm"
+              disabled
+              aria-disabled
+              title="Печать талона недоступна"
+              data-testid="visit-print-button"
+            >
+              Талон
+            </Button>
+          </Flex>
+        ) : (
+          <>
+            <Button
+              colorPalette="green"
+              bg="brandGreen"
+              color="white"
+              _hover={{ bg: 'brandGreenDark' }}
+              size="lg"
+              width="100%"
+              onClick={primaryAction}
+              data-testid="visit-primary-action"
+            >
+              {primaryLabel}
+            </Button>
+            <Flex gap="6px">
+              <Button
+                variant="outline"
+                flex="1"
+                size="sm"
+                disabled
+                aria-disabled
+                title="Оплата недоступна"
+                data-testid="visit-pay-button"
+              >
+                К оплате
+              </Button>
+              <Button
+                variant="outline"
+                flex="1"
+                size="sm"
+                disabled
+                aria-disabled
+                title="Печать талона недоступна"
+                data-testid="visit-print-button"
+              >
+                Талон
+              </Button>
+            </Flex>
+            <Button
+              variant="outline"
+              color="danger"
+              borderColor="danger"
+              _hover={{ bg: 'danger', color: 'white' }}
+              size="sm"
+              width="100%"
+              onClick={onMarkNoShow}
+              disabled={noShowDisabled}
+              aria-disabled={noShowDisabled}
+              data-testid="visit-noshow-button"
+            >
+              Не пришёл
+            </Button>
+          </>
+        )}
       </Box>
     </Box>
   )
