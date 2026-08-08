@@ -72,5 +72,30 @@
     "npx --no-install vitest run src/pages/admin/consistency.test.tsx",
     "npx --no-install vitest run src/pages/admin"
   ],
-  "_proof_comment": "Первая команда каждой из TASK-16..19 указывает на НОВЫЙ тест-файл, которого ещё нет: vitest падает, пока агент его не создаст. Прежние проверки указывали на каталоги, где тесты проходили и ДО задачи, — и четыре задачи закрылись, не тронув ни строки."
+  "_proof_comment": "Первая команда каждой из TASK-16..19 указывает на НОВЫЙ тест-файл, которого ещё нет: vitest падает, пока агент его не создаст. Прежние проверки указывали на каталоги, где тесты проходили и ДО задачи, — и четыре задачи закрылись, не тронув ни строки.",
+  "_findings3_comment": "TASK-20..25 — третий круг приёмки (прогон g_20260808-173152): 15 находок, 5 P1. Четыре P1 — прямые последствия TASK-14/15: сервер стал строгим, интерфейсы остались на старых допущениях.",
+  "TASK-20": [
+    "npx --no-install vitest run src/pages/operator/grid-columns.test.tsx",
+    "npx --no-install vitest run src/pages/operator"
+  ],
+  "TASK-21": [
+    "npx --no-install vitest run stubs/api/slot-release.test.js",
+    "npx --no-install vitest run stubs/api"
+  ],
+  "TASK-22": [
+    "npx --no-install vitest run src/pages/registrar/transitions.test.tsx",
+    "npx --no-install vitest run src/pages/registrar"
+  ],
+  "TASK-23": [
+    "npx --no-install vitest run src/pages/doctor/complete-guard.test.tsx",
+    "npx --no-install vitest run src/pages/doctor"
+  ],
+  "TASK-24": [
+    "npx --no-install vitest run stubs/api/schedule.test.js",
+    "npx --no-install vitest run src/pages/operator/operator-page.test.tsx"
+  ],
+  "TASK-25": [
+    "npx --no-install vitest run stubs/api/specialties-sync.test.js",
+    "npx --no-install vitest run stubs/api"
+  ]
 }
