@@ -190,6 +190,7 @@ export const OperatorPage = () => {
         <Box w="320px" flex="none">
           {selected && selectedDoctor && selectedResource ? (
             <SlotCard
+              key={`${selected.time}:${selected.doctorId}`}
               scheduleDate={schedule.date}
               time={selected.time}
               doctor={selectedDoctor}

@@ -24,7 +24,15 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
     (a) => a.status === 'no_show' || a.status === 'arrived',
   ).length
 
-  const Stat = ({ value, label }: { value: string; label: string }) => (
+  const Stat = ({
+    value,
+    label,
+    testId,
+  }: {
+    value: string
+    label: string
+    testId: string
+  }) => (
     <Stack gap="2px">
       <Text
         fontSize="24px"
@@ -32,6 +40,7 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
         fontWeight="600"
         letterSpacing="-0.02em"
         fontFamily="mono"
+        data-testid={testId}
       >
         {value}
       </Text>
@@ -48,6 +57,7 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
       borderColor="borderLight"
       p="4"
       borderRadius="compact"
+      data-testid="shift-overview"
     >
       <Text
         fontSize="13px"
@@ -60,14 +70,20 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
         Обзор смены
       </Text>
       <HStack gap="6" align="flex-start">
-        <Stat value={String(total)} label="Записей в смене" />
+        <Stat
+          value={String(total)}
+          label="Записей в смене"
+          testId="shift-stat-total"
+        />
         <Stat
           value={avg > 0 ? formatMinutes(avg) : '—'}
           label="Среднее время записи"
+          testId="shift-stat-avg"
         />
         <Stat
           value={needsAction > 0 ? String(needsAction) : '0'}
           label="Требуют действия"
+          testId="shift-stat-needs-action"
         />
       </HStack>
     </Box>

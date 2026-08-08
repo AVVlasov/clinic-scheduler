@@ -324,6 +324,33 @@ describe('DoctorPage', () => {
     expect(persisted.nextVisit).toBe('через 7 дней')
 
     expect(screen.getByTestId('visit-status-badge').textContent).toBe('Завершён')
+
+    const reloadComplaints = screen.getByTestId('visit-complaints') as HTMLTextAreaElement
+    expect(reloadComplaints.value).toBe('Головная боль в височной области третьи сутки')
+
+    const reloadDiagnosis = screen.getByTestId('visit-diagnosis') as HTMLInputElement
+    expect(reloadDiagnosis.value).toBe('G44.1 Сосудистая головная боль')
+
+    const reloadVisitTypeRepeat = screen.getByTestId('visit-type-repeat')
+    expect(reloadVisitTypeRepeat.getAttribute('data-active')).toBe('true')
+
+    const reloadServiceS003 = screen.getByTestId('visit-service-s-003')
+    expect(reloadServiceS003.textContent).toContain('✓')
+
+    const reloadServiceS001 = screen.getByTestId('visit-service-s-001')
+    expect(reloadServiceS001.textContent).not.toContain('✓')
+
+    const reloadRec1 = screen.getByTestId('visit-rec-КТ контрольная через 14 дней')
+    expect(reloadRec1.getAttribute('data-active')).toBe('true')
+    const reloadRec2 = screen.getByTestId('visit-rec-Снятие швов через 10 дней')
+    expect(reloadRec2.getAttribute('data-active')).toBe('true')
+
+    const reloadNextVisit = screen.getByTestId('visit-next') as HTMLInputElement
+    expect(reloadNextVisit.value).toBe('через 7 дней')
+
+    const reloadFinish = screen.getByTestId('visit-finish') as HTMLButtonElement
+    expect(reloadFinish.disabled).toBe(true)
+
     const getAppointmentCalls = fetchMock.mock.calls.filter(
       (c) => String(c[0]).endsWith('/appointments') && (c[1]?.method ?? 'GET') === 'GET',
     )

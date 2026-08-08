@@ -123,6 +123,7 @@ export const VisitForm = ({
               borderColor="borderDark"
               onClick={() => update('visitType', 'first')}
               data-testid="visit-type-first"
+              data-active={state.visitType === 'first' ? 'true' : 'false'}
               _hover={{ bg: state.visitType === 'first' ? 'brandGreenDark' : 'brandGreenFaint' }}
             >
               Первичный
@@ -137,6 +138,7 @@ export const VisitForm = ({
               borderColor="borderDark"
               onClick={() => update('visitType', 'repeat')}
               data-testid="visit-type-repeat"
+              data-active={state.visitType === 'repeat' ? 'true' : 'false'}
               _hover={{ bg: state.visitType === 'repeat' ? 'brandGreenDark' : 'brandGreenFaint' }}
             >
               Повторный
@@ -296,6 +298,7 @@ export const VisitForm = ({
                 borderColor="borderDark"
                 onClick={() => toggleRecommendation(label)}
                 data-testid={`visit-rec-${label}`}
+                data-active={on ? 'true' : 'false'}
                 _hover={{ bg: on ? 'brandGreenDark' : 'brandGreenFaint' }}
               >
                 {label}
