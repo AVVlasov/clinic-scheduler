@@ -76,6 +76,8 @@ export const VisitCard = (props: VisitCardProps) => {
     )
   }
 
+  const isCompleted = visit.status === 'completed'
+
   const primaryLabel =
     visit.status === 'arrived' ? 'Отменить приход' : 'Отметить приход'
   const primaryAction =
@@ -142,56 +144,74 @@ export const VisitCard = (props: VisitCardProps) => {
       </Stack>
 
       <Box p="14px 16px" display="flex" flexDirection="column" gap="6px" borderTopWidth="1px" borderColor="borderLight" mt="auto">
-        <Button
-          colorPalette="green"
-          bg="brandGreen"
-          color="white"
-          _hover={{ bg: 'brandGreenDark' }}
-          size="lg"
-          width="100%"
-          onClick={primaryAction}
-          data-testid="visit-primary-action"
-        >
-          {primaryLabel}
-        </Button>
-        <Flex gap="6px">
-          <Button
-            variant="outline"
-            flex="1"
-            size="sm"
-            disabled
-            aria-disabled
-            title="Оплата недоступна"
-            data-testid="visit-pay-button"
-          >
-            К оплате
-          </Button>
-          <Button
-            variant="outline"
-            flex="1"
-            size="sm"
-            disabled
-            aria-disabled
-            title="Печать талона недоступна"
-            data-testid="visit-print-button"
-          >
-            Талон
-          </Button>
-        </Flex>
-        <Button
-          variant="outline"
-          color="danger"
-          borderColor="danger"
-          _hover={{ bg: 'danger', color: 'white' }}
-          size="sm"
-          width="100%"
-          onClick={onMarkNoShow}
-          disabled={noShowDisabled}
-          aria-disabled={noShowDisabled}
-          data-testid="visit-noshow-button"
-        >
-          Не пришёл
-        </Button>
+        {isCompleted ? (
+          <Flex gap="6px">
+            <Button
+              variant="outline"
+              flex="1"
+              size="sm"
+              disabled
+              aria-disabled
+              title="Печать талона недоступна"
+              data-testid="visit-print-button"
+            >
+              Талон
+            </Button>
+          </Flex>
+        ) : (
+          <>
+            <Button
+              colorPalette="green"
+              bg="brandGreen"
+              color="white"
+              _hover={{ bg: 'brandGreenDark' }}
+              size="lg"
+              width="100%"
+              onClick={primaryAction}
+              data-testid="visit-primary-action"
+            >
+              {primaryLabel}
+            </Button>
+            <Flex gap="6px">
+              <Button
+                variant="outline"
+                flex="1"
+                size="sm"
+                disabled
+                aria-disabled
+                title="Оплата недоступна"
+                data-testid="visit-pay-button"
+              >
+                К оплате
+              </Button>
+              <Button
+                variant="outline"
+                flex="1"
+                size="sm"
+                disabled
+                aria-disabled
+                title="Печать талона недоступна"
+                data-testid="visit-print-button"
+              >
+                Талон
+              </Button>
+            </Flex>
+            <Button
+              variant="outline"
+              color="danger"
+              borderColor="danger"
+              _hover={{ bg: 'danger', color: 'white' }}
+              size="sm"
+              width="100%"
+              onClick={onMarkNoShow}
+              disabled={noShowDisabled}
+              aria-disabled={noShowDisabled}
+              data-testid="visit-noshow-button"
+            >
+              Не пришёл
+            </Button>
+          </>
+        )}
       </Box>
     </Box>
   )
