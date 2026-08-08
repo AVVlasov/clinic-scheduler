@@ -25,6 +25,11 @@
 - `stubs/api/schedule.test.js`
 - `src/pages/operator/operator-page.test.tsx`
 
+**Triggers-allow:** src/pages/operator/operator-page.test.tsx, stubs/api/schedule.test.js
+
+<!-- Владелец просмотрел: удалены 57 строк — ассерты на статические подписи («Записей в смене» и
+прочие), заменённые на проверки значений. Это предмет задачи. -->
+
 ## Вход
 
 —

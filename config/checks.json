@@ -97,5 +97,22 @@
   "TASK-25": [
     "npx --no-install vitest run stubs/api/specialties-sync.test.js",
     "npx --no-install vitest run stubs/api"
+  ],
+  "_findings4_comment": "TASK-26..29 — четвёртый круг приёмки (прогон g_20260808-181728): 19 находок, 7 P1. Сведены к корневой причине: правила жизни записи (переходы, терминальность, занятость, принадлежность шаблону) считались в разных местах и разошлись.",
+  "TASK-26": [
+    "npx --no-install vitest run stubs/api/lifecycle.test.js",
+    "npx --no-install vitest run stubs/api"
+  ],
+  "TASK-27": [
+    "npx --no-install vitest run src/pages/registrar/terminal-states.test.tsx",
+    "npx --no-install vitest run src/pages/registrar"
+  ],
+  "TASK-28": [
+    "npx --no-install vitest run src/pages/operator/reschedule-guard.test.tsx",
+    "npx --no-install vitest run src/pages/operator"
+  ],
+  "TASK-29": [
+    "npx --no-install vitest run src/pages/admin/week-selection.test.tsx",
+    "npx --no-install vitest run src/pages/admin"
   ]
 }
