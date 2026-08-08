@@ -42,6 +42,15 @@ const payerLabel = (paymentType: Appointment['paymentType']): string => {
   }
 }
 
+const fromAppointment = (a: Appointment): VisitFormState => ({
+  complaints: a.complaints ?? '',
+  diagnosis: a.diagnosis ?? '',
+  visitType: a.visitType ?? 'first',
+  selectedServiceIds: Array.isArray(a.performedServiceIds) ? [...a.performedServiceIds] : [],
+  recommendations: Array.isArray(a.recommendations) ? [...a.recommendations] : [],
+  nextVisit: a.nextVisit ?? '',
+})
+
 export const DoctorPage = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -58,6 +67,13 @@ export const DoctorPage = () => {
         if (cancelled) return
         setAppointments(appts.items)
         setServices(svcs.items)
+        setVisitForm((prev) => {
+          const next = { ...prev }
+          for (const a of appts.items) {
+            next[a.id] = fromAppointment(a)
+          }
+          return next
+        })
         if (appts.items.length > 0 && !selectedId) {
           setSelectedId(appts.items[0].id)
         }
@@ -83,7 +99,7 @@ export const DoctorPage = () => {
   )
 
   const currentFormState: VisitFormState = selected
-    ? visitForm[selected.id] ?? emptyVisitFormState
+    ? visitForm[selected.id] ?? fromAppointment(selected)
     : emptyVisitFormState
 
   const updateCurrentForm = useCallback(
