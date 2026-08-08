@@ -39,39 +39,58 @@ const patients = [
   { id: 'p-004', name: 'Дмитриева Анна Сергеевна', phone: '+7 900 100-00-04', birthDate: '2001-01-30' },
 ];
 
+const stepMinutes = 15;
+const dayStart = '08:00';
+const dayEnd = '20:00';
+
+const findSeedSlot = (date, doctorId, dayIdx, durationMin, usedMinutes) => {
+  const intervals = (weekTemplateSeed[doctorId] || [])[dayIdx] || [];
+  for (const interval of intervals) {
+    if (interval.kind !== 'work' && interval.kind !== 'break') continue;
+    const ivStart = toMinutes(interval.start);
+    const ivEnd = toMinutes(interval.end);
+    for (let m = ivStart; m + durationMin <= ivEnd; m += stepMinutes) {
+      const conflict = usedMinutes.some((u) => u.doctorId === doctorId && m < u.endMin && m + durationMin > u.startMin);
+      if (!conflict) return m;
+    }
+  }
+  return null;
+};
+
 const seedAppointments = (date) => {
-  const base = [
-    {
-      doctorId: 'd-001', patientId: 'p-001',
-      start: isoAt(date, '09', '00'), durationMin: 30,
-      status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
-    },
-    {
-      doctorId: 'd-001', patientId: 'p-002',
-      start: isoAt(date, '10', '30'), durationMin: 20,
-      status: 'arrived', paymentType: 'card', serviceId: 's-002',
-    },
-    {
-      doctorId: 'd-002', patientId: 'p-003',
-      start: isoAt(date, '11', '00'), durationMin: 30,
-      status: 'in_progress', paymentType: 'insurance', serviceId: 's-001',
-    },
-    {
-      doctorId: 'd-003', patientId: 'p-004',
-      start: isoAt(date, '12', '15'), durationMin: 30,
-      status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
-    },
-    {
-      doctorId: 'd-004', patientId: 'p-001',
-      start: isoAt(date, '14', '00'), durationMin: 30,
-      status: 'completed', paymentType: 'card', serviceId: 's-007',
-    },
-    {
-      doctorId: 'd-005', patientId: 'p-002',
-      start: isoAt(date, '15', '30'), durationMin: 30,
-      status: 'no_show', paymentType: 'cash', serviceId: 's-001',
-    },
+  const d = new Date(`${date}T00:00:00`);
+  const js = d.getDay();
+  const dayIdx = js === 0 ? 6 : js - 1;
+
+  const plan = [
+    { doctorId: 'd-001', patientId: 'p-001', status: 'scheduled',   paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
+    { doctorId: 'd-002', patientId: 'p-002', status: 'arrived',     paymentType: 'card',      serviceId: 's-002', durationMin: 20 },
+    { doctorId: 'd-002', patientId: 'p-003', status: 'in_progress', paymentType: 'insurance', serviceId: 's-001', durationMin: 30 },
+    { doctorId: 'd-003', patientId: 'p-004', status: 'scheduled',   paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
+    { doctorId: 'd-004', patientId: 'p-001', status: 'completed',   paymentType: 'card',      serviceId: 's-007', durationMin: 30 },
+    { doctorId: 'd-005', patientId: 'p-002', status: 'no_show',     paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
+    { doctorId: 'd-002', patientId: 'p-004', status: 'completed',   paymentType: 'cash',      serviceId: 's-007', durationMin: 20 },
+    { doctorId: 'd-002', patientId: 'p-001', status: 'cancelled',   paymentType: 'card',      serviceId: 's-001', durationMin: 30 },
   ];
+
+  const usedMinutes = [];
+  const base = plan.map((p) => {
+    const startMin = findSeedSlot(date, p.doctorId, dayIdx, p.durationMin, usedMinutes);
+    if (startMin == null) return null;
+    usedMinutes.push({ doctorId: p.doctorId, startMin, endMin: startMin + p.durationMin });
+    const hh = String(Math.floor(startMin / 60)).padStart(2, '0');
+    const mm = String(startMin % 60).padStart(2, '0');
+    return {
+      doctorId: p.doctorId,
+      patientId: p.patientId,
+      start: isoAt(date, hh, mm),
+      durationMin: p.durationMin,
+      status: p.status,
+      paymentType: p.paymentType,
+      serviceId: p.serviceId,
+    };
+  }).filter(Boolean);
+
   return base.map((a, i) => ({
     id: `a-${String(i + 1).padStart(3, '0')}`,
     ...a,
@@ -113,7 +132,7 @@ const doctorCards = [
     equipmentAccess: [],
   },
   // Незаполненные карточки: без основной площадки и без специальностей.
-  { id: 'd-004', specialties: [], site: '', temporarySites: [], admissionRules: [], equipmentAccess: [] },
+  { id: 'd-004', specialties: ['Невролог'], site: '', temporarySites: [], admissionRules: [], equipmentAccess: [] },
   { id: 'd-005', specialties: ['Эндокринолог'], site: '', temporarySites: [], admissionRules: [], equipmentAccess: [] },
   { id: 'd-006', specialties: [], site: '', temporarySites: [], admissionRules: [], equipmentAccess: [] },
 ];
@@ -230,7 +249,7 @@ const countWeekSlots = (weekStart) => {
     for (const row of rows) {
       const intervals = (row.days[dayIdx] && row.days[dayIdx].intervals) || [];
       for (const interval of intervals) {
-        if (interval.kind !== 'work') continue;
+        if (interval.kind !== 'work' && interval.kind !== 'break') continue;
         const span = toMinutes(interval.end) - toMinutes(interval.start);
         if (span <= 0) continue;
         doctors.add(row.doctorId);
@@ -276,10 +295,6 @@ const newId = () => {
   return `a-${String(state.seq).padStart(3, '0')}`;
 };
 
-const stepMinutes = 15;
-const dayStart = '08:00';
-const dayEnd = '20:00';
-
 // Статусы, в которых запись реально занимает слот в сетке расписания.
 // `cancelled` и `no_show` — терминальные, но слот НЕ блокируют: их можно
 // повторно продать. См. также ACTIVE_APPOINTMENT_STATUSES в src/__data__/types.ts.
@@ -324,7 +339,7 @@ const buildSlots = (date) => {
   for (const doc of state.doctors) {
     const intervals = intervalsByDoctor.get(doc.id) || [];
     for (const interval of intervals) {
-      if (interval.kind !== 'work') continue;
+      if (interval.kind !== 'work' && interval.kind !== 'break') continue;
       const span = toMinutes(interval.end) - toMinutes(interval.start);
       if (span <= 0) continue;
       const workStart = toMinutes(interval.start);
@@ -346,7 +361,7 @@ const buildSlots = (date) => {
       const intervals = intervalsByDoctor.get(doc.id) || [];
       let inWork = false;
       for (const interval of intervals) {
-        if (interval.kind !== 'work') continue;
+        if (interval.kind !== 'work' && interval.kind !== 'break') continue;
         const span = toMinutes(interval.end) - toMinutes(interval.start);
         if (span <= 0) continue;
         const wStart = new Date(`${date}T${interval.start}:00`).getTime();

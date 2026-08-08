@@ -165,7 +165,7 @@ describe('stubs/api — освобождение слота после отме�
       .send({
         doctorId: 'd-004',
         patientId: 'p-001',
-        start: '2031-05-01T09:00:00',
+        start: '2031-05-01T11:00:00',
         durationMin: 30,
       });
     expect(create.status).toBe(201);
@@ -190,7 +190,7 @@ describe('stubs/api — освобождение слота после отме�
     const create = await request(app)
       .post('/appointments')
       .send({
-        doctorId: 'd-005',
+        doctorId: 'd-002',
         patientId: 'p-001',
         start,
         durationMin: 30,
@@ -205,7 +205,7 @@ describe('stubs/api — освобождение слота после отме�
     const rebook = await request(app)
       .post('/appointments')
       .send({
-        doctorId: 'd-005',
+        doctorId: 'd-002',
         patientId: 'p-002',
         start,
         durationMin: 30,
