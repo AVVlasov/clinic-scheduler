@@ -56,8 +56,8 @@ router.patch('/doctor-cards/:id', (req, res) => {
   // Кабинет и специальность живут в общей записи врача: их читают остальные АРМы.
   if (doctor) {
     if (body.cabinet !== undefined) doctor.cabinet = body.cabinet;
-    if (body.specialties !== undefined && body.specialties.length > 0) {
-      doctor.specialty = body.specialties[0];
+    if (body.specialties !== undefined) {
+      doctor.specialty = body.specialties.length > 0 ? body.specialties[0] : '';
     }
   }
 

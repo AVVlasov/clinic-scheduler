@@ -30,6 +30,7 @@ const statusLabel = (s: AppointmentStatus): string => {
     case 'arrived': return 'Пришёл'
     case 'in_progress': return 'На приёме'
     case 'completed': return 'Завершён'
+    case 'cancelled': return 'Отменён'
     case 'no_show': return 'Не пришёл'
   }
 }
@@ -40,6 +41,7 @@ const statusPalette = (s: AppointmentStatus): { bg: string; fg: string } => {
     case 'arrived': return { bg: 'brandGreenTint', fg: 'brandGreen700' }
     case 'in_progress': return { bg: 'brandOrange', fg: 'white' }
     case 'completed': return { bg: 'gray.200', fg: 'textPrimary' }
+    case 'cancelled': return { bg: 'gray.200', fg: 'textSecondary' }
     case 'no_show': return { bg: 'danger', fg: 'white' }
   }
 }
@@ -242,27 +244,7 @@ export const QueueTable = (props: QueueTableProps) => {
                               >
                                 Отменить приход
                               </Box>
-                            ) : a.status === 'no_show' ? (
-                              <Box
-                                as="button"
-                                onClick={(e: React.MouseEvent) => {
-                                  e.stopPropagation()
-                                  onMarkWaiting(a.id)
-                                }}
-                                px="10px"
-                                h="26px"
-                                borderRadius="compact"
-                                bg="white"
-                                color="brandGreen700"
-                                borderWidth="1px"
-                                borderColor="brandGreen"
-                                fontSize="12px"
-                                fontWeight="600"
-                                cursor="pointer"
-                              >
-                                Восстановить
-                              </Box>
-                            ) : (
+                            ) : a.status === 'no_show' ? null : (
                               <Box
                                 as="button"
                                 onClick={(e: React.MouseEvent) => {
@@ -282,29 +264,28 @@ export const QueueTable = (props: QueueTableProps) => {
                                 Отметить приход
                               </Box>
                             )}
-                            <Box
-                              as="button"
-                              onClick={(e: React.MouseEvent) => {
-                                e.stopPropagation()
-                                onMarkNoShow(a.id)
-                              }}
-                              px="10px"
-                              h="26px"
-                              borderRadius="compact"
-                              bg="white"
-                              color="danger"
-                              borderWidth="1px"
-                              borderColor="danger"
-                              fontSize="12px"
-                              fontWeight="600"
-                              cursor="pointer"
-                              opacity={a.status === 'no_show' ? '0.4' : '1'}
-                              aria-disabled={a.status === 'no_show'}
-                              data-disabled={a.status === 'no_show' ? true : undefined}
-                              title="Отметить неявку"
-                            >
-                              Не пришёл
-                            </Box>
+                            {a.status !== 'no_show' ? (
+                              <Box
+                                as="button"
+                                onClick={(e: React.MouseEvent) => {
+                                  e.stopPropagation()
+                                  onMarkNoShow(a.id)
+                                }}
+                                px="10px"
+                                h="26px"
+                                borderRadius="compact"
+                                bg="white"
+                                color="danger"
+                                borderWidth="1px"
+                                borderColor="danger"
+                                fontSize="12px"
+                                fontWeight="600"
+                                cursor="pointer"
+                                title="Отметить неявку"
+                              >
+                                Не пришёл
+                              </Box>
+                            ) : null}
                           </>
                         )}
                       </Flex>

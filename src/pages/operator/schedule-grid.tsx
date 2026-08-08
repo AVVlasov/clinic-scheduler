@@ -110,6 +110,38 @@ const SlotCell = ({
   )
 }
 
+const OffStateCell = ({
+  slot,
+  doctor,
+}: {
+  slot: ScheduleSlot
+  doctor: Doctor
+}) => {
+  const ariaLabel = `${slot.time} ${doctor.name} не работает`
+  return (
+    <Box
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      data-testid={`slot-${doctor.id}-${slot.time}`}
+      data-working="false"
+      data-busy="false"
+      cursor="default"
+      bg="surfaceLight"
+      borderWidth="1px"
+      borderColor="borderLight"
+      borderLeftWidth="3px"
+      borderLeftColor="#C8C8C8"
+      borderStyle="dashed"
+      borderRadius="none"
+      height={SLOT_HEIGHT}
+      display="flex"
+      alignItems="center"
+      px="2"
+    />
+  )
+}
+
 export const ScheduleGrid = ({
   schedule,
   doctors,
@@ -184,55 +216,68 @@ export const ScheduleGrid = ({
             </Text>
           </Box>
         ))}
-        {slots.map((slot) => (
-          <Box
-            key={`time-${slot.time}`}
-            display="contents"
-            data-testid={`row-${slot.time}`}
-          >
+        {slots.map((slot) => {
+          const slotDoctorById = new Map(slot.doctors.map((d) => [d.id, d]))
+          return (
             <Box
-              bg="surfaceLight"
-              borderRightWidth="1px"
-              borderTopWidth="1px"
-              borderColor="borderLight"
-              height={SLOT_HEIGHT}
-              position="sticky"
-              left="0"
-              zIndex={1}
-              display="flex"
-              alignItems="center"
-              px="2"
+              key={`time-${slot.time}`}
+              display="contents"
+              data-testid={`row-${slot.time}`}
             >
-              <Text
-                fontSize="12px"
-                fontFamily="mono"
-                lineHeight="15px"
-                color="textPrimary"
+              <Box
+                bg="surfaceLight"
+                borderRightWidth="1px"
+                borderTopWidth="1px"
+                borderColor="borderLight"
+                height={SLOT_HEIGHT}
+                position="sticky"
+                left="0"
+                zIndex={1}
+                display="flex"
+                alignItems="center"
+                px="2"
               >
-                {slot.time}
-              </Text>
+                <Text
+                  fontSize="12px"
+                  fontFamily="mono"
+                  lineHeight="15px"
+                  color="textPrimary"
+                >
+                  {slot.time}
+                </Text>
+              </Box>
+              {doctors.map((doctor) => {
+                const doc = slotDoctorById.get(doctor.id)
+                if (!doc) {
+                  return (
+                    <OffStateCell
+                      key={`${slot.time}-${doctor.id}-off`}
+                      slot={slot}
+                      doctor={doctor}
+                    />
+                  )
+                }
+                const appt = appointmentFor(appointments, doc.id, doc.appointmentId)
+                const selected =
+                  selectedTime === slot.time && selectedDoctorId === doc.id
+                const isRescheduleTarget =
+                  rescheduleTargetTime === slot.time &&
+                  rescheduleTargetDoctorId === doc.id
+                return (
+                  <SlotCell
+                    key={`${slot.time}-${doc.id}`}
+                    slot={slot}
+                    doctor={doc}
+                    appointment={appt}
+                    selected={selected}
+                    isRescheduleTarget={isRescheduleTarget}
+                    onClick={() => onSlotClick(slot, doc)}
+                  />
+                )
+              })}
             </Box>
-            {slot.doctors.map((doc) => {
-              const appt = appointmentFor(appointments, doc.id, doc.appointmentId)
-              const selected =
-                selectedTime === slot.time && selectedDoctorId === doc.id
-              const isRescheduleTarget =
-                rescheduleTargetTime === slot.time &&
-                rescheduleTargetDoctorId === doc.id
-              return (
-                <SlotCell
-                  key={`${slot.time}-${doc.id}`}
-                  slot={slot}
-                  doctor={doc}
-                  appointment={appt}
-                  selected={selected}
-                  isRescheduleTarget={isRescheduleTarget}
-                  onClick={() => onSlotClick(slot, doc)}
-                />
-              )
-            })}
-          </Box>
-        ))}
+          )
+        })}
       </Box>
     </Box>
   )

@@ -280,6 +280,16 @@ const stepMinutes = 15;
 const dayStart = '08:00';
 const dayEnd = '20:00';
 
+// Статусы, в которых запись реально занимает слот в сетке расписания.
+// `cancelled` и `no_show` — терминальные, но слот НЕ блокируют: их можно
+// повторно продать. См. также ACTIVE_APPOINTMENT_STATUSES в src/__data__/types.ts.
+const ACTIVE_APPOINTMENT_STATUSES = new Set([
+  'scheduled',
+  'arrived',
+  'in_progress',
+  'completed',
+]);
+
 const dayIndex = (date) => {
   const d = new Date(`${date}T00:00:00`);
   const js = d.getDay();
@@ -349,6 +359,7 @@ const buildSlots = (date) => {
       if (!inWork) continue;
       const collision = state.appointments.find((a) => {
         if (a.doctorId !== doc.id) return false;
+        if (!ACTIVE_APPOINTMENT_STATUSES.has(a.status)) return false;
         const aStart = new Date(a.start).getTime();
         const aEnd = aStart + a.durationMin * 60000;
         return aStart < slotEnd.getTime() && aEnd > slotStart.getTime();
@@ -368,6 +379,7 @@ const buildSlots = (date) => {
 const overlaps = (a, doctorId, startTime, durationMin, excludeId) => {
   if (a.id === excludeId) return false;
   if (a.doctorId !== doctorId) return false;
+  if (!ACTIVE_APPOINTMENT_STATUSES.has(a.status)) return false;
   const aStart = new Date(a.start).getTime();
   const aEnd = aStart + a.durationMin * 60000;
   const newStart = new Date(startTime).getTime();

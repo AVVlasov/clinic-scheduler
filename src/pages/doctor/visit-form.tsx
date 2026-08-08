@@ -31,6 +31,9 @@ interface VisitFormProps {
   onFinish: () => void
   isSubmitting: boolean
   alreadyCompleted: boolean
+  blockReason: string | null
+  submitError: string | null
+  onDismissError: () => void
 }
 
 const FOLLOW_UP_PRESETS = [
@@ -59,9 +62,13 @@ export const VisitForm = ({
   onFinish,
   isSubmitting,
   alreadyCompleted,
+  blockReason,
+  submitError,
+  onDismissError,
 }: VisitFormProps) => {
   const isValid = isVisitFormValid(state)
-  const canSubmit = isValid && !isSubmitting && !alreadyCompleted && Boolean(appointment)
+  const canSubmit =
+    isValid && !isSubmitting && !alreadyCompleted && blockReason === null && Boolean(appointment)
 
   const update = <K extends keyof VisitFormState>(key: K, value: VisitFormState[K]) => {
     onChange({ ...state, [key]: value })
@@ -322,12 +329,18 @@ export const VisitForm = ({
       </Box>
 
       <Flex align="center" gap="2" pt="2" borderTopWidth="1px" borderTopStyle="solid" borderTopColor="borderLight">
-        <Text fontSize="12px" color="textSecondary">
+        <Text
+          fontSize="12px"
+          color="textSecondary"
+          data-testid="visit-block-reason"
+        >
           {alreadyCompleted
             ? 'Протокол закрыт и передан в МИС'
-            : isValid
-              ? 'Черновик сохраняется автоматически'
-              : 'Заполните жалобы и диагноз, чтобы закрыть приём'}
+            : blockReason !== null
+              ? blockReason
+              : isValid
+                ? 'Черновик сохраняется автоматически'
+                : 'Заполните жалобы и диагноз, чтобы закрыть приём'}
         </Text>
         <Box flex="1" />
         <Button
@@ -343,6 +356,39 @@ export const VisitForm = ({
           {isSubmitting ? 'Завершаем…' : 'Завершить приём'}
         </Button>
       </Flex>
+      {submitError !== null && (
+        <Flex
+          align="center"
+          gap="2"
+          bg="surfaceLight"
+          color="textPrimary"
+          borderWidth="1px"
+          borderStyle="solid"
+          borderColor="danger"
+          borderRadius="compact"
+          px="3"
+          py="2"
+          data-testid="visit-submit-error"
+        >
+          <Text fontSize="13px" flex="1" data-testid="visit-submit-error-text">
+            {submitError}
+          </Text>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            borderRadius="pill"
+            borderColor="danger"
+            color="danger"
+            bg="white"
+            _hover={{ bg: 'surfaceLight' }}
+            onClick={onDismissError}
+            data-testid="visit-submit-error-dismiss"
+          >
+            Закрыть
+          </Button>
+        </Flex>
+      )}
     </Box>
   )
 }
