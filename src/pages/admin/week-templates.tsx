@@ -53,6 +53,11 @@ interface WeekTemplatesProps {
   data: WeekTemplatesData | null
   isLoading: boolean
   templatesError: string | null
+  weekStart: string
+  canGoPrev: boolean
+  canGoNext: boolean
+  onWeekPrev: () => void
+  onWeekNext: () => void
   publishState: 'idle' | 'confirming' | 'publishing'
   publishResult: PublishWeekResult | null
   publishError: string | null
@@ -65,6 +70,11 @@ export const WeekTemplates = ({
   data,
   isLoading,
   templatesError,
+  weekStart,
+  canGoPrev,
+  canGoNext,
+  onWeekPrev,
+  onWeekNext,
   publishState,
   publishResult,
   publishError,
@@ -110,13 +120,67 @@ export const WeekTemplates = ({
           borderBottomWidth="1px"
           borderColor="borderLight"
         >
-          <Text fontSize="18px" lineHeight="24px" fontWeight="700" letterSpacing="-0.022em">
-            Шаблоны приёма на неделю
-          </Text>
-          <Text fontSize="12px" color="textSecondary" data-testid="week-range">
-            {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)} · применяется к сетке
-            при публикации
-          </Text>
+          <Flex
+            align="center"
+            gap="4px"
+            bg="surfaceLight"
+            borderWidth="1px"
+            borderColor="borderLight"
+            borderRadius="compact"
+            p="2px"
+            data-testid="week-selector"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              borderRadius="compact"
+              borderColor="transparent"
+              bg="transparent"
+              color="textPrimary"
+              _hover={{ bg: 'white' }}
+              onClick={onWeekPrev}
+              disabled={!canGoPrev}
+              data-testid="week-prev"
+              aria-label="Предыдущая неделя"
+            >
+              ←
+            </Button>
+            <Text
+              fontSize="13px"
+              fontWeight="700"
+              color="brandGreen700"
+              px="10px"
+              data-testid="week-current"
+            >
+              {weekStart}
+            </Text>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              borderRadius="compact"
+              borderColor="transparent"
+              bg="transparent"
+              color="textPrimary"
+              _hover={{ bg: 'white' }}
+              onClick={onWeekNext}
+              disabled={!canGoNext}
+              data-testid="week-next"
+              aria-label="Следующая неделя"
+            >
+              →
+            </Button>
+          </Flex>
+          <Stack gap="0">
+            <Text fontSize="18px" lineHeight="24px" fontWeight="700" letterSpacing="-0.022em">
+              Шаблоны приёма на неделю
+            </Text>
+            <Text fontSize="12px" color="textSecondary" data-testid="week-range">
+              {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)} · применяется к сетке
+              при публикации
+            </Text>
+          </Stack>
           <Box flex="1" />
           {data.published ? (
             <Text
