@@ -1,4 +1,22 @@
-export type AppointmentStatus = 'scheduled' | 'arrived' | 'in_progress' | 'completed' | 'no_show'
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'arrived'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show'
+
+/**
+ * Статусы, в которых запись реально занимает слот в расписании.
+ * `cancelled` и `no_show` слот освобождают: их нельзя перезаписать,
+ * но и блокировать соседние слоты они не должны.
+ */
+export const ACTIVE_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = [
+  'scheduled',
+  'arrived',
+  'in_progress',
+  'completed',
+]
 
 export type PaymentType = 'cash' | 'card' | 'insurance'
 
