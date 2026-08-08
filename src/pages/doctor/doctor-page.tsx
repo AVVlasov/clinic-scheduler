@@ -58,6 +58,23 @@ export const DoctorPage = () => {
   const [visitForm, setVisitForm] = useState<Record<string, VisitFormState>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const blockReasonFor = (status: Appointment['status']): string | null => {
+    switch (status) {
+      case 'scheduled':
+        return 'Сначала отметьте приход пациента, чтобы закрыть приём'
+      case 'no_show':
+        return 'Пациент не явился — закрыть приём нельзя, переведите запись в «Не явился» через регистратуру'
+      case 'cancelled':
+        return 'Приём отменён — закрывать нечего'
+      case 'completed':
+      case 'arrived':
+      case 'in_progress':
+      default:
+        return null
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -114,7 +131,9 @@ export const DoctorPage = () => {
     if (!selected) return
     const state = visitForm[selected.id] ?? emptyVisitFormState
     if (!isVisitFormValid(state) || selected.status === 'completed') return
+    if (blockReasonFor(selected.status) !== null) return
     setIsSubmitting(true)
+    setSubmitError(null)
     try {
       const updated = await rescheduleAppointment(selected.id, {
         status: 'completed',
@@ -126,8 +145,9 @@ export const DoctorPage = () => {
         nextVisit: state.nextVisit || null,
       })
       setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
+      setSubmitError(null)
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Не удалось завершить приём')
+      setSubmitError(err instanceof Error ? err.message : 'Не удалось завершить приём')
     } finally {
       setIsSubmitting(false)
     }
@@ -156,7 +176,10 @@ export const DoctorPage = () => {
       <DayList
         appointments={sortedAppointments}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={(id) => {
+          setSubmitError(null)
+          setSelectedId(id)
+        }}
       />
 
       <Box
@@ -233,6 +256,9 @@ export const DoctorPage = () => {
                 onFinish={onFinish}
                 isSubmitting={isSubmitting}
                 alreadyCompleted={selected.status === 'completed'}
+                blockReason={blockReasonFor(selected.status)}
+                submitError={submitError}
+                onDismissError={() => setSubmitError(null)}
               />
             </Box>
           </>
