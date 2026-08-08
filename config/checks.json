@@ -114,5 +114,18 @@
   "TASK-29": [
     "npx --no-install vitest run src/pages/admin/week-selection.test.tsx",
     "npx --no-install vitest run src/pages/admin"
+  ],
+  "_findings5_comment": "TASK-30..32 — пятый круг (прогон g_20260808-192745): 15 находок, 6 P1. Прежний класс «интерфейс предлагает то, что сервер запрещает» почти исчез; три из шести P1 внесены самими исправлениями прошлого круга.",
+  "TASK-30": [
+    "npx --no-install vitest run stubs/api/immutability.test.js",
+    "npx --no-install vitest run stubs/api"
+  ],
+  "TASK-31": [
+    "npx --no-install vitest run src/pages/admin/async-state.test.tsx",
+    "npx --no-install vitest run src/pages/admin"
+  ],
+  "TASK-32": [
+    "npx --no-install vitest run src/pages/operator/reschedule-target.test.tsx",
+    "npx --no-install vitest run src/pages/operator"
   ]
 }
