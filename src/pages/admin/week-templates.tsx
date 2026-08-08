@@ -82,13 +82,25 @@ export const WeekTemplates = ({
     borderRadius="compact"
     data-testid="week-templates"
   >
-    {isLoading || !data ? (
+    {isLoading && !templatesError && !data ? (
       <Box p="6" data-testid="week-templates-loading">
         <Text fontSize="13px" color="textSecondary">
-          {isLoading ? 'Загрузка шаблонов…' : ''}
+          Загрузка шаблонов…
         </Text>
       </Box>
-    ) : (
+    ) : templatesError ? (
+      <Box
+        m="12px 16px"
+        p="8px 14px"
+        bg="danger"
+        color="white"
+        borderRadius="compact"
+        fontSize="13px"
+        data-testid="week-templates-error"
+      >
+        {templatesError}
+      </Box>
+    ) : data ? (
       <>
         <Flex
           align="center"
@@ -327,6 +339,6 @@ export const WeekTemplates = ({
           </Stack>
         </Box>
       </>
-    )}
+    ) : null}
   </Stack>
 )

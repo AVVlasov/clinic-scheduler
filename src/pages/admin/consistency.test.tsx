@@ -94,7 +94,7 @@ const cardsPayload: DoctorCardList = {
       name: 'Иванова Евгения Сергеевна',
       specialty: 'Терапевт',
       cabinet: '201',
-      specialties: ['Терапевт'],
+      specialties: [],
     }),
   ],
 }
