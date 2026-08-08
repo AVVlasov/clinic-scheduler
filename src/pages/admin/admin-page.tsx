@@ -83,6 +83,8 @@ export const AdminPage = () => {
 
   const selectedIdRef = useRef<string | null>(null)
   selectedIdRef.current = selectedId
+  const saveSeqRef = useRef(0)
+  const currentSaveTokenRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -150,10 +152,17 @@ export const AdminPage = () => {
     if (Object.keys(input).length === 0) return
 
     const targetId = selectedId
+    saveSeqRef.current += 1
+    const myToken = saveSeqRef.current
+    currentSaveTokenRef.current = myToken
     setIsSaving(true)
     setSaveError(null)
     saveDoctorCard(targetId, input)
       .then((saved) => {
+        if (currentSaveTokenRef.current !== myToken) {
+          setIsSaving(false)
+          return
+        }
         setCards((prev) => prev.map((c) => (c.id === saved.id ? saved : c)))
         if (selectedIdRef.current !== targetId) {
           setIsSaving(false)
@@ -163,6 +172,10 @@ export const AdminPage = () => {
         setIsSaving(false)
       })
       .catch((err: unknown) => {
+        if (currentSaveTokenRef.current !== myToken) {
+          setIsSaving(false)
+          return
+        }
         if (selectedIdRef.current !== targetId) {
           setIsSaving(false)
           return

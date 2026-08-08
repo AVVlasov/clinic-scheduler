@@ -433,3 +433,170 @@ describe('AdminPage — счётчик незаполненных карточе
     })
   })
 })
+
+describe('AdminPage — поздний ответ saveDoctorCard не подменяет свежий черновик', () => {
+  beforeEach(() => {
+    mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /**
+   * Сценарий: save A → выбор B → возврат на A → правка A → save A.
+   * Первый запрос задержан и его ответ приходит ПОСЛЕ второго save. Без
+   * счётчика токенов ответ #1 перезаписывает state: setCards пишет устаревшее
+   * значение, а setDraft возвращает черновик к старой правке.
+   */
+  it('ответ устаревшего save не затирает draft и cards от свежего save', async () => {
+    const deferreds: Array<{
+      url: string
+      resolve: (body: Record<string, unknown>) => void
+      body: Record<string, unknown>
+    }> = []
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    fetchMock.mockImplementation((input, init) => {
+      const url = typeof input === 'string' ? input : (input as Request).url
+      const method = init?.method ?? 'GET'
+      if (url.includes('/week-templates/publish')) {
+        return json(publishPayload)
+      }
+      if (url.includes('/week-templates')) {
+        return json(templatesPayload)
+      }
+      if (url.includes('/doctor-cards/') && method === 'PATCH') {
+        const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+        return new Promise<Response>((resolve) => {
+          deferreds.push({ url, resolve: (b) => resolve(json(b, 200)), body })
+        })
+      }
+      if (url.includes('/doctor-cards')) {
+        return json(cardsPayload)
+      }
+      return json({ error: 'not_found', message: 'Не найдено' }, 404)
+    })
+
+    renderPage()
+    await openDoctors()
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-004'))
+    const siteInput = await screen.findByTestId('field-site')
+    fireEvent.change(siteInput, { target: { value: 'Площадка №1 · Старый ответ' } })
+    fireEvent.click(screen.getByTestId('doctor-save'))
+
+    await waitFor(() => {
+      expect(deferreds.length).toBe(1)
+    })
+    const firstRequest = deferreds[0]
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-002'))
+    await screen.findByTestId('doctor-item-d-002')
+    await waitFor(() => {
+      expect(screen.getByTestId('field-site')).toHaveValue('   ')
+    })
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-004'))
+    const siteInput2 = await screen.findByTestId('field-site')
+    fireEvent.change(siteInput2, { target: { value: 'Площадка №9 · Свежий ответ' } })
+    fireEvent.click(screen.getByTestId('doctor-save'))
+
+    await waitFor(() => {
+      expect(deferreds.length).toBe(2)
+    })
+    const secondRequest = deferreds[1]
+
+    secondRequest.resolve({ ...cardsPayload.items.find((c) => c.id === 'd-004')!, site: 'Площадка №9 · Свежий ответ' })
+    await waitFor(() => {
+      expect(screen.getByTestId('field-site')).toHaveValue('Площадка №9 · Свежий ответ')
+    })
+    firstRequest.resolve({ ...cardsPayload.items.find((c) => c.id === 'd-004')!, site: 'Площадка №1 · Старый ответ' })
+
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.getByTestId('field-site')).toHaveValue('Площадка №9 · Свежий ответ')
+    expect(screen.getByTestId('doctor-item-d-004')).toHaveTextContent('Площадка №9 · Свежий ответ')
+    expect(screen.getByTestId('doctor-item-d-004')).not.toHaveTextContent('Площадка №1 · Старый ответ')
+  })
+
+  /**
+   * Контр-сценарий: один save, ответ приходит нормально — состояние применяется.
+   * Без этого теста легко «защитить всё подряд» и закрыть задачу-в-пустоту.
+   */
+  it('единственный save без гонки применяет ответ сервера', async () => {
+    mockApi({
+      patchResponse: (body) => json({
+        ...cardsPayload.items.find((c) => c.id === 'd-004')!,
+        ...body,
+      }),
+    })
+    renderPage()
+    await openDoctors()
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-004'))
+    fireEvent.change(await screen.findByTestId('field-site'), {
+      target: { value: 'Площадка №7 · Контроль' },
+    })
+    fireEvent.click(screen.getByTestId('doctor-save'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('field-site')).toHaveValue('Площадка №7 · Контроль')
+    })
+    expect(screen.getByTestId('doctor-item-d-004')).toHaveTextContent('Площадка №7 · Контроль')
+  })
+
+  it('устаревший ответ не показывает чужую ошибку saveError', async () => {
+    const deferreds: Array<{
+      resolve: (body: Record<string, unknown>, status?: number) => void
+    }> = []
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    fetchMock.mockImplementation((input, init) => {
+      const url = typeof input === 'string' ? input : (input as Request).url
+      const method = init?.method ?? 'GET'
+      if (url.includes('/week-templates/publish')) return json(publishPayload)
+      if (url.includes('/week-templates')) return json(templatesPayload)
+      if (url.includes('/doctor-cards/') && method === 'PATCH') {
+        return new Promise<Response>((resolve) => {
+          deferreds.push({ resolve: (b, s) => resolve(json(b, s ?? 200)) })
+        })
+      }
+      if (url.includes('/doctor-cards')) return json(cardsPayload)
+      return json({ error: 'not_found' }, 404)
+    })
+
+    renderPage()
+    await openDoctors()
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-004'))
+    fireEvent.change(await screen.findByTestId('field-site'), {
+      target: { value: 'Площадка №1 · Старый' },
+    })
+    fireEvent.click(screen.getByTestId('doctor-save'))
+
+    await waitFor(() => expect(deferreds.length).toBe(1))
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-002'))
+    await screen.findByTestId('doctor-item-d-002')
+    await waitFor(() => {
+      expect(screen.getByTestId('field-site')).toHaveValue('   ')
+    })
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-004'))
+    fireEvent.change(await screen.findByTestId('field-site'), {
+      target: { value: 'Площадка №2 · Свежий' },
+    })
+    fireEvent.click(screen.getByTestId('doctor-save'))
+
+    await waitFor(() => expect(deferreds.length).toBe(2))
+
+    deferreds[0].resolve(
+      { error: 'invalid_site', message: 'Ошибка из устаревшего ответа' },
+      400,
+    )
+    deferreds[1].resolve({ ...cardsPayload.items[3], site: 'Площадка №2 · Свежий' })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('field-site')).toHaveValue('Площадка №2 · Свежий')
+    })
+    expect(screen.queryByTestId('doctor-save-error')).not.toBeInTheDocument()
+  })
+})

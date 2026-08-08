@@ -274,8 +274,17 @@ router.patch('/appointments/:id', (req, res) => {
 });
 
 router.delete('/appointments/:id', (req, res) => {
-  const idx = state.appointments.findIndex((x) => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'not_found' });
+  const a = state.appointments.find((x) => x.id === req.params.id);
+  if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
+
+  if (isTerminalStatus(a.status)) {
+    return res.status(409).json({
+      error: 'terminal_status',
+      message: `Запись ${a.id} в статусе «${a.status}» неизменяема`,
+    });
+  }
+
+  const idx = state.appointments.indexOf(a);
   state.appointments.splice(idx, 1);
   res.status(204).send();
 });
