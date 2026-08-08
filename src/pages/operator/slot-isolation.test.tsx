@@ -225,11 +225,12 @@ describe('SlotCard — выбор пациента изолирован межд
     expect(busyCard).toHaveAttribute('data-busy', 'true')
 
     expect(screen.queryByTestId('patient-picker')).not.toBeInTheDocument()
-    expect(screen.getByTestId('card-pick-target')).toBeInTheDocument()
+    expect(screen.queryByTestId('card-pick-target')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('card-pick-target'))
+    fireEvent.click(await screen.findByTestId('slot-d-001-08:30'))
 
     expect(screen.getByTestId('reschedule-hint')).toBeInTheDocument()
+    expect(screen.getByTestId('card-reschedule')).toBeInTheDocument()
   })
 
   it('повторный клик по тому же свободному слоту сохраняет выбранного пациента', async () => {
