@@ -24,6 +24,10 @@
 - `src/pages/admin/consistency.test.tsx`
 - `stubs/api/directories.js`
 
+**Triggers-allow:** src/pages/admin/**, stubs/api/directories.js
+
+<!-- Владелец просмотрел удаления (192 строки в week-templates.tsx, разбор общего loadError в admin-page.tsx): это и есть предмет задачи — независимые ошибки загрузки и живой флаг published. Пауза снята для файлов задачи и только для них. -->
+
 ## Вход
 
 TASK-14

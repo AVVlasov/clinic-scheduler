@@ -16,6 +16,12 @@
 - `src/pages/registrar/registrar-page.test.tsx`
 - `src/pages/registrar/status-flow.test.tsx`
 
+**Triggers-allow:** src/pages/registrar/**
+
+<!-- Владелец просмотрел удаления (90 строк в queue-table.tsx, 50 в visit-card.tsx): это старая
+разметка кнопок перехода, заменённая на отрисовку с учётом статуса — ровно то, ради чего
+задача заведена. Пауза по порогу удалений снята для файлов задачи и только для них. -->
+
 ## Вход
 
 TASK-15
