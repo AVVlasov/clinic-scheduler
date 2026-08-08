@@ -170,6 +170,8 @@ const ListField = ({ label, hint, testId, values, emptyText, onChange }: ListFie
 
 export interface DoctorsDirectoryProps {
   cards: DoctorCard[]
+  cardsError: string | null
+  isLoading: boolean
   selectedId: string | null
   draft: DoctorCardDraft | null
   isSaving: boolean
@@ -181,6 +183,8 @@ export interface DoctorsDirectoryProps {
 
 export const DoctorsDirectory = ({
   cards,
+  cardsError,
+  isLoading,
   selectedId,
   draft,
   isSaving,
@@ -232,8 +236,25 @@ export const DoctorsDirectory = ({
             data-testid="doctors-search"
           />
         </Stack>
+        {cardsError ? (
+          <Box
+            m="12px 16px"
+            p="8px 14px"
+            bg="danger"
+            color="white"
+            borderRadius="compact"
+            fontSize="13px"
+            data-testid="doctors-list-error"
+          >
+            {cardsError}
+          </Box>
+        ) : null}
         <Box flex="1" overflow="auto" p="8px">
-          {visible.length === 0 ? (
+          {isLoading ? (
+            <Text fontSize="12px" color="textSecondary" p="8px" data-testid="doctors-list-loading">
+              Загрузка справочника…
+            </Text>
+          ) : visible.length === 0 ? (
             <Text fontSize="12px" color="textSecondary" p="8px" data-testid="doctors-list-empty">
               Врачи не найдены.
             </Text>

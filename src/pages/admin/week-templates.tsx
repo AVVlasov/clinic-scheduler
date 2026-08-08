@@ -50,7 +50,9 @@ const intervalText = (interval: WeekTemplateInterval): string => {
 }
 
 interface WeekTemplatesProps {
-  data: WeekTemplatesData
+  data: WeekTemplatesData | null
+  isLoading: boolean
+  templatesError: string | null
   publishState: 'idle' | 'confirming' | 'publishing'
   publishResult: PublishWeekResult | null
   publishError: string | null
@@ -61,6 +63,8 @@ interface WeekTemplatesProps {
 
 export const WeekTemplates = ({
   data,
+  isLoading,
+  templatesError,
   publishState,
   publishResult,
   publishError,
@@ -78,217 +82,263 @@ export const WeekTemplates = ({
     borderRadius="compact"
     data-testid="week-templates"
   >
-    <Flex
-      align="center"
-      gap="10px"
-      flexWrap="wrap"
-      p="12px 16px"
-      borderBottomWidth="1px"
-      borderColor="borderLight"
-    >
-      <Text fontSize="18px" lineHeight="24px" fontWeight="700" letterSpacing="-0.022em">
-        Шаблоны приёма на неделю
-      </Text>
-      <Text fontSize="12px" color="textSecondary" data-testid="week-range">
-        {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)} · применяется к сетке
-        при публикации
-      </Text>
-      <Box flex="1" />
-      <Button
-        size="sm"
-        bg="brandGreen"
+    {isLoading && !templatesError && !data ? (
+      <Box p="6" data-testid="week-templates-loading">
+        <Text fontSize="13px" color="textSecondary">
+          Загрузка шаблонов…
+        </Text>
+      </Box>
+    ) : templatesError ? (
+      <Box
+        m="12px 16px"
+        p="8px 14px"
+        bg="danger"
         color="white"
         borderRadius="compact"
-        _hover={{ bg: 'brandGreenDark' }}
-        disabled={publishState === 'publishing'}
-        onClick={onPublishClick}
-        data-testid="publish-week"
+        fontSize="13px"
+        data-testid="week-templates-error"
       >
-        Опубликовать неделю
-      </Button>
-    </Flex>
-
-    {publishState === 'confirming' ? (
-      <Box
-        role="dialog"
-        aria-label="Подтверждение публикации недели"
-        m="12px 16px 0"
-        p="12px 14px"
-        bg="surfaceLight"
-        borderWidth="1px"
-        borderColor="brandOrange"
-        borderRadius="compact"
-        data-testid="publish-confirm"
-      >
-        <Text fontSize="14px" fontWeight="700" color="brandOrange700" mb="1">
-          Опубликовать неделю {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)}?
-        </Text>
-        <Text fontSize="13px" color="textPrimary" lineHeight="18px" mb="3">
-          Публикация нарежет слоты по шаблонам и применится к сетке приёма. Отменить
-          публикацию нельзя.
-        </Text>
-        <Flex gap="2">
+        {templatesError}
+      </Box>
+    ) : data ? (
+      <>
+        <Flex
+          align="center"
+          gap="10px"
+          flexWrap="wrap"
+          p="12px 16px"
+          borderBottomWidth="1px"
+          borderColor="borderLight"
+        >
+          <Text fontSize="18px" lineHeight="24px" fontWeight="700" letterSpacing="-0.022em">
+            Шаблоны приёма на неделю
+          </Text>
+          <Text fontSize="12px" color="textSecondary" data-testid="week-range">
+            {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)} · применяется к сетке
+            при публикации
+          </Text>
+          <Box flex="1" />
+          {data.published ? (
+            <Text
+              fontSize="12px"
+              fontWeight="700"
+              color="brandGreen700"
+              data-testid="week-published-badge"
+            >
+              Неделя опубликована
+            </Text>
+          ) : null}
           <Button
             size="sm"
             bg="brandGreen"
             color="white"
             borderRadius="compact"
             _hover={{ bg: 'brandGreenDark' }}
-            onClick={onPublishConfirm}
-            data-testid="publish-confirm-yes"
+            disabled={publishState === 'publishing' || data.published}
+            onClick={onPublishClick}
+            data-testid="publish-week"
           >
-            Подтвердить публикацию
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            borderColor="borderLight"
-            borderRadius="compact"
-            onClick={onPublishCancel}
-            data-testid="publish-confirm-no"
-          >
-            Отмена
+            Опубликовать неделю
           </Button>
         </Flex>
-      </Box>
-    ) : null}
 
-    {publishError ? (
-      <Box
-        m="12px 16px 0"
-        p="8px 14px"
-        bg="danger"
-        color="white"
-        borderRadius="compact"
-        fontSize="13px"
-        data-testid="publish-error"
-      >
-        {publishError}
-      </Box>
-    ) : null}
+        {templatesError ? (
+          <Box
+            m="12px 16px 0"
+            p="8px 14px"
+            bg="danger"
+            color="white"
+            borderRadius="compact"
+            fontSize="13px"
+            data-testid="week-templates-error"
+          >
+            {templatesError}
+          </Box>
+        ) : null}
 
-    {publishResult ? (
-      <Box
-        m="12px 16px 0"
-        p="10px 14px"
-        bg="brandGreenTint"
-        borderWidth="1px"
-        borderColor="brandGreen"
-        borderRadius="compact"
-        data-testid="publish-result"
-      >
-        <Text fontSize="14px" fontWeight="700" color="brandGreen700">
-          Неделя опубликована
-        </Text>
-        <Text fontSize="13px" color="textPrimary" lineHeight="18px">
-          Нарезано {formatCount(publishResult.slotsCreated)} слотов на{' '}
-          {formatCount(publishResult.doctorsAffected)} врачей.
-        </Text>
-      </Box>
-    ) : null}
-
-    <Box flex="1" overflow="auto" p="16px">
-      <Flex gap="8px" align="flex-end" pb="8px">
-        <Box w={DOCTOR_COL_WIDTH} flex="none" fontSize="11px" color="textSecondary">
-          Врач
-        </Box>
-        {data.days.map((day) => (
-          <Stack key={day.date} flex="1 1 0" minW={CELL_MIN_WIDTH} gap="1px">
-            <Text fontSize="13px" lineHeight="17px" fontWeight="500">
-              {day.weekday}
+        {publishState === 'confirming' ? (
+          <Box
+            role="dialog"
+            aria-label="Подтверждение публикации недели"
+            m="12px 16px 0"
+            p="12px 14px"
+            bg="surfaceLight"
+            borderWidth="1px"
+            borderColor="brandOrange"
+            borderRadius="compact"
+            data-testid="publish-confirm"
+          >
+            <Text fontSize="14px" fontWeight="700" color="brandOrange700" mb="1">
+              Опубликовать неделю {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)}?
             </Text>
-            <Text fontSize="11px" lineHeight="14px" color="textSecondary">
-              {formatDayDate(day.date)}
+            <Text fontSize="13px" color="textPrimary" lineHeight="18px" mb="3">
+              Публикация нарежет слоты по шаблонам и применится к сетке приёма. Отменить
+              публикацию нельзя.
             </Text>
-          </Stack>
-        ))}
-      </Flex>
+            <Flex gap="2">
+              <Button
+                size="sm"
+                bg="brandGreen"
+                color="white"
+                borderRadius="compact"
+                _hover={{ bg: 'brandGreenDark' }}
+                onClick={onPublishConfirm}
+                data-testid="publish-confirm-yes"
+              >
+                Подтвердить публикацию
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                borderColor="borderLight"
+                borderRadius="compact"
+                onClick={onPublishCancel}
+                data-testid="publish-confirm-no"
+              >
+                Отмена
+              </Button>
+            </Flex>
+          </Box>
+        ) : null}
 
-      <Stack gap="6px">
-        {data.rows.map((row) => (
-          <Flex key={row.doctorId} gap="8px" align="stretch" data-testid={`tpl-row-${row.doctorId}`}>
-            <Stack
-              w={DOCTOR_COL_WIDTH}
-              flex="none"
-              gap="1px"
-              justify="center"
-              pr="8px"
-              minW="0"
-            >
-              <Text
-                fontSize="13px"
-                lineHeight="17px"
-                fontWeight="500"
-                whiteSpace="nowrap"
-                overflow="hidden"
-                textOverflow="ellipsis"
-              >
-                {row.doctorName}
-              </Text>
-              <Text
-                fontSize="11px"
-                lineHeight="14px"
-                color="textSecondary"
-                whiteSpace="nowrap"
-                overflow="hidden"
-                textOverflow="ellipsis"
-              >
-                {row.specialty}
-              </Text>
-            </Stack>
-            {row.days.map((day) => {
-              const primary = day.intervals[0]
-              const style = KIND_STYLE[primary ? primary.kind : 'off']
-              return (
-                <Stack
-                  key={`${row.doctorId}-${day.date}`}
-                  flex="1 1 0"
-                  minW={CELL_MIN_WIDTH}
-                  gap="2px"
-                  justify="center"
-                  position="relative"
-                  minH="52px"
-                  px="9px 11px"
-                  pl="11px"
-                  bg={style.bg}
-                  borderWidth="1px"
-                  borderColor="borderLight"
-                  borderLeftWidth="3px"
-                  borderLeftColor={style.bar}
-                  borderRadius="compact"
-                  overflow="hidden"
-                  data-testid={`tpl-cell-${row.doctorId}-${day.date}`}
-                >
-                  {primary ? (
-                    <>
-                      <Text fontSize="12px" lineHeight="15px" color={style.ink}>
-                        {intervalText(primary)}
-                      </Text>
-                      <Text fontSize="11px" lineHeight="14px" color="textSecondary">
-                        {KIND_LABEL[primary.kind]}
-                      </Text>
-                      {day.intervals.slice(1).map((extra) => (
-                        <Text
-                          key={`${extra.start}-${extra.end}-${extra.kind}`}
-                          fontSize="11px"
-                          lineHeight="14px"
-                          color="textSecondary"
-                        >
-                          {intervalText(extra)}
-                        </Text>
-                      ))}
-                    </>
-                  ) : (
-                    <Text fontSize="11px" lineHeight="14px" color="textSecondary">
-                      {KIND_LABEL.off}
-                    </Text>
-                  )}
-                </Stack>
-              )
-            })}
+        {publishError ? (
+          <Box
+            m="12px 16px 0"
+            p="8px 14px"
+            bg="danger"
+            color="white"
+            borderRadius="compact"
+            fontSize="13px"
+            data-testid="publish-error"
+          >
+            {publishError}
+          </Box>
+        ) : null}
+
+        {publishResult ? (
+          <Box
+            m="12px 16px 0"
+            p="10px 14px"
+            bg="brandGreenTint"
+            borderWidth="1px"
+            borderColor="brandGreen"
+            borderRadius="compact"
+            data-testid="publish-result"
+          >
+            <Text fontSize="14px" fontWeight="700" color="brandGreen700">
+              Неделя опубликована
+            </Text>
+            <Text fontSize="13px" color="textPrimary" lineHeight="18px">
+              Нарезано {formatCount(publishResult.slotsCreated)} слотов на{' '}
+              {formatCount(publishResult.doctorsAffected)} врачей.
+            </Text>
+          </Box>
+        ) : null}
+
+        <Box flex="1" overflow="auto" p="16px">
+          <Flex gap="8px" align="flex-end" pb="8px">
+            <Box w={DOCTOR_COL_WIDTH} flex="none" fontSize="11px" color="textSecondary">
+              Врач
+            </Box>
+            {data.days.map((day) => (
+              <Stack key={day.date} flex="1 1 0" minW={CELL_MIN_WIDTH} gap="1px">
+                <Text fontSize="13px" lineHeight="17px" fontWeight="500">
+                  {day.weekday}
+                </Text>
+                <Text fontSize="11px" lineHeight="14px" color="textSecondary">
+                  {formatDayDate(day.date)}
+                </Text>
+              </Stack>
+            ))}
           </Flex>
-        ))}
-      </Stack>
-    </Box>
+
+          <Stack gap="6px">
+            {data.rows.map((row) => (
+              <Flex key={row.doctorId} gap="8px" align="stretch" data-testid={`tpl-row-${row.doctorId}`}>
+                <Stack
+                  w={DOCTOR_COL_WIDTH}
+                  flex="none"
+                  gap="1px"
+                  justify="center"
+                  pr="8px"
+                  minW="0"
+                >
+                  <Text
+                    fontSize="13px"
+                    lineHeight="17px"
+                    fontWeight="500"
+                    whiteSpace="nowrap"
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                  >
+                    {row.doctorName}
+                  </Text>
+                  <Text
+                    fontSize="11px"
+                    lineHeight="14px"
+                    color="textSecondary"
+                    whiteSpace="nowrap"
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                  >
+                    {row.specialty}
+                  </Text>
+                </Stack>
+                {row.days.map((day) => {
+                  const primary = day.intervals[0]
+                  const style = KIND_STYLE[primary ? primary.kind : 'off']
+                  return (
+                    <Stack
+                      key={`${row.doctorId}-${day.date}`}
+                      flex="1 1 0"
+                      minW={CELL_MIN_WIDTH}
+                      gap="2px"
+                      justify="center"
+                      position="relative"
+                      minH="52px"
+                      px="9px 11px"
+                      pl="11px"
+                      bg={style.bg}
+                      borderWidth="1px"
+                      borderColor="borderLight"
+                      borderLeftWidth="3px"
+                      borderLeftColor={style.bar}
+                      borderRadius="compact"
+                      overflow="hidden"
+                      data-testid={`tpl-cell-${row.doctorId}-${day.date}`}
+                    >
+                      {primary ? (
+                        <>
+                          <Text fontSize="12px" lineHeight="15px" color={style.ink}>
+                            {intervalText(primary)}
+                          </Text>
+                          <Text fontSize="11px" lineHeight="14px" color="textSecondary">
+                            {KIND_LABEL[primary.kind]}
+                          </Text>
+                          {day.intervals.slice(1).map((extra) => (
+                            <Text
+                              key={`${extra.start}-${extra.end}-${extra.kind}`}
+                              fontSize="11px"
+                              lineHeight="14px"
+                              color="textSecondary"
+                            >
+                              {intervalText(extra)}
+                            </Text>
+                          ))}
+                        </>
+                      ) : (
+                        <Text fontSize="11px" lineHeight="14px" color="textSecondary">
+                          {KIND_LABEL.off}
+                        </Text>
+                      )}
+                    </Stack>
+                  )
+                })}
+              </Flex>
+            ))}
+          </Stack>
+        </Box>
+      </>
+    ) : null}
   </Stack>
 )

@@ -35,12 +35,15 @@ export const AdminPage = () => {
   const [weekStart] = useState(() => weekStartOf(new Date()))
   const [section, setSection] = useState<Section>('templates')
   const [templates, setTemplates] = useState<WeekTemplatesData | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [templatesError, setTemplatesError] = useState<string | null>(null)
+  const [isTemplatesLoading, setIsTemplatesLoading] = useState(true)
   const [publishState, setPublishState] = useState<PublishState>('idle')
   const [publishResult, setPublishResult] = useState<PublishWeekResult | null>(null)
   const [publishError, setPublishError] = useState<string | null>(null)
 
   const [cards, setCards] = useState<DoctorCard[]>([])
+  const [cardsError, setCardsError] = useState<string | null>(null)
+  const [isCardsLoading, setIsCardsLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DoctorCardDraft | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -48,15 +51,18 @@ export const AdminPage = () => {
 
   useEffect(() => {
     let cancelled = false
+    setIsTemplatesLoading(true)
     getWeekTemplates(weekStart)
       .then((res) => {
         if (cancelled) return
         setTemplates(res)
-        setLoadError(null)
+        setTemplatesError(null)
+        setIsTemplatesLoading(false)
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить шаблоны приёма')
+        setTemplatesError(err instanceof Error ? err.message : 'Не удалось загрузить шаблоны приёма')
+        setIsTemplatesLoading(false)
       })
     return () => {
       cancelled = true
@@ -65,15 +71,18 @@ export const AdminPage = () => {
 
   useEffect(() => {
     let cancelled = false
+    setIsCardsLoading(true)
     getDoctorCards()
       .then((res) => {
         if (cancelled) return
         setCards(res.items)
-        setLoadError(null)
+        setCardsError(null)
+        setIsCardsLoading(false)
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить справочник врачей')
+        setCardsError(err instanceof Error ? err.message : 'Не удалось загрузить справочник врачей')
+        setIsCardsLoading(false)
       })
     return () => {
       cancelled = true
@@ -137,22 +146,6 @@ export const AdminPage = () => {
       })
   }, [weekStart])
 
-  if (loadError) {
-    return (
-      <Box p="6" data-testid="admin-error">
-        <Text color="danger">{loadError}</Text>
-      </Box>
-    )
-  }
-
-  if (!templates) {
-    return (
-      <Box p="6" data-testid="admin-loading">
-        <Text color="textSecondary">Загрузка данных площадки…</Text>
-      </Box>
-    )
-  }
-
   return (
     <Stack h="100%" gap="12px" p="12px" bg="surfaceLight" data-testid="admin-page">
       <Flex
@@ -215,6 +208,8 @@ export const AdminPage = () => {
         {section === 'templates' ? (
           <WeekTemplates
             data={templates}
+            isLoading={isTemplatesLoading}
+            templatesError={templatesError}
             publishState={publishState}
             publishResult={publishResult}
             publishError={publishError}
@@ -225,6 +220,8 @@ export const AdminPage = () => {
         ) : (
           <DoctorsDirectory
             cards={cards}
+            cardsError={cardsError}
+            isLoading={isCardsLoading}
             selectedId={selectedId}
             draft={draft}
             isSaving={isSaving}
