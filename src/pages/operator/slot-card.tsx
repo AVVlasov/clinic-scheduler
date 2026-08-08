@@ -24,7 +24,6 @@ interface SlotCardProps {
   services: Service[]
   patients: Patient[]
   onBookingDone?: () => void
-  onSelectRescheduleTarget?: (time: string, doctorId: string) => void
   rescheduleTargetTime?: string | null
   rescheduleTargetDoctorId?: string | null
 }
@@ -52,7 +51,6 @@ export const SlotCard = ({
   services,
   patients,
   onBookingDone,
-  onSelectRescheduleTarget,
   rescheduleTargetTime,
   rescheduleTargetDoctorId,
 }: SlotCardProps) => {
@@ -122,6 +120,13 @@ export const SlotCard = ({
       setError('Выберите свободный слот для переноса')
       return
     }
+    if (
+      rescheduleTargetTime === time &&
+      rescheduleTargetDoctorId === doctor.id
+    ) {
+      setError('Выберите другой слот — текущий уже и есть исходный')
+      return
+    }
     const targetIso = buildStartIso(scheduleDate, rescheduleTargetTime)
     setError(null)
     setBusy(true)
@@ -141,12 +146,6 @@ export const SlotCard = ({
     } finally {
       setBusy(false)
     }
-  }
-
-  const handlePickTarget = () => {
-    if (!onSelectRescheduleTarget) return
-    setError(null)
-    onSelectRescheduleTarget(time, doctor.id)
   }
 
   const statusLabel = appointment?.status ?? (isBusy ? 'Занят' : 'Свободен')
@@ -359,37 +358,21 @@ export const SlotCard = ({
         <HStack gap="2">
           {isBusy ? (
             canReschedule ? (
-              <>
-                <Button
-                  onClick={handlePickTarget}
-                  disabled={busy}
-                  size="sm"
-                  variant="outline"
-                  bg="white"
-                  color="textPrimary"
-                  borderColor="borderDark"
-                  borderRadius="compact"
-                  fontWeight="400"
-                  data-testid="card-pick-target"
-                >
-                  Выбрать целью
-                </Button>
-                <Button
-                  onClick={handleReschedule}
-                  disabled={busy || !rescheduleTargetTime}
-                  size="sm"
-                  variant="outline"
-                  bg="white"
-                  color="textPrimary"
-                  borderColor="borderDark"
-                  borderRadius="compact"
-                  fontWeight="400"
-                  data-testid="card-reschedule"
-                  title={rescheduleHint}
-                >
-                  {busy ? 'Перенос…' : 'Перенести'}
-                </Button>
-              </>
+              <Button
+                onClick={handleReschedule}
+                disabled={busy || !rescheduleTargetTime}
+                size="sm"
+                variant="outline"
+                bg="white"
+                color="textPrimary"
+                borderColor="borderDark"
+                borderRadius="compact"
+                fontWeight="400"
+                data-testid="card-reschedule"
+                title={rescheduleHint}
+              >
+                {busy ? 'Перенос…' : 'Перенести'}
+              </Button>
             ) : (
               <Text
                 fontSize="12px"

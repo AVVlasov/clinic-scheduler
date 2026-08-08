@@ -94,7 +94,8 @@ export const OperatorPage = () => {
   const handleSlotClick = useCallback(
     (slot: ScheduleSlot, doctor: SlotResource) => {
       const selectedTerminal = isTerminalAppointmentStatus(selectedAppointment?.status)
-      if (selectedResource?.busy && !doctor.busy && !selectedTerminal) {
+      const sameAsSelected = selected?.time === slot.time && selected?.doctorId === doctor.id
+      if (selectedResource?.busy && !doctor.busy && !selectedTerminal && !sameAsSelected) {
         setRescheduleTarget({ time: slot.time, doctorId: doctor.id })
         return
       }
@@ -102,7 +103,7 @@ export const OperatorPage = () => {
       setRescheduleTarget(null)
       setSelected({ time: slot.time, doctorId: doctor.id })
     },
-    [selectedResource, selectedAppointment],
+    [selectedResource, selectedAppointment, selected],
   )
 
   const handleBookingDone = useCallback(() => {
@@ -110,13 +111,6 @@ export const OperatorPage = () => {
     setRescheduleTarget(null)
     load().catch(() => undefined)
   }, [load])
-
-  const handlePickRescheduleTarget = useCallback(
-    (time: string, doctorId: string) => {
-      setRescheduleTarget({ time, doctorId })
-    },
-    [],
-  )
 
   if (error) {
     return (
@@ -202,7 +196,6 @@ export const OperatorPage = () => {
               patients={patients}
               rescheduleTargetTime={rescheduleTarget?.time ?? null}
               rescheduleTargetDoctorId={rescheduleTarget?.doctorId ?? null}
-              onSelectRescheduleTarget={handlePickRescheduleTarget}
               onBookingDone={handleBookingDone}
             />
           ) : (
