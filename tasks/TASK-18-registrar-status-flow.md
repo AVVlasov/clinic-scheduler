@@ -14,6 +14,7 @@
 - `src/pages/registrar/queue-table.tsx`
 - `src/pages/registrar/visit-card.tsx`
 - `src/pages/registrar/registrar-page.test.tsx`
+- `src/pages/registrar/status-flow.test.tsx`
 
 ## Вход
 
@@ -32,7 +33,7 @@ TASK-15
 ## Проверки
 
 ```
-npx --no-install vitest run src/pages/registrar
+npx --no-install vitest run src/pages/registrar/status-flow.test.tsx
 npx --no-install tsc --noEmit
 npx --no-install eslint ./src --max-warnings=0
 ```

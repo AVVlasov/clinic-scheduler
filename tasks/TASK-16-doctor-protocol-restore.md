@@ -14,6 +14,7 @@
 - `src/pages/doctor/doctor-page.tsx`
 - `src/pages/doctor/visit-form.tsx`
 - `src/pages/doctor/doctor-page.test.tsx`
+- `src/pages/doctor/protocol-restore.test.tsx`
 
 ## Вход
 
@@ -33,7 +34,7 @@ TASK-15
 ## Проверки
 
 ```
-npx --no-install vitest run src/pages/doctor
+npx --no-install vitest run src/pages/doctor/protocol-restore.test.tsx
 npx --no-install tsc --noEmit
 npx --no-install eslint ./src --max-warnings=0
 ```

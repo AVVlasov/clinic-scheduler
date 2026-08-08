@@ -21,6 +21,7 @@
 - `src/pages/admin/week-templates.tsx`
 - `src/pages/admin/doctors-directory.tsx`
 - `src/pages/admin/admin-page.test.tsx`
+- `src/pages/admin/consistency.test.tsx`
 - `stubs/api/directories.js`
 
 ## Вход
@@ -40,7 +41,7 @@ TASK-14
 ## Проверки
 
 ```
-npx --no-install vitest run src/pages/admin
+npx --no-install vitest run src/pages/admin/consistency.test.tsx
 npx --no-install tsc --noEmit
 npx --no-install eslint ./src --max-warnings=0
 ```

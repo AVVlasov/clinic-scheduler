@@ -1,12 +1,10 @@
 {
   "_doc": "Обязательные детерминированные проверки по задачам — источник вердикта. Задаются владельцем ВНЕ агента: verify.ps1 объединяет их с теми, что агент предложил в VERIFY-REQUEST, и сузить их агент не может. Ключ — id задачи или _default. Значение — команды оболочки (код 0 = зелено).",
-
   "_default": [
     "npx --no-install tsc --noEmit",
     "npx --no-install eslint ./src --max-warnings=0"
   ],
   "_default_comment": "Типчек и линт обязаны быть зелёными у ЛЮБОЙ задачи. Общего `npm test` здесь нет намеренно: он зелен и на пустом месте. Каждая задача доказывается СВОИМИ тестами — они перечислены ниже под её id.",
-
   "TASK-01": [
     "npx --no-install tsc --noEmit",
     "npx --no-install eslint ./src --max-warnings=0",
@@ -37,7 +35,6 @@
     "npx --no-install vitest run src/pages/app-shell.test.tsx",
     "npm test"
   ],
-
   "_findings_comment": "TASK-10..13 — находки приёмки прогона g_20260806-151836: дефекты не экранов, а стыков между ними. Их не ловит ни tsc, ни линт, ни тесты задачи — все они были зелёными.",
   "TASK-10": [
     "npx --no-install vitest run stubs/api/api.test.js",
@@ -52,7 +49,6 @@
   "TASK-13": [
     "npx --no-install vitest run src/pages/registrar"
   ],
-
   "_findings2_comment": "TASK-14..19 — второй круг приёмки (прогон g_20260806-195014): восемь семантических конфликтов, четыре P1, и два нечестных теста. Все задачи прошлого круга при этом были закрыты по гейтам.",
   "TASK-14": [
     "npx --no-install vitest run stubs/api/schedule.test.js"
@@ -61,15 +57,20 @@
     "npx --no-install vitest run stubs/api/appointments.test.js"
   ],
   "TASK-16": [
+    "npx --no-install vitest run src/pages/doctor/protocol-restore.test.tsx",
     "npx --no-install vitest run src/pages/doctor"
   ],
   "TASK-17": [
+    "npx --no-install vitest run src/pages/operator/slot-isolation.test.tsx",
     "npx --no-install vitest run src/pages/operator"
   ],
   "TASK-18": [
+    "npx --no-install vitest run src/pages/registrar/status-flow.test.tsx",
     "npx --no-install vitest run src/pages/registrar"
   ],
   "TASK-19": [
+    "npx --no-install vitest run src/pages/admin/consistency.test.tsx",
     "npx --no-install vitest run src/pages/admin"
-  ]
+  ],
+  "_proof_comment": "Первая команда каждой из TASK-16..19 указывает на НОВЫЙ тест-файл, которого ещё нет: vitest падает, пока агент его не создаст. Прежние проверки указывали на каталоги, где тесты проходили и ДО задачи, — и четыре задачи закрылись, не тронув ни строки."
 }

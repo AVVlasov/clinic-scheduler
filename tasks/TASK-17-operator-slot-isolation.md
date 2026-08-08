@@ -17,6 +17,7 @@
 - `src/pages/operator/operator-page.tsx`
 - `src/pages/operator/shift-overview.tsx`
 - `src/pages/operator/operator-page.test.tsx`
+- `src/pages/operator/slot-isolation.test.tsx`
 
 ## Вход
 
@@ -35,7 +36,7 @@ TASK-15
 ## Проверки
 
 ```
-npx --no-install vitest run src/pages/operator
+npx --no-install vitest run src/pages/operator/slot-isolation.test.tsx
 npx --no-install tsc --noEmit
 npx --no-install eslint ./src --max-warnings=0
 ```
