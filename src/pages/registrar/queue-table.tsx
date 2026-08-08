@@ -2,6 +2,7 @@ import React from 'react'
 import { Badge, Box, Flex, Table } from '@chakra-ui/react'
 
 import type { Appointment, AppointmentStatus, PaymentType } from '../../__data__/types'
+import { isRegistrarTerminal } from '../../__data__/lifecycle'
 
 export type QueueFilter = 'all' | 'scheduled' | 'arrived' | 'no_show'
 
@@ -61,9 +62,6 @@ const paymentPalette = (p: PaymentType): { bg: string; fg: string } => {
     case 'insurance': return { bg: 'brandOrange', fg: 'white' }
   }
 }
-
-const isTerminalForRegistrar = (status: AppointmentStatus): boolean =>
-  status === 'completed' || status === 'in_progress'
 
 const FILTERS: Array<{ id: QueueFilter; label: string }> = [
   { id: 'all', label: 'Все' },
@@ -184,7 +182,7 @@ export const QueueTable = (props: QueueTableProps) => {
                     </Table.Cell>
                     <Table.Cell>
                       <Flex gap="6px" justify="flex-end">
-                        {isTerminalForRegistrar(a.status) ? (
+                        {isRegistrarTerminal(a.status) ? (
                           <Box
                             as="button"
                             aria-disabled

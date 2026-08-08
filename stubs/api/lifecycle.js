@@ -17,7 +17,7 @@ const TERMINAL_STATUSES = new Set([
 
 const STATUS_TRANSITIONS = {
   scheduled: new Set(['arrived', 'in_progress', 'cancelled', 'no_show']),
-  arrived: new Set(['in_progress', 'completed', 'cancelled', 'no_show']),
+  arrived: new Set(['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show']),
   in_progress: new Set(['completed', 'cancelled', 'no_show']),
   completed: new Set(),
   cancelled: new Set(),

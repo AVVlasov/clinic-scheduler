@@ -2,6 +2,7 @@ import React from 'react'
 import { Badge, Box, Button, Flex, Stack } from '@chakra-ui/react'
 
 import type { Appointment } from '../../__data__/types'
+import { isRegistrarTerminal } from '../../__data__/lifecycle'
 
 export interface VisitCardProps {
   visit: Appointment | null
@@ -41,9 +42,6 @@ const paymentLabel = (p: Appointment['paymentType']): string => {
 const formatRub = (amount: number): string =>
   `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`
 
-const isTerminalForRegistrar = (status: Appointment['status']): boolean =>
-  status === 'completed' || status === 'in_progress'
-
 const visitAmount = (visit: Appointment, priceMap: Map<string, number>): number => {
   const ids = visit.performedServiceIds.length > 0
     ? visit.performedServiceIds
@@ -80,7 +78,7 @@ export const VisitCard = (props: VisitCardProps) => {
     )
   }
 
-  const isTerminalForRegistrarVisit = isTerminalForRegistrar(visit.status)
+  const isTerminalVisit = isRegistrarTerminal(visit.status)
 
   const primaryLabel =
     visit.status === 'arrived' ? 'Отменить приход' : 'Отметить приход'
@@ -148,7 +146,7 @@ export const VisitCard = (props: VisitCardProps) => {
       </Stack>
 
       <Box p="14px 16px" display="flex" flexDirection="column" gap="6px" borderTopWidth="1px" borderColor="borderLight" mt="auto">
-        {isTerminalForRegistrarVisit ? (
+        {isTerminalVisit ? (
           <Flex gap="6px">
             <Button
               variant="outline"

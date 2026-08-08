@@ -88,6 +88,7 @@ describe('stubs/api/lifecycle — единый источник правил ж�
     expect(lifecycle.isStatusTransitionAllowed('no_show', 'scheduled')).toBe(false);
     expect(lifecycle.isStatusTransitionAllowed('scheduled', 'arrived')).toBe(true);
     expect(lifecycle.isStatusTransitionAllowed('arrived', 'in_progress')).toBe(true);
+    expect(lifecycle.isStatusTransitionAllowed('arrived', 'scheduled')).toBe(true);
     expect(lifecycle.isStatusTransitionAllowed('in_progress', 'completed')).toBe(true);
     expect(lifecycle.isStatusTransitionAllowed('scheduled', 'cancelled')).toBe(true);
     expect(lifecycle.isStatusTransitionAllowed('scheduled', 'no_show')).toBe(true);

@@ -73,7 +73,7 @@ describe('RegistrarPage — действия очереди и палитра с
     vi.clearAllMocks()
   })
 
-  it('«Отменить приход» для arrived уходит со статусом no_show — допустимый переход arrived→no_show', async () => {
+  it('«Отменить приход» для arrived возвращает в scheduled — допустимый переход arrived→scheduled', async () => {
     const arrived: Appointment[] = [
       makeAppointment({
         id: 'a-arrived',
@@ -97,7 +97,7 @@ describe('RegistrarPage — действия очереди и палитра с
     fireEvent.click(cancelBtn)
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-arrived', { status: 'no_show' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-arrived', { status: 'scheduled' })
     })
 
     expect(screen.queryByTestId('registrar-error')).toBeNull()
@@ -130,7 +130,7 @@ describe('RegistrarPage — действия очереди и палитра с
     })
   })
 
-  it('«Отменить приход» в карточке визита для arrived уходит со статусом no_show', async () => {
+  it('«Отменить приход» в карточке визита для arrived возвращает в scheduled', async () => {
     const arrived: Appointment[] = [
       makeAppointment({
         id: 'a-card-arrived',
@@ -156,7 +156,7 @@ describe('RegistrarPage — действия очереди и палитра с
     fireEvent.click(primary)
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-card-arrived', { status: 'no_show' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-card-arrived', { status: 'scheduled' })
     })
   })
 

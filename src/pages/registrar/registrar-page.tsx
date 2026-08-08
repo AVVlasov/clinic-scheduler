@@ -165,14 +165,14 @@ export const RegistrarPage = () => {
           onFilterChange={setFilter}
           onSelect={setSelectedId}
           onMarkArrived={(id) => { void updateStatus(id, 'arrived') }}
-          onMarkWaiting={(id) => { void updateStatus(id, 'no_show') }}
+          onMarkWaiting={(id) => { void updateStatus(id, 'scheduled') }}
           onMarkNoShow={(id) => { void updateStatus(id, 'no_show') }}
         />
         <VisitCard
           visit={selected}
           priceMap={priceMap}
           onMarkArrived={() => { if (selected) void updateStatus(selected.id, 'arrived') }}
-          onMarkWaiting={() => { if (selected) void updateStatus(selected.id, 'no_show') }}
+          onMarkWaiting={() => { if (selected) void updateStatus(selected.id, 'scheduled') }}
           onMarkNoShow={() => { if (selected) void updateStatus(selected.id, 'no_show') }}
         />
       </Flex>
