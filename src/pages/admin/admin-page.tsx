@@ -18,7 +18,7 @@ import {
 import { WeekTemplates } from './week-templates'
 
 /** Понедельник недели, в которую попадает дата. */
-const weekStartOf = (date: Date): string => {
+export const weekStartOf = (date: Date): string => {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
   const yyyy = d.getFullYear()
@@ -27,12 +27,42 @@ const weekStartOf = (date: Date): string => {
   return `${yyyy}-${mm}-${dd}`
 }
 
+/** Сдвиг даты в формате ГГГГ-ММ-ДД на N дней. Локаль-независимо. */
+export const shiftDate = (from: string, days: number): string => {
+  const [y, m, d] = from.split('-').map(Number)
+  const date = new Date(y, m - 1, d + days)
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+/**
+ * Границы выбора недели: вперёд — запас на «опубликовать на 1–2 месяца вперёд»,
+ * назад — только прошлая неделя: глубже шаблоны приёма уже не действуют.
+ * Уход за границу запрещён, чтобы администратор не публиковал «несуществующую»
+ * неделю по ошибке.
+ */
+const MAX_WEEKS_FORWARD = 8
+const MAX_WEEKS_BACK = 1
+
 type PublishState = 'idle' | 'confirming' | 'publishing'
 
 type Section = 'templates' | 'doctors'
 
 export const AdminPage = () => {
-  const [weekStart] = useState(() => weekStartOf(new Date()))
+  const currentWeekStart = weekStartOf(new Date())
+  const [weekStart, setWeekStart] = useState<string>(currentWeekStart)
+  const minWeekStart = shiftDate(currentWeekStart, -7 * MAX_WEEKS_BACK)
+  const maxWeekStart = shiftDate(currentWeekStart, 7 * MAX_WEEKS_FORWARD)
+  const canGoPrev = weekStart > minWeekStart
+  const canGoNext = weekStart < maxWeekStart
+  const handleWeekPrev = useCallback(() => {
+    setWeekStart((prev) => (prev > minWeekStart ? shiftDate(prev, -7) : prev))
+  }, [minWeekStart])
+  const handleWeekNext = useCallback(() => {
+    setWeekStart((prev) => (prev < maxWeekStart ? shiftDate(prev, 7) : prev))
+  }, [maxWeekStart])
   const [section, setSection] = useState<Section>('templates')
   const [templates, setTemplates] = useState<WeekTemplatesData | null>(null)
   const [templatesError, setTemplatesError] = useState<string | null>(null)
@@ -52,6 +82,9 @@ export const AdminPage = () => {
   useEffect(() => {
     let cancelled = false
     setIsTemplatesLoading(true)
+    setPublishResult(null)
+    setPublishError(null)
+    setPublishState('idle')
     getWeekTemplates(weekStart)
       .then((res) => {
         if (cancelled) return
@@ -210,6 +243,11 @@ export const AdminPage = () => {
             data={templates}
             isLoading={isTemplatesLoading}
             templatesError={templatesError}
+            weekStart={weekStart}
+            canGoPrev={canGoPrev}
+            canGoNext={canGoNext}
+            onWeekPrev={handleWeekPrev}
+            onWeekNext={handleWeekNext}
             publishState={publishState}
             publishResult={publishResult}
             publishError={publishError}
