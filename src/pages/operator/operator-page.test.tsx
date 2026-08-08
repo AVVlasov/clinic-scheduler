@@ -393,6 +393,57 @@ describe('OperatorPage — сетка из данных стаба', () => {
     expect(avgB).not.toBe(avgA)
   })
 
+  it('Shift overview на пустом списке даёт нули и «—», а не константы', async () => {
+    const date = new Date().toISOString().slice(0, 10)
+    const emptyPayload: AppointmentList = { items: [] }
+
+    const buildFetch = (payload: AppointmentList) =>
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : (input as Request).url
+        if (url.includes('/schedule/')) {
+          return Promise.resolve(new Response(JSON.stringify(buildSchedule(date)), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/appointments')) {
+          return Promise.resolve(new Response(JSON.stringify(payload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/doctors')) {
+          return Promise.resolve(new Response(JSON.stringify(doctorsPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/services')) {
+          return Promise.resolve(new Response(JSON.stringify(servicesPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/patients')) {
+          return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        return Promise.resolve(new Response('not found', { status: 404 }))
+      })
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    fetchMock.mockReset()
+    fetchMock.mockImplementation(buildFetch(emptyPayload))
+
+    renderWithProviders(<OperatorPage />)
+    await screen.findByTestId('schedule-grid')
+
+    const total = screen.getByTestId('shift-stat-total').textContent
+    const avg = screen.getByTestId('shift-stat-avg').textContent
+    const needs = screen.getByTestId('shift-stat-needs-action').textContent
+
+    expect(total).toBe('0')
+    expect(needs).toBe('0')
+    expect(avg).toBe('—')
+  })
+
   it('кнопка «Записать» disabled без выбранного пациента и не уходит на p-001', async () => {
     const date = new Date().toISOString().slice(0, 10)
     mockApiOk(date)

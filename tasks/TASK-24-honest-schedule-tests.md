@@ -57,9 +57,15 @@ npx --no-install tsc --noEmit
 - `tsc --noEmit` — без ошибок
 - `eslint ./src --max-warnings=0` — без ошибок
 
+**Результаты прогона 2026-08-08 19:41 (после добавления empty-payload теста):**
+- `schedule.test.js` — 13/13 PASS
+- `operator-page.test.tsx` — 8/8 PASS
+- `tsc --noEmit` — без ошибок
+- `eslint ./src --max-warnings=0` — без ошибок
+
 **RED-проверка на константах:**
 - `data.js buildSlots` → пустой массив: 4 теста schedule упали (slots.length > 0)
-- `shift-overview.tsx` → константы 999/0/999: тест shift-overview упал (expected 999 toBe 1)
+- `shift-overview.tsx` → константы 999/0/999: 2 теста shift-overview упали (initial: expected 999 toBe 1; empty: expected 999 toBe 0)
 
 ## Что учесть
 
