@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 
 import { getDoctorCards, getWeekTemplates, publishWeek, saveDoctorCard } from '../../__data__/api'
@@ -53,6 +53,8 @@ type Section = 'templates' | 'doctors'
 export const AdminPage = () => {
   const currentWeekStart = weekStartOf(new Date())
   const [weekStart, setWeekStart] = useState<string>(currentWeekStart)
+  const weekStartRef = useRef<string>(currentWeekStart)
+  weekStartRef.current = weekStart
   const minWeekStart = shiftDate(currentWeekStart, -7 * MAX_WEEKS_BACK)
   const maxWeekStart = shiftDate(currentWeekStart, 7 * MAX_WEEKS_FORWARD)
   const canGoPrev = weekStart > minWeekStart
@@ -79,9 +81,14 @@ export const AdminPage = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  const selectedIdRef = useRef<string | null>(null)
+  selectedIdRef.current = selectedId
+
   useEffect(() => {
     let cancelled = false
     setIsTemplatesLoading(true)
+    setTemplates(null)
+    setTemplatesError(null)
     setPublishResult(null)
     setPublishError(null)
     setPublishState('idle')
@@ -129,6 +136,7 @@ export const AdminPage = () => {
       setSelectedId(id)
       setDraft(draftFromCard(card))
       setSaveError(null)
+      setIsSaving(false)
     },
     [cards],
   )
@@ -141,43 +149,57 @@ export const AdminPage = () => {
     const input = draftDiff(card, draft)
     if (Object.keys(input).length === 0) return
 
+    const targetId = selectedId
     setIsSaving(true)
     setSaveError(null)
-    saveDoctorCard(selectedId, input)
+    saveDoctorCard(targetId, input)
       .then((saved) => {
         setCards((prev) => prev.map((c) => (c.id === saved.id ? saved : c)))
+        if (selectedIdRef.current !== targetId) {
+          setIsSaving(false)
+          return
+        }
         setDraft(draftFromCard(saved))
         setIsSaving(false)
       })
       .catch((err: unknown) => {
+        if (selectedIdRef.current !== targetId) {
+          setIsSaving(false)
+          return
+        }
         setSaveError(err instanceof Error ? err.message : 'Не удалось сохранить карточку врача')
         setIsSaving(false)
       })
   }, [cards, draft, selectedId])
 
   const handlePublishClick = useCallback(() => {
+    if (isTemplatesLoading || templates === null) return
     setPublishError(null)
     setPublishState('confirming')
-  }, [])
+  }, [isTemplatesLoading, templates])
 
   const handlePublishCancel = useCallback(() => {
     setPublishState('idle')
   }, [])
 
   const handlePublishConfirm = useCallback(() => {
+    const targetWeekStart = weekStart
+    if (publishState !== 'confirming') return
     setPublishState('publishing')
     setPublishError(null)
-    publishWeek(weekStart)
+    publishWeek(targetWeekStart)
       .then((result) => {
+        if (weekStartRef.current !== targetWeekStart) return
         setPublishResult(result)
         setPublishState('idle')
         setTemplates((prev) => (prev ? { ...prev, published: true } : prev))
       })
       .catch((err: unknown) => {
+        if (weekStartRef.current !== targetWeekStart) return
         setPublishError(err instanceof Error ? err.message : 'Не удалось опубликовать неделю')
         setPublishState('idle')
       })
-  }, [weekStart])
+  }, [publishState, weekStart])
 
   return (
     <Stack h="100%" gap="12px" p="12px" bg="surfaceLight" data-testid="admin-page">
