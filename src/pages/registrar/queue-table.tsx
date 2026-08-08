@@ -60,6 +60,9 @@ const paymentPalette = (p: PaymentType): { bg: string; fg: string } => {
   }
 }
 
+const isTerminalForRegistrar = (status: AppointmentStatus): boolean =>
+  status === 'completed' || status === 'in_progress'
+
 const FILTERS: Array<{ id: QueueFilter; label: string }> = [
   { id: 'all', label: 'Все' },
   { id: 'scheduled', label: 'Ожидают' },
@@ -179,7 +182,7 @@ export const QueueTable = (props: QueueTableProps) => {
                     </Table.Cell>
                     <Table.Cell>
                       <Flex gap="6px" justify="flex-end">
-                        {a.status === 'completed' ? (
+                        {isTerminalForRegistrar(a.status) ? (
                           <Box
                             as="button"
                             aria-disabled

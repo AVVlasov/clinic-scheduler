@@ -189,6 +189,53 @@ describe('RegistrarPage — поток статусов завершённого
     })
   })
 
+  it('в строке визита со статусом «На приёме» нет кнопок «Отметить приход», «Восстановить», «Не пришёл» (in_progress терминален для регистратора)', async () => {
+    const inProgress: Appointment[] = [
+      makeAppointment({
+        id: COMPLETED_APPOINTMENT_ID,
+        patientName: 'Дмитриева Анна',
+        start: '2026-08-06T13:00:00+03:00',
+        status: 'in_progress',
+        paymentType: 'card',
+      }),
+    ]
+    setupMocks(inProgress)
+
+    renderPage()
+
+    const row = await screen.findByTestId(`queue-row-${COMPLETED_APPOINTMENT_ID}`)
+    expect(within(row).queryByTestId(`mark-arrived-${COMPLETED_APPOINTMENT_ID}`)).toBeNull()
+    expect(within(row).queryByTestId(`mark-waiting-${COMPLETED_APPOINTMENT_ID}`)).toBeNull()
+    expect(within(row).queryByText('Отметить приход')).toBeNull()
+    expect(within(row).queryByText('Восстановить')).toBeNull()
+    expect(within(row).queryByText('Не пришёл')).toBeNull()
+  })
+
+  it('карточка визита «На приёме» не показывает кнопку основного действия и кнопку «Не пришёл»', async () => {
+    const inProgress: Appointment[] = [
+      makeAppointment({
+        id: COMPLETED_APPOINTMENT_ID,
+        patientName: 'Дмитриева Анна',
+        start: '2026-08-06T13:00:00+03:00',
+        status: 'in_progress',
+        paymentType: 'card',
+      }),
+    ]
+    setupMocks(inProgress)
+
+    renderPage()
+
+    const card = await screen.findByTestId('visit-card')
+    await waitFor(() => {
+      expect(within(card).getByTestId('visit-status-badge')).toHaveTextContent('На приёме')
+    })
+
+    expect(within(card).queryByTestId('visit-primary-action')).toBeNull()
+    expect(within(card).queryByTestId('visit-noshow-button')).toBeNull()
+    expect(within(card).queryByText('Отметить приход')).toBeNull()
+    expect(within(card).queryByText('Не пришёл')).toBeNull()
+  })
+
   it('в строке незавершённого визита кнопки статуса доступны (контрпример — обычные визиты не сломаны)', async () => {
     const mixed: Appointment[] = [
       makeAppointment({ id: 'a-001', patientName: 'Алексеев Игорь', start: '2026-08-06T09:00:00+03:00' }),
