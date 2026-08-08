@@ -291,7 +291,15 @@ const buildState = () => {
 const state = buildState();
 
 const newId = () => {
-  state.seq += 1;
+  let maxSeq = state.seq;
+  const re = /^a-(\d+)$/;
+  for (const a of state.appointments) {
+    const m = re.exec(a.id);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > maxSeq) maxSeq = n;
+  }
+  state.seq = maxSeq + 1;
   return `a-${String(state.seq).padStart(3, '0')}`;
 };
 

@@ -9,6 +9,7 @@ const {
   isAppointmentStatus,
   isPaymentType,
   isWithinPublishedShift,
+  isTerminalStatus,
 } = require('./lifecycle');
 
 const router = Router();
@@ -43,7 +44,7 @@ const checkShift = (doctorId, start, durationMin) => {
 const tryApplyProtocolPatch = (draft, body) => {
   for (const field of PROTOCOL_STRING_FIELDS) {
     if (body[field] !== undefined) {
-      if (typeof body[field] !== 'string') {
+      if (body[field] !== null && typeof body[field] !== 'string') {
         return { ok: false, field };
       }
       draft[field] = body[field];
@@ -184,6 +185,13 @@ router.patch('/appointments/:id', (req, res) => {
   if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
 
   const body = req.body || {};
+
+  if (isTerminalStatus(a.status)) {
+    return res.status(409).json({
+      error: 'terminal_status',
+      message: `Запись ${a.id} в статусе «${a.status}» неизменяема`,
+    });
+  }
 
   const draft = { ...a };
   draft.performedServiceIds = [...a.performedServiceIds];
