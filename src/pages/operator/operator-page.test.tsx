@@ -261,14 +261,187 @@ describe('OperatorPage — сетка из данных стаба', () => {
 
   it('Shift overview считает статистику из данных, а не из констант', async () => {
     const date = new Date().toISOString().slice(0, 10)
-    mockApiOk(date)
+
+    const initialPayload: AppointmentList = {
+      items: [
+        {
+          id: 'a-001',
+          doctorId: 'd-001',
+          patientId: 'p-001',
+          start: `${date}T08:15:00+03:00`,
+          durationMin: 30,
+          status: 'scheduled',
+          paymentType: 'cash',
+          serviceId: 's-001',
+          doctorName: 'Иванова Е.С.',
+          patientName: 'Алексеев Игорь Николаевич',
+        },
+      ],
+    }
+
+    const heavyPayload: AppointmentList = {
+      items: [
+        {
+          id: 'a-010',
+          doctorId: 'd-001',
+          patientId: 'p-010',
+          start: `${date}T08:00:00+03:00`,
+          durationMin: 45,
+          status: 'scheduled',
+          paymentType: 'cash',
+          serviceId: 's-001',
+          doctorName: 'Иванова Е.С.',
+          patientName: 'Иванов Иван',
+        },
+        {
+          id: 'a-011',
+          doctorId: 'd-002',
+          patientId: 'p-011',
+          start: `${date}T08:15:00+03:00`,
+          durationMin: 75,
+          status: 'no_show',
+          paymentType: 'cash',
+          serviceId: 's-001',
+          doctorName: 'Петров А.В.',
+          patientName: 'Петров Пётр',
+        },
+        {
+          id: 'a-012',
+          doctorId: 'd-001',
+          patientId: 'p-012',
+          start: `${date}T08:30:00+03:00`,
+          durationMin: 60,
+          status: 'arrived',
+          paymentType: 'cash',
+          serviceId: 's-001',
+          doctorName: 'Иванова Е.С.',
+          patientName: 'Сидоров Сидор',
+        },
+      ],
+    }
+
+    const buildFetch = (payload: AppointmentList) =>
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : (input as Request).url
+        if (url.includes('/schedule/')) {
+          return Promise.resolve(new Response(JSON.stringify(buildSchedule(date)), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/appointments')) {
+          return Promise.resolve(new Response(JSON.stringify(payload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/doctors')) {
+          return Promise.resolve(new Response(JSON.stringify(doctorsPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/services')) {
+          return Promise.resolve(new Response(JSON.stringify(servicesPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/patients')) {
+          return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        return Promise.resolve(new Response('not found', { status: 404 }))
+      })
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    fetchMock.mockReset()
+    fetchMock.mockImplementation(buildFetch(initialPayload))
+
+    const { unmount } = renderWithProviders(<OperatorPage />)
+
+    await screen.findByTestId('schedule-grid')
+
+    const totalA = screen.getByTestId('shift-stat-total').textContent
+    const avgA = screen.getByTestId('shift-stat-avg').textContent
+    const needsA = screen.getByTestId('shift-stat-needs-action').textContent
+
+    expect(totalA).toMatch(/^\d+$/)
+    expect(needsA).toMatch(/^\d+$/)
+    expect(totalA).not.toBe('0')
+    expect(totalA).toBe('1')
+    expect(needsA).toBe('0')
+    expect(avgA).toBe('00:30')
+
+    unmount()
+
+    fetchMock.mockReset()
+    fetchMock.mockImplementation(buildFetch(heavyPayload))
+
     renderWithProviders(<OperatorPage />)
 
     await screen.findByTestId('schedule-grid')
 
-    expect(screen.getByText('Записей в смене')).toBeInTheDocument()
-    expect(screen.getByText('Среднее время записи')).toBeInTheDocument()
-    expect(screen.getByText('Требуют действия')).toBeInTheDocument()
+    const totalB = await screen.findByTestId('shift-stat-total')
+    const totalBText = totalB.textContent
+    const avgB = screen.getByTestId('shift-stat-avg').textContent
+    const needsB = screen.getByTestId('shift-stat-needs-action').textContent
+
+    expect(totalBText).toBe('3')
+    expect(needsB).toBe('2')
+    expect(avgB).toBe('01:00')
+
+    expect(totalBText).not.toBe(totalA)
+    expect(needsB).not.toBe(needsA)
+    expect(avgB).not.toBe(avgA)
+  })
+
+  it('Shift overview на пустом списке даёт нули и «—», а не константы', async () => {
+    const date = new Date().toISOString().slice(0, 10)
+    const emptyPayload: AppointmentList = { items: [] }
+
+    const buildFetch = (payload: AppointmentList) =>
+      vi.fn((input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : (input as Request).url
+        if (url.includes('/schedule/')) {
+          return Promise.resolve(new Response(JSON.stringify(buildSchedule(date)), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/appointments')) {
+          return Promise.resolve(new Response(JSON.stringify(payload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/doctors')) {
+          return Promise.resolve(new Response(JSON.stringify(doctorsPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/services')) {
+          return Promise.resolve(new Response(JSON.stringify(servicesPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        if (url.endsWith('/patients')) {
+          return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+        }
+        return Promise.resolve(new Response('not found', { status: 404 }))
+      })
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    fetchMock.mockReset()
+    fetchMock.mockImplementation(buildFetch(emptyPayload))
+
+    renderWithProviders(<OperatorPage />)
+    await screen.findByTestId('schedule-grid')
+
+    const total = screen.getByTestId('shift-stat-total').textContent
+    const avg = screen.getByTestId('shift-stat-avg').textContent
+    const needs = screen.getByTestId('shift-stat-needs-action').textContent
+
+    expect(total).toBe('0')
+    expect(needs).toBe('0')
+    expect(avg).toBe('—')
   })
 
   it('кнопка «Записать» disabled без выбранного пациента и не уходит на p-001', async () => {

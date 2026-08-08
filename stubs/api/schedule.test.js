@@ -34,10 +34,13 @@ describe('stubs/api/schedule — сетка строится по опублик
       const res = await request(app).get(`/schedule?date=${data.state.date}`);
       expect(res.status).toBe(200);
       expect(res.body.stepMinutes).toBe(15);
+      expect(Array.isArray(res.body.slots)).toBe(true);
+      expect(res.body.slots.length).toBeGreaterThan(0);
 
       const times = res.body.slots.map((s) => s.time);
       const uniq = new Set(times);
       expect(uniq.size).toBe(times.length);
+      expect(uniq.size).toBeGreaterThan(0);
 
       const hasDoctorColumn = (doctorId, time) => {
         const slot = res.body.slots.find((s) => s.time === time);
@@ -52,6 +55,7 @@ describe('stubs/api/schedule — сетка строится по опублик
     test('шаг между слотами ровно 15 минут', async () => {
       const res = await request(app).get(`/schedule?date=${data.state.date}`);
       expect(res.status).toBe(200);
+      expect(res.body.slots.length).toBeGreaterThanOrEqual(2);
       for (let i = 1; i < res.body.slots.length; i++) {
         const [ph, pm] = res.body.slots[i - 1].time.split(':').map(Number);
         const [ch, cm] = res.body.slots[i].time.split(':').map(Number);
@@ -156,10 +160,7 @@ describe('stubs/api/schedule — сетка строится по опублик
       const publish = await request(app)
         .post('/week-templates/publish')
         .send({ weekStart: testWeekStart });
-      expect([200, 409]).toContain(publish.status);
-      if (publish.status === 409) {
-        return;
-      }
+      expect(publish.status).toBe(200);
       const { slotsCreated, doctorsAffected } = publish.body;
       expect(slotsCreated).toBeGreaterThan(0);
       expect(doctorsAffected).toBeGreaterThan(0);
@@ -175,14 +176,11 @@ describe('stubs/api/schedule — сетка строится по опублик
     });
 
     test('повторная публикация той же недели → 409 week_already_published', async () => {
-      const date = '2098-12-29';
+      const date = '2097-11-24';
       const first = await request(app)
         .post('/week-templates/publish')
         .send({ weekStart: date });
-      expect([200, 409]).toContain(first.status);
-      if (first.status === 409) {
-        return;
-      }
+      expect(first.status).toBe(200);
       const second = await request(app)
         .post('/week-templates/publish')
         .send({ weekStart: date });
@@ -200,6 +198,7 @@ describe('stubs/api/schedule — сетка строится по опублик
       expect(typeof res.body.endTime).toBe('string');
       expect(typeof res.body.stepMinutes).toBe('number');
       expect(res.body.stepMinutes).toBe(15);
+      expect(res.body.slots.length).toBeGreaterThan(0);
       expect(res.body.slots.every((s) => /^\d{2}:\d{2}$/.test(s.time))).toBe(true);
       expect(res.body.slots.every((s) => s.doctors.every((d) => typeof d.busy === 'boolean'))).toBe(true);
       expect(res.body.slots.every((s) => s.doctors.every((d) => typeof d.id === 'string'))).toBe(true);
@@ -208,18 +207,25 @@ describe('stubs/api/schedule — сетка строится по опублик
 
   describe('регресс — старая «08:00–20:00 всем» падает на новых тестах', () => {
     test('d-005 в пятницу не должен иметь 48 слотов в своей колонке', async () => {
-      const dayIndex = data.dayIndex(data.state.date);
-      const seed = data.weekTemplateSeed['d-005'];
-      const isWork = seed[dayIndex].some((iv) => iv.kind === 'work');
-      if (isWork) {
-        const res = await request(app).get(`/schedule?date=${data.state.date}`);
-        const d005 = res.body.slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-005'));
-        expect(d005.length).toBeGreaterThan(0);
-      } else {
-        const res = await request(app).get(`/schedule?date=${data.state.date}`);
-        const d005 = res.body.slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-005'));
-        expect(d005.length).toBe(0);
-      }
+      const ws = data.weekStartOf(data.state.date);
+      const friday = (() => {
+        const d = new Date(`${ws}T00:00:00`);
+        d.setDate(d.getDate() + 4);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+
+      const fridayIdx = data.dayIndex(friday);
+      const seed = data.weekTemplateSeed['d-005'][fridayIdx];
+      const isWork = seed.some((iv) => iv.kind === 'work');
+      expect(isWork).toBe(false);
+
+      const res = await request(app).get(`/schedule?date=${friday}`);
+      expect(res.status).toBe(200);
+      const d005 = res.body.slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-005'));
+      expect(d005.length).toBe(0);
     });
   });
 });
