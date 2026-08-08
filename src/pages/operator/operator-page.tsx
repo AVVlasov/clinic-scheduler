@@ -17,6 +17,7 @@ import type {
   Service,
   SlotResource,
 } from '../../__data__/types'
+import { isTerminalAppointmentStatus } from '../../__data__/types'
 
 import { ScheduleGrid } from './schedule-grid'
 import { ShiftOverview } from './shift-overview'
@@ -92,7 +93,8 @@ export const OperatorPage = () => {
 
   const handleSlotClick = useCallback(
     (slot: ScheduleSlot, doctor: SlotResource) => {
-      if (selectedResource?.busy && !doctor.busy) {
+      const selectedTerminal = isTerminalAppointmentStatus(selectedAppointment?.status)
+      if (selectedResource?.busy && !doctor.busy && !selectedTerminal) {
         setRescheduleTarget({ time: slot.time, doctorId: doctor.id })
         return
       }
@@ -100,7 +102,7 @@ export const OperatorPage = () => {
       setRescheduleTarget(null)
       setSelected({ time: slot.time, doctorId: doctor.id })
     },
-    [selectedResource],
+    [selectedResource, selectedAppointment],
   )
 
   const handleBookingDone = useCallback(() => {
