@@ -50,6 +50,7 @@ export const OperatorPage = () => {
   const [selected, setSelected] = useState<SelectedSlot | null>(null)
   const [rescheduleTarget, setRescheduleTarget] = useState<SelectedSlot | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const date = todayDate()
@@ -107,9 +108,16 @@ export const OperatorPage = () => {
   )
 
   const handleBookingDone = useCallback(() => {
-    setSelected(null)
-    setRescheduleTarget(null)
-    load().catch(() => undefined)
+    setRefreshError(null)
+    load()
+      .then(() => {
+        setSelected(null)
+        setRescheduleTarget(null)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : 'Не удалось обновить сетку после записи'
+        setRefreshError(message)
+      })
   }, [load])
 
   if (error) {
@@ -137,6 +145,26 @@ export const OperatorPage = () => {
       gap="3"
       p="3"
     >
+      {refreshError ? (
+        <Box
+          bg="danger"
+          color="white"
+          borderRadius="compact"
+          px="4"
+          py="3"
+          data-testid="operator-refresh-error"
+        >
+          <Text fontSize="14px" fontWeight="700" lineHeight="20px">
+            Не удалось обновить сетку после записи
+          </Text>
+          <Text fontSize="12px" lineHeight="16px" mt="1">
+            {refreshError}
+          </Text>
+          <Text fontSize="12px" lineHeight="16px" mt="2" data-testid="operator-refresh-error-hint">
+            Запись создана на сервере, но локальная сетка устарела. Повторите действие или обновите страницу.
+          </Text>
+        </Box>
+      ) : null}
       <Flex gap="3" align="stretch" flex="1" minH="0">
         <Stack
           gap="3"
