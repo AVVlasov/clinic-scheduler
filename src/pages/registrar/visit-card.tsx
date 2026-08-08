@@ -25,6 +25,7 @@ const statusLabel = (s: Appointment['status']): string => {
     case 'arrived': return 'Пришёл'
     case 'in_progress': return 'На приёме'
     case 'completed': return 'Завершён'
+    case 'cancelled': return 'Отменён'
     case 'no_show': return 'Не пришёл'
   }
 }
