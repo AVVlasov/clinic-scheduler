@@ -194,7 +194,7 @@ describe('stubs/api — машина состояний статуса запи�
     return res.body.id;
   };
 
-  test('completed → arrived отклоняется (409 invalid_state_transition)', async () => {
+  test('completed → arrived отклоняется (409 terminal_status)', async () => {
     const id = await createAt('2030-11-25T09:00:00');
 
     const toArrived = await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
@@ -212,7 +212,7 @@ describe('stubs/api — машина состояний статуса запи�
 
     const back = await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
     expect(back.status).toBe(409);
-    expect(back.body.error).toBe('invalid_state_transition');
+    expect(back.body.error).toBe('terminal_status');
     expect(typeof back.body.message).toBe('string');
     expect(back.body.message.length).toBeGreaterThan(0);
 
@@ -221,7 +221,7 @@ describe('stubs/api — машина состояний статуса запи�
     expect(afterBack.status).toBe('completed');
   });
 
-  test('completed → cancelled отклоняется (409 invalid_state_transition)', async () => {
+  test('completed → cancelled отклоняется (409 terminal_status)', async () => {
     const id = await createAt('2030-12-02T09:00:00', 'p-002', 'd-001');
 
     await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
@@ -232,7 +232,7 @@ describe('stubs/api — машина состояний статуса запи�
 
     const patch = await request(app).patch(`/appointments/${id}`).send({ status: 'cancelled' });
     expect(patch.status).toBe(409);
-    expect(patch.body.error).toBe('invalid_state_transition');
+    expect(patch.body.error).toBe('terminal_status');
 
     const after2 = await fetchAppointment(app, id);
     expect(snapshotCoreFields(after2)).toEqual(before);
@@ -246,7 +246,7 @@ describe('stubs/api — машина состояний статуса запи�
 
     const patch = await request(app).patch(`/appointments/${id}`).send({ status: 'in_progress' });
     expect(patch.status).toBe(409);
-    expect(patch.body.error).toBe('invalid_state_transition');
+    expect(patch.body.error).toBe('terminal_status');
   });
 
   test('scheduled → arrived → completed: разрешённая цепочка работает', async () => {
@@ -285,7 +285,7 @@ describe('stubs/api — машина состояний статуса запи�
 
     const r2 = await request(app).patch(`/appointments/${idB}`).send({ status: 'no_show' });
     expect(r2.status).toBe(409);
-    expect(r2.body.error).toBe('invalid_state_transition');
+    expect(r2.body.error).toBe('terminal_status');
   });
 
   test('неизвестный статус → 400 invalid_status (а не молчаливое принятие)', async () => {
@@ -300,16 +300,21 @@ describe('stubs/api — машина состояний статуса запи�
     expect(snapshotCoreFields(after)).toEqual(snapshotCoreFields(before));
   });
 
-  test('PATCH без поля status на завершённой записи не меняет её (допустимо редактировать протокол, статус остаётся completed)', async () => {
+  test('PATCH без поля status на завершённой записи отклоняется (запись неизменяема целиком)', async () => {
     const id = await createAt('2030-12-02T10:00:00', 'p-001', 'd-001');
     await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
     await request(app).patch(`/appointments/${id}`).send({ status: 'completed' });
 
+    const before = await fetchAppointment(app, id);
+
     const patch = await request(app)
       .patch(`/appointments/${id}`)
       .send({ complaints: 'уточнение жалоб после закрытия' });
-    expect(patch.status).toBe(200);
-    expect(patch.body.status).toBe('completed');
-    expect(patch.body.complaints).toBe('уточнение жалоб после закрытия');
+    expect(patch.status).toBe(409);
+    expect(patch.body.error).toBe('terminal_status');
+
+    const after = await fetchAppointment(app, id);
+    expect(snapshotCoreFields(after)).toEqual(snapshotCoreFields(before));
+    expect(after.complaints).toBe(before.complaints);
   });
 });
