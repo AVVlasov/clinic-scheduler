@@ -18,6 +18,22 @@ export const ACTIVE_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = [
   'completed',
 ]
 
+/**
+ * Статусы, в которых запись уже завершила свой жизненный цикл:
+ * менять её нельзя — ни переносить, ни отменять. `completed` слот
+ * по-прежнему занимает, но как исторический факт. Дубликат stubs/api/lifecycle.js,
+ * чтобы фронт не тянул Node-модуль; сервер это правило всё равно проверяет.
+ */
+export const TERMINAL_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = [
+  'completed',
+  'cancelled',
+  'no_show',
+]
+
+export const isTerminalAppointmentStatus = (
+  status: AppointmentStatus | undefined | null,
+): boolean => !!status && TERMINAL_APPOINTMENT_STATUSES.includes(status)
+
 export type PaymentType = 'cash' | 'card' | 'insurance'
 
 export type VisitType = 'first' | 'repeat'

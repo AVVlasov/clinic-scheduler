@@ -13,6 +13,7 @@ import type {
   Service,
   SlotResource,
 } from '../../__data__/types'
+import { isTerminalAppointmentStatus } from '../../__data__/types'
 
 interface SlotCardProps {
   scheduleDate: string
@@ -63,6 +64,8 @@ export const SlotCard = ({
   )
 
   const isBusy = doctorResource.busy
+  const isTerminal = isTerminalAppointmentStatus(appointment?.status)
+  const canReschedule = isBusy && !!appointment && !isTerminal
   const startIso = buildStartIso(scheduleDate, time)
 
   const filteredPatients = useMemo(() => {
@@ -111,6 +114,10 @@ export const SlotCard = ({
 
   const handleReschedule = async () => {
     if (!appointment) return
+    if (isTerminalAppointmentStatus(appointment.status)) {
+      setError('Запись уже завершена — перенос невозможен')
+      return
+    }
     if (!rescheduleTargetTime || !rescheduleTargetDoctorId) {
       setError('Выберите свободный слот для переноса')
       return
@@ -351,37 +358,47 @@ export const SlotCard = ({
 
         <HStack gap="2">
           {isBusy ? (
-            <>
-              <Button
-                onClick={handlePickTarget}
-                disabled={busy}
-                size="sm"
-                variant="outline"
-                bg="white"
-                color="textPrimary"
-                borderColor="borderDark"
-                borderRadius="compact"
-                fontWeight="400"
-                data-testid="card-pick-target"
+            canReschedule ? (
+              <>
+                <Button
+                  onClick={handlePickTarget}
+                  disabled={busy}
+                  size="sm"
+                  variant="outline"
+                  bg="white"
+                  color="textPrimary"
+                  borderColor="borderDark"
+                  borderRadius="compact"
+                  fontWeight="400"
+                  data-testid="card-pick-target"
+                >
+                  Выбрать целью
+                </Button>
+                <Button
+                  onClick={handleReschedule}
+                  disabled={busy || !rescheduleTargetTime}
+                  size="sm"
+                  variant="outline"
+                  bg="white"
+                  color="textPrimary"
+                  borderColor="borderDark"
+                  borderRadius="compact"
+                  fontWeight="400"
+                  data-testid="card-reschedule"
+                  title={rescheduleHint}
+                >
+                  {busy ? 'Перенос…' : 'Перенести'}
+                </Button>
+              </>
+            ) : (
+              <Text
+                fontSize="12px"
+                color="textSecondary"
+                data-testid="card-reschedule-blocked"
               >
-                Выбрать целью
-              </Button>
-              <Button
-                onClick={handleReschedule}
-                disabled={busy || !rescheduleTargetTime}
-                size="sm"
-                variant="outline"
-                bg="white"
-                color="textPrimary"
-                borderColor="borderDark"
-                borderRadius="compact"
-                fontWeight="400"
-                data-testid="card-reschedule"
-                title={rescheduleHint}
-              >
-                {busy ? 'Перенос…' : 'Перенести'}
-              </Button>
-            </>
+                Запись завершена — перенос недоступен
+              </Text>
+            )
           ) : (
             <Button
               onClick={handleBook}
