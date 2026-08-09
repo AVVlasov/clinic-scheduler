@@ -40,6 +40,7 @@ export const RegistrarPage = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>('all')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export const RegistrarPage = () => {
         setServices(servicesRes.items)
         if (apptsRes.items.length > 0) setSelectedId(apptsRes.items[0].id)
         setLoadError(null)
+        setIsLoaded(true)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -96,6 +98,27 @@ export const RegistrarPage = () => {
       .reduce((acc, a) => acc + appointmentAmount(a, priceMap), 0),
     [items, priceMap],
   )
+
+  if (loadError) {
+    return (
+      <Stack h="100%" direction="column" gap="12px" p="12px" bg="surfaceLight" data-testid="registrar-error">
+        <Text fontSize="16px" fontWeight="700" color="danger">Ошибка загрузки</Text>
+        <Text fontSize="13px" color="textSecondary">{loadError}</Text>
+      </Stack>
+    )
+  }
+
+  if (!isLoaded) {
+    return (
+      <Stack h="100%" direction="column" gap="12px" p="12px" bg="surfaceLight" data-testid="registrar-loading">
+        <Text fontSize="16px" fontWeight="700" color="textPrimary">АРМ регистратора</Text>
+        <Text fontSize="13px" color="textSecondary">Загрузка очереди…</Text>
+      </Stack>
+    )
+  }
+
+  const isEmpty = items.length === 0
+  const emptyReason = 'Сегодня приёмов нет — очередь пуста.'
 
   return (
     <Stack h="100%" direction="column" gap="12px" p="12px" bg="surfaceLight">
@@ -154,6 +177,21 @@ export const RegistrarPage = () => {
           data-testid="registrar-error"
         >
           {loadError}
+        </Box>
+      ) : null}
+
+      {isEmpty ? (
+        <Box
+          bg="white"
+          borderWidth="1px"
+          borderColor="borderLight"
+          borderRadius="compact"
+          p="16px"
+          data-testid="registrar-empty"
+        >
+          <Text fontSize="13px" color="textSecondary" data-testid="registrar-empty-reason">
+            {emptyReason}
+          </Text>
         </Box>
       ) : null}
 
