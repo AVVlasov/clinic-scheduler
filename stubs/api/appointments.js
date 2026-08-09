@@ -90,8 +90,19 @@ const hashCode = (s) => {
   return h;
 };
 
+const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+
 router.get('/appointments', (req, res) => {
-  res.json({ items: state.appointments.map(decorate) });
+  const rawDate = req.query.date;
+  const requested = rawDate != null && rawDate !== '' ? String(rawDate) : state.date;
+  if (!isDate(requested)) {
+    res.status(400).json({ error: 'invalid_date', message: 'Дата должна быть в формате ГГГГ-ММ-ДД' });
+    return;
+  }
+  const items = state.appointments
+    .filter((a) => String(a.start).slice(0, 10) === requested)
+    .map(decorate);
+  res.json({ items, date: requested });
 });
 
 router.get('/appointments/:id', (req, res) => {

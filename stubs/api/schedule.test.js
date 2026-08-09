@@ -31,7 +31,17 @@ describe('stubs/api/schedule — сетка строится по опублик
 
   describe('GET /schedule — слоты только в work-интервалах шаблона', () => {
     test('сетка на сегодня не повторяет захардкоженный 08:00–20:00 для всех', async () => {
-      const res = await request(app).get(`/schedule?date=${data.state.date}`);
+      const ws = data.weekStartOf(data.state.date);
+      const friday = (() => {
+        const d = new Date(`${ws}T00:00:00`);
+        d.setDate(d.getDate() + 4);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+
+      const res = await request(app).get(`/schedule?date=${friday}`);
       expect(res.status).toBe(200);
       expect(res.body.stepMinutes).toBe(15);
       expect(Array.isArray(res.body.slots)).toBe(true);
@@ -121,13 +131,23 @@ describe('stubs/api/schedule — сетка строится по опублик
 
   describe('buildSlots — урезанный рабочий день (absent)', () => {
     test('d-005 в пятницу (absent) — нет ни одного слота с d-005', async () => {
-      const dayIndex = data.dayIndex(data.state.date);
+      const ws = data.weekStartOf(data.state.date);
+      const friday = (() => {
+        const d = new Date(`${ws}T00:00:00`);
+        d.setDate(d.getDate() + 4);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+
+      const dayIndex = data.dayIndex(friday);
       const seed = data.weekTemplateSeed['d-005'];
       const interval = seed[dayIndex];
       expect(interval).toBeDefined();
       expect(interval.every((iv) => iv.kind !== 'work')).toBe(true);
 
-      const res = await request(app).get(`/schedule?date=${data.state.date}`);
+      const res = await request(app).get(`/schedule?date=${friday}`);
       expect(res.status).toBe(200);
       const d005 = res.body.slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-005'));
       expect(d005).toEqual([]);

@@ -93,7 +93,7 @@ describe('stubs/api — express-стабы расписания, записей 
 
   describe('POST /appointments', () => {
     test('create appointment — валидное тело → 201, запись в списке', async () => {
-      const before = (await request(app).get('/appointments')).body.items.length;
+      const before = (await request(app).get('/appointments?date=2030-04-15')).body.items.length;
       const res = await request(app)
         .post('/appointments')
         .send({
@@ -109,7 +109,7 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(res.body.id).toMatch(/^a-\d{3}$/);
       expect(res.body.doctorName).toContain('Волков');
 
-      const after = (await request(app).get('/appointments')).body.items;
+      const after = (await request(app).get('/appointments?date=2030-04-15')).body.items;
       expect(after.length).toBe(before + 1);
       expect(after.some((a) => a.id === res.body.id)).toBe(true);
     });
@@ -189,7 +189,7 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(patch.status).toBe(200);
       expect(new Date(patch.body.start).toISOString()).toBe(newStart);
 
-      const list = await request(app).get('/appointments');
+      const list = await request(app).get('/appointments?date=2030-04-29');
       const item = list.body.items.find((a) => a.id === createdId);
       expect(new Date(item.start).toISOString()).toBe(newStart);
     });
@@ -312,7 +312,7 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(single.body.diagnosis).toBe('K01.1 Ретенированный зуб');
       expect(single.body.performedServiceIds).toEqual(['s-001', 's-003']);
 
-      const list = await request(app).get('/appointments');
+      const list = await request(app).get('/appointments?date=2030-09-02');
       const item = list.body.items.find((a) => a.id === id);
       expect(item).toBeDefined();
       expect(item.diagnosis).toBe('K01.1 Ретенированный зуб');
