@@ -59,6 +59,7 @@ export const DoctorPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isAppointmentsLoaded, setIsAppointmentsLoaded] = useState(false)
 
   const blockReasonFor = (status: Appointment['status']): string | null => {
     switch (status) {
@@ -94,6 +95,7 @@ export const DoctorPage = () => {
         if (appts.items.length > 0 && !selectedId) {
           setSelectedId(appts.items[0].id)
         }
+        setIsAppointmentsLoaded(true)
       } catch (err) {
         if (cancelled) return
         setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить данные')
@@ -155,18 +157,31 @@ export const DoctorPage = () => {
 
   if (loadError) {
     return (
-      <Flex direction="column" p="4" gap="2">
+      <Flex direction="column" p="4" gap="2" data-testid="doctor-error">
         <Text fontSize="16px" fontWeight="700" color="danger">Ошибка загрузки</Text>
         <Text fontSize="13px" color="textSecondary">{loadError}</Text>
       </Flex>
     )
   }
 
-  if (sortedAppointments.length === 0) {
+  if (!isAppointmentsLoaded) {
     return (
-      <Flex direction="column" p="4" gap="2">
+      <Flex direction="column" p="4" gap="2" data-testid="doctor-loading">
         <Text fontSize="16px" fontWeight="700" color="textPrimary">АРМ врача</Text>
         <Text fontSize="13px" color="textSecondary">Загрузка приёмов…</Text>
+      </Flex>
+    )
+  }
+
+  if (sortedAppointments.length === 0) {
+    const weekday = new Date().getDay()
+    const reason = weekday === 0 || weekday === 6
+      ? 'Сегодня выходной — приёмов нет.'
+      : 'На сегодня приёмов нет.'
+    return (
+      <Flex direction="column" p="4" gap="2" data-testid="doctor-empty">
+        <Text fontSize="16px" fontWeight="700" color="textPrimary">АРМ врача</Text>
+        <Text fontSize="13px" color="textSecondary" data-testid="doctor-empty-reason">{reason}</Text>
       </Flex>
     )
   }

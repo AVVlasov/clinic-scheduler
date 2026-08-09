@@ -51,6 +51,7 @@ export const OperatorPage = () => {
   const [rescheduleTarget, setRescheduleTarget] = useState<SelectedSlot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
 
   const load = useCallback(async () => {
     const date = todayDate()
@@ -66,6 +67,7 @@ export const OperatorPage = () => {
     setDoctors(docs.items)
     setServices(svcs.items)
     setPatients(pats.items)
+    setIsLoaded(true)
   }, [])
 
   useEffect(() => {
@@ -128,13 +130,22 @@ export const OperatorPage = () => {
     )
   }
 
-  if (!schedule) {
+  if (!isLoaded) {
     return (
       <Box p="6" data-testid="operator-loading">
         <Text color="textSecondary">Загрузка сетки…</Text>
       </Box>
     )
   }
+
+  const isScheduleEmpty = !schedule || schedule.slots.length === 0
+  const emptyReason = (() => {
+    if (!schedule) return 'Смена не опубликована.'
+    const weekday = new Date().getDay()
+    return weekday === 0 || weekday === 6
+      ? 'Сегодня выходной — смена не опубликована.'
+      : 'Смена на сегодня не опубликована.'
+  })()
 
   return (
     <Flex
@@ -185,9 +196,11 @@ export const OperatorPage = () => {
             >
               Сетка смены
             </Text>
-            <Text fontSize="12px" color="textSecondary">
-              {formatRangeTitle(schedule.date)} · шаг {schedule.stepMinutes} мин
-            </Text>
+            {schedule && (
+              <Text fontSize="12px" color="textSecondary">
+                {formatRangeTitle(schedule.date)} · шаг {schedule.stepMinutes} мин
+              </Text>
+            )}
             {selectedResource?.busy && (
               <Text
                 fontSize="12px"
@@ -198,16 +211,31 @@ export const OperatorPage = () => {
               </Text>
             )}
           </Box>
-          <ScheduleGrid
-            schedule={schedule}
-            doctors={doctors}
-            appointments={appointments}
-            selectedTime={selected?.time ?? null}
-            selectedDoctorId={selected?.doctorId ?? null}
-            rescheduleTargetTime={rescheduleTarget?.time ?? null}
-            rescheduleTargetDoctorId={rescheduleTarget?.doctorId ?? null}
-            onSlotClick={handleSlotClick}
-          />
+          {isScheduleEmpty ? (
+            <Box
+              p="6"
+              borderRadius="compact"
+              borderWidth="1px"
+              borderStyle="dashed"
+              borderColor="borderLight"
+              data-testid="operator-empty"
+            >
+              <Text fontSize="13px" color="textSecondary" data-testid="operator-empty-reason">
+                {emptyReason}
+              </Text>
+            </Box>
+          ) : (
+            <ScheduleGrid
+              schedule={schedule!}
+              doctors={doctors}
+              appointments={appointments}
+              selectedTime={selected?.time ?? null}
+              selectedDoctorId={selected?.doctorId ?? null}
+              rescheduleTargetTime={rescheduleTarget?.time ?? null}
+              rescheduleTargetDoctorId={rescheduleTarget?.doctorId ?? null}
+              onSlotClick={handleSlotClick}
+            />
+          )}
           <ShiftOverview appointments={appointments} />
         </Stack>
 
