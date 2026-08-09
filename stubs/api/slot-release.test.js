@@ -176,7 +176,7 @@ describe('stubs/api — освобождение слота после отме�
       .send({ status: 'cancelled' });
     expect(cancel.status).toBe(200);
 
-    const list = await request(app).get('/appointments');
+    const list = await request(app).get('/appointments?date=2031-05-01');
     expect(list.status).toBe(200);
     const found = list.body.items.find((a) => a.id === id);
     expect(found).toBeDefined();

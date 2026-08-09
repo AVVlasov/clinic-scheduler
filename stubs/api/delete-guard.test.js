@@ -31,8 +31,9 @@ const fetchAppointment = async (app, id) => {
   return res.body;
 };
 
-const fetchList = async (app) => {
-  const res = await request(app).get('/appointments');
+const fetchList = async (app, date) => {
+  const url = date ? `/appointments?date=${date}` : '/appointments';
+  const res = await request(app).get(url);
   expect(res.status).toBe(200);
   return res.body.items;
 };
@@ -120,13 +121,13 @@ describe('stubs/api/delete-guard — DELETE уважает терминальн�
 
   test('DELETE на scheduled-записи физически удаляет запись (204, пропадает из списка)', async () => {
     const id = await createScheduled(app, 'd-004', 'p-003', '2030-12-09T10:00:00');
-    const listBefore = await fetchList(app);
+    const listBefore = await fetchList(app, '2030-12-09');
     expect(listBefore.some((a) => a.id === id)).toBe(true);
 
     const del = await request(app).delete(`/appointments/${id}`);
     expect(del.status).toBe(204);
 
-    const listAfter = await fetchList(app);
+    const listAfter = await fetchList(app, '2030-12-09');
     expect(listAfter.some((a) => a.id === id)).toBe(false);
 
     const get404 = await request(app).get(`/appointments/${id}`);

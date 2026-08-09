@@ -140,7 +140,8 @@ const doctorCards = [
 // Шаблоны приёма на неделю: интервалы «врач × день». Часть дней намеренно не рабочая
 // (block/absent/off) — иначе итог публикации был бы равен простому произведению
 // врачей на дни и не доказывал бы, что число посчитано по шаблонам.
-const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+const WEEKDAYS_PER_WEEK = 7;
 
 const weekTemplateSeed = {
   'd-001': [
@@ -150,6 +151,7 @@ const weekTemplateSeed = {
     [{ start: '08:00', end: '12:00', kind: 'break' }],
     [{ start: '08:00', end: '14:00', kind: 'work' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
   ],
   'd-002': [
     [{ start: '09:00', end: '15:00', kind: 'work' }],
@@ -158,6 +160,7 @@ const weekTemplateSeed = {
     [{ start: '00:00', end: '00:00', kind: 'absent' }],
     [{ start: '09:00', end: '15:00', kind: 'work' }],
     [{ start: '10:00', end: '13:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
   ],
   'd-003': [
     [{ start: '08:00', end: '13:00', kind: 'work' }],
@@ -165,6 +168,7 @@ const weekTemplateSeed = {
     [{ start: '08:00', end: '13:00', kind: 'work' }],
     [{ start: '13:00', end: '18:00', kind: 'work' }],
     [{ start: '08:00', end: '11:00', kind: 'break' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
   ],
   'd-004': [
@@ -174,6 +178,7 @@ const weekTemplateSeed = {
     [{ start: '10:00', end: '16:00', kind: 'work' }],
     [{ start: '10:00', end: '16:00', kind: 'work' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
   ],
   'd-005': [
     [{ start: '08:30', end: '12:30', kind: 'work' }],
@@ -182,6 +187,7 @@ const weekTemplateSeed = {
     [{ start: '08:30', end: '12:30', kind: 'work' }],
     [{ start: '00:00', end: '00:00', kind: 'absent' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
   ],
   'd-006': [
     [{ start: '08:00', end: '20:00', kind: 'work' }],
@@ -189,6 +195,7 @@ const weekTemplateSeed = {
     [{ start: '08:00', end: '20:00', kind: 'work' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
     [{ start: '08:00', end: '20:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
   ],
 };
@@ -228,7 +235,7 @@ const buildWeekTemplates = (weekStart) => {
   }));
   return {
     weekStart,
-    weekEnd: addDays(weekStart, WEEKDAYS.length - 1),
+    weekEnd: addDays(weekStart, WEEKDAYS_PER_WEEK - 1),
     days,
     rows,
     published: state.publishedWeeks.includes(weekStart),
@@ -244,7 +251,7 @@ const countWeekSlots = (weekStart) => {
   let slotsCreated = 0;
   const doctors = new Set();
 
-  for (let dayIdx = 0; dayIdx < WEEKDAYS.length; dayIdx++) {
+  for (let dayIdx = 0; dayIdx < WEEKDAYS_PER_WEEK; dayIdx++) {
     const dayTimes = new Set();
     for (const row of rows) {
       const intervals = (row.days[dayIdx] && row.days[dayIdx].intervals) || [];
@@ -269,7 +276,18 @@ const countWeekSlots = (weekStart) => {
 };
 
 const buildState = () => {
-  const date = today();
+  const sysDate = today();
+  const sysDayIdx = dayIndex(sysDate);
+  const effectiveDate = sysDayIdx === 6 ? addDays(sysDate, 1) : sysDate;
+  const currentWeekStart = weekStartOf(sysDate);
+  const nextWeekStart = addDays(currentWeekStart, 7);
+  const publishedWeeks = [currentWeekStart];
+  if (effectiveDate !== sysDate) {
+    const effectiveWeekStart = weekStartOf(effectiveDate);
+    if (!publishedWeeks.includes(effectiveWeekStart)) {
+      publishedWeeks.push(effectiveWeekStart);
+    }
+  }
   return {
     doctors: doctors.map((d) => ({ ...d })),
     doctorCards: doctorCards.map((c) => ({
@@ -281,26 +299,12 @@ const buildState = () => {
     })),
     services: services.map((s) => ({ ...s })),
     patients: patients.map((p) => ({ ...p })),
-    date,
-    appointments: seedAppointments(date),
-    publishedWeeks: [weekStartOf(date)],
+    date: effectiveDate,
+    sysDate,
+    appointments: seedAppointments(effectiveDate),
+    publishedWeeks,
     seq: 7,
   };
-};
-
-const state = buildState();
-
-const newId = () => {
-  let maxSeq = state.seq;
-  const re = /^a-(\d+)$/;
-  for (const a of state.appointments) {
-    const m = re.exec(a.id);
-    if (!m) continue;
-    const n = Number(m[1]);
-    if (Number.isFinite(n) && n > maxSeq) maxSeq = n;
-  }
-  state.seq = maxSeq + 1;
-  return `a-${String(state.seq).padStart(3, '0')}`;
 };
 
 // Статусы, в которых запись реально занимает слот в сетке расписания.
@@ -319,13 +323,28 @@ const dayIndex = (date) => {
   return js === 0 ? 6 : js - 1;
 };
 
+const state = buildState();
+
+const newId = () => {
+  let maxSeq = state.seq;
+  const re = /^a-(\d+)$/;
+  for (const a of state.appointments) {
+    const m = re.exec(a.id);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > maxSeq) maxSeq = n;
+  }
+  state.seq = maxSeq + 1;
+  return `a-${String(state.seq).padStart(3, '0')}`;
+};
+
 const buildSlots = (date) => {
   const weekStart = weekStartOf(date);
   if (!state.publishedWeeks.includes(weekStart)) {
     return [];
   }
   const di = dayIndex(date);
-  if (di < 0 || di > 5) {
+  if (di < 0 || di > 6) {
     return [];
   }
 
