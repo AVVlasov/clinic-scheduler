@@ -132,5 +132,13 @@
     "npx --no-install vitest run stubs/api/delete-guard.test.js",
     "npx --no-install vitest run src/pages/operator/refresh-failure.test.tsx",
     "npx --no-install vitest run src/pages/admin"
+  ],
+  "TASK-34": [
+    "npx --no-install vitest run stubs/api/calendar.test.js",
+    "npx --no-install vitest run stubs/api"
+  ],
+  "TASK-35": [
+    "npx --no-install vitest run src/pages/empty-states.test.tsx",
+    "npx --no-install tsc --noEmit"
   ]
 }
