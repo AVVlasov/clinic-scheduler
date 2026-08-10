@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { getAppointments, getAppointmentHistory, getDoctors, getServices, createWaitlist, rescheduleAppointment } from '../../__data__/api'
 import { parseArmDate, parseArmDoctorId, withArmDate } from '../../__data__/dates'
+import { plural } from '../../__data__/plural'
 import { appointmentStatusLabel } from '../../__data__/status-labels'
 import type { Appointment, AppointmentHistoryEntry, Doctor, Service } from '../../__data__/types'
 import { URLs } from '../../__data__/urls'
@@ -16,7 +17,7 @@ import {
   type VisitFormState,
 } from './visit-form'
 
-const computeAgeYears = (birthDate: string | null): string | null => {
+export const computeAgeYears = (birthDate: string | null): string | null => {
   if (!birthDate) return null
   const b = new Date(birthDate)
   if (Number.isNaN(b.getTime())) return null
@@ -24,7 +25,8 @@ const computeAgeYears = (birthDate: string | null): string | null => {
   let years = now.getFullYear() - b.getFullYear()
   const m = now.getMonth() - b.getMonth()
   if (m < 0 || (m === 0 && now.getDate() < b.getDate())) years -= 1
-  return `${b.getFullYear()} г. р. · ${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`
+  // Прежнее правило (`years < 5 ? 'года' : 'лет'`) верно только до 5: 34 давало «34 лет».
+  return `${b.getFullYear()} г. р. · ${years} ${plural(years, 'год', 'года', 'лет')}`
 }
 
 const formatRange = (start: string, durationMin: number): string => {
