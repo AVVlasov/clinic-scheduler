@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 
 import { filterServicesByQuery } from '../../__data__/booking'
+import { doctorsWord } from '../../__data__/plural'
 import type { Service } from '../../__data__/types'
 
 interface ServicePickerProps {
@@ -94,7 +95,7 @@ export const ServicePicker = ({ services, selectedId, onSelect }: ServicePickerP
                   {s.name}
                 </Text>
                 <Text fontSize="12px" color="textSecondary">
-                  {s.category} · {s.duration} мин · {s.doctorIds.length} врача
+                  {s.category} · {s.duration} мин · {s.doctorIds.length} {doctorsWord(s.doctorIds.length)}
                 </Text>
               </Box>
             )

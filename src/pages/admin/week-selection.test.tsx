@@ -267,7 +267,7 @@ describe('AdminPage — выбор недели (TASK-29)', () => {
     const result = await screen.findByTestId('publish-result')
     expect(result).toHaveTextContent('1 234')
     expect(result).toHaveTextContent('9')
-    expect(result).toHaveTextContent('Нарезано 1 234 слотов на 9 врачей.')
+    expect(result).toHaveTextContent('Нарезано 1 234 слота на 9 врачей.')
 
     // 5) POST ушёл на publish с weekStart именно следующей недели
     const calls = postPublish(log)

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 
+import { doctorsWord, slotsWord } from '../../__data__/plural'
 import type {
   PublishWeekResult,
   WeekTemplateInterval,
@@ -354,8 +355,10 @@ export const WeekTemplates = ({
                 Неделя опубликована
               </Text>
               <Text fontSize="13px" color="textPrimary" lineHeight="18px">
-                Нарезано {formatCount(publishResult.slotsCreated)} слотов на{' '}
-                {formatCount(publishResult.doctorsAffected)} врачей.
+                Нарезано {formatCount(publishResult.slotsCreated)}{' '}
+                {slotsWord(publishResult.slotsCreated)} на{' '}
+                {formatCount(publishResult.doctorsAffected)}{' '}
+                {doctorsWord(publishResult.doctorsAffected)}.
               </Text>
             </Box>
           ) : null}

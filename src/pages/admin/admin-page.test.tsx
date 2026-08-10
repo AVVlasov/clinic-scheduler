@@ -271,7 +271,7 @@ describe('AdminPage — шаблоны недели', () => {
     // числа названы, а не «готово»
     expect(result).toHaveTextContent('1 842')
     expect(result).toHaveTextContent('6')
-    expect(result).toHaveTextContent('Нарезано 1 842 слотов на 6 врачей.')
+    expect(result).toHaveTextContent('Нарезано 1 842 слота на 6 врачей.')
 
     // запрос ушёл на нужный адрес и с нужной неделей
     const calls = postPublishCalls(fetchMock)
