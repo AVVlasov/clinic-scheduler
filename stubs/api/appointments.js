@@ -100,13 +100,15 @@ router.get('/appointments', (req, res) => {
     return;
   }
   const items = state.appointments
+    .concat(state.demoAppointments || [])
     .filter((a) => String(a.start).slice(0, 10) === requested)
     .map(decorate);
   res.json({ items, date: requested });
 });
 
 router.get('/appointments/:id', (req, res) => {
-  const a = state.appointments.find((x) => x.id === req.params.id);
+  const a = state.appointments.find((x) => x.id === req.params.id)
+    || (state.demoAppointments || []).find((x) => x.id === req.params.id);
   if (!a) return res.status(404).json({ error: 'not_found' });
   res.json(decorate(a));
 });

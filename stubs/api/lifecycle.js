@@ -1,5 +1,7 @@
 'use strict';
 
+const data = require('./data');
+
 const APPOINTMENT_STATUSES = Object.freeze([
   'scheduled',
   'arrived',
@@ -46,10 +48,7 @@ const isAppointmentStatus = (status) => APPOINTMENT_STATUSES.includes(status);
 
 const isPaymentType = (value) => PAYMENT_TYPES.includes(value);
 
-const toMinutes = (hhmm) => {
-  const [hh, mm] = String(hhmm).split(':').map(Number);
-  return hh * 60 + mm;
-};
+const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value)) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
 
 const isWithinPublishedShift = (
   date,
@@ -60,14 +59,13 @@ const isWithinPublishedShift = (
   weekTemplateSeed,
   publishedWeeks,
 ) => {
+  if (!isValidDate(date)) return false;
   if (!publishedWeeks.includes(weekStart)) return false;
   const seed = weekTemplateSeed[doctorId];
   if (!seed) return false;
 
-  const d = new Date(`${date}T00:00:00`);
-  const js = d.getDay();
-  const dayIndex = js === 0 ? 6 : js - 1;
-  if (dayIndex < 0 || dayIndex > 5) return false;
+  const dayIndex = data.dayIndex(date);
+  if (dayIndex < 0 || dayIndex > 6) return false;
 
   const intervals = seed[dayIndex] || [];
   if (intervals.length === 0) return false;
@@ -76,10 +74,11 @@ const isWithinPublishedShift = (
   const endTime = new Date(startTime.getTime() + Number(durationMin) * 60000);
   if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) return false;
 
+  // Единая предикатная проверка с data.buildSlots: рабочий интервал = kind=work И
+  // положительная длительность. off/absent/block/break здесь НЕ считаются сменой,
+  // и data.js, и lifecycle.js спрашивают один и тот же isWorkingInterval.
   for (const interval of intervals) {
-    if (interval.kind !== 'work' && interval.kind !== 'break') continue;
-    const span = toMinutes(interval.end) - toMinutes(interval.start);
-    if (span <= 0) continue;
+    if (!data.isWorkingInterval(interval)) continue;
     const ivStart = new Date(`${date}T${interval.start}:00`).getTime();
     const ivEnd = new Date(`${date}T${interval.end}:00`).getTime();
     if (startTime.getTime() >= ivStart && endTime.getTime() <= ivEnd) {
@@ -101,4 +100,5 @@ module.exports = {
   isAppointmentStatus,
   isPaymentType,
   isWithinPublishedShift,
+  isValidDate,
 };
