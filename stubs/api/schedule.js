@@ -9,13 +9,15 @@ const {
   dayEnd,
   today,
   weekStartOf,
+  addDays,
   buildWeekTemplates,
   countWeekSlots,
+  seedAppointments,
 } = require('./data');
 
 const router = Router();
 
-const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value)) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
 
 router.get('/week-templates', (req, res) => {
   const raw = req.query.weekStart ? String(req.query.weekStart) : today();
@@ -47,11 +49,22 @@ router.post('/week-templates/publish', (req, res) => {
   }
 
   state.publishedWeeks.push(weekStart);
+
+  const sysDate = state.sysDate;
+  for (let i = 0; i < 7; i += 1) {
+    seedAppointments(addDays(weekStart, i), sysDate);
+  }
+
   res.json({ weekStart, slotsCreated, doctorsAffected, publishedAt: new Date().toISOString() });
 });
 
 router.get('/schedule', (req, res) => {
-  const date = (req.query.date && String(req.query.date)) || state.date;
+  const raw = req.query.date;
+  const date = (raw != null && raw !== '') ? String(raw) : state.date;
+  if (!isDate(date)) {
+    res.status(400).json({ error: 'invalid_date', message: 'Дата должна быть в формате ГГГГ-ММ-ДД' });
+    return;
+  }
   res.json({
     date,
     startTime: dayStart,
@@ -63,6 +76,10 @@ router.get('/schedule', (req, res) => {
 
 router.get('/schedule/:date', (req, res) => {
   const date = req.params.date;
+  if (!isDate(date)) {
+    res.status(400).json({ error: 'invalid_date', message: 'Дата должна быть в формате ГГГГ-ММ-ДД' });
+    return;
+  }
   res.json({
     date,
     startTime: dayStart,

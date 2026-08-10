@@ -98,10 +98,11 @@ describe('stubs/api/schedule — сетка строится по опублик
       expect(/20\s*\*\s*60/.test(body)).toBe(false);
     });
 
-    test('buildSlots в data.js итерирует по intervals с kind=work (Math.floor(span / stepMinutes))', () => {
+    test('buildSlots в data.js использует isWorkingInterval (единый предикат с lifecycle.js)', () => {
       const src = require('fs').readFileSync(require('path').join(__dirname, 'data.js'), 'utf8');
-      expect(/kind\s*!==\s*['"]work['"]/.test(src)).toBe(true);
-      expect(/Math\.floor\(\s*span\s*\/\s*stepMinutes\s*\)/.test(src)).toBe(true);
+      expect(/isWorkingInterval\s*\(/.test(src)).toBe(true);
+      expect(/Math\.floor\(/.test(src)).toBe(true);
+      expect(/stepMinutes\s*\)/.test(src)).toBe(true);
     });
   });
 
@@ -246,6 +247,40 @@ describe('stubs/api/schedule — сетка строится по опублик
       expect(res.status).toBe(200);
       const d005 = res.body.slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-005'));
       expect(d005.length).toBe(0);
+    });
+  });
+
+  describe('R5 — мусор в дате → 400 invalid_date', () => {
+    test('GET /schedule?date=мусор → 400 invalid_date (не 200 c пустым массивом)', async () => {
+      const res = await request(app).get('/schedule?date=мусор');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('invalid_date');
+      expect(typeof res.body.message).toBe('string');
+      expect(res.body.message.length).toBeGreaterThan(0);
+    });
+
+    test('GET /schedule?date=not-a-date → 400 invalid_date', async () => {
+      const res = await request(app).get('/schedule?date=not-a-date');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('invalid_date');
+    });
+
+    test('GET /schedule?date=2026-13-99 → 400 invalid_date', async () => {
+      const res = await request(app).get('/schedule?date=2026-13-99');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('invalid_date');
+    });
+
+    test('GET /schedule/мусор → 400 invalid_date', async () => {
+      const res = await request(app).get('/schedule/мусор');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('invalid_date');
+    });
+
+    test('GET /schedule/garbage → 400 invalid_date', async () => {
+      const res = await request(app).get('/schedule/garbage');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('invalid_date');
     });
   });
 });

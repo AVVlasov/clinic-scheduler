@@ -43,10 +43,32 @@ const stepMinutes = 15;
 const dayStart = '08:00';
 const dayEnd = '20:00';
 
-const findSeedSlot = (date, doctorId, dayIdx, durationMin, usedMinutes) => {
+const dateMs = (date) => new Date(`${date}T00:00:00`).getTime();
+
+const compareDate = (a, b) => {
+  const ma = dateMs(a);
+  const mb = dateMs(b);
+  if (ma < mb) return -1;
+  if (ma > mb) return 1;
+  return 0;
+};
+
+const isWorkingInterval = (interval) => {
+  if (!interval) return false;
+  if (interval.kind !== 'work') return false;
+  const span = toMinutes(interval.end) - toMinutes(interval.start);
+  return span > 0;
+};
+
+const hasWorkingDay = (intervals) => {
+  if (!Array.isArray(intervals) || intervals.length === 0) return false;
+  return intervals.some(isWorkingInterval);
+};
+
+const findSeedSlot = (doctorId, dayIdx, durationMin, usedMinutes) => {
   const intervals = (weekTemplateSeed[doctorId] || [])[dayIdx] || [];
   for (const interval of intervals) {
-    if (interval.kind !== 'work' && interval.kind !== 'break') continue;
+    if (!isWorkingInterval(interval)) continue;
     const ivStart = toMinutes(interval.start);
     const ivEnd = toMinutes(interval.end);
     for (let m = ivStart; m + durationMin <= ivEnd; m += stepMinutes) {
@@ -57,42 +79,110 @@ const findSeedSlot = (date, doctorId, dayIdx, durationMin, usedMinutes) => {
   return null;
 };
 
-const seedAppointments = (date) => {
-  const d = new Date(`${date}T00:00:00`);
-  const js = d.getDay();
-  const dayIdx = js === 0 ? 6 : js - 1;
+// Фиксированный пул записей: достаточно разный, чтобы покрыть ≥5 записей
+// на каждый рабочий день окна. Порядок важен — поздние записи «добивают»
+// день до нужного минимума независимо от того, какие врачи работают.
+const SEED_PLAN = [
+  { doctorId: 'd-001', patientId: 'p-001', status: 'completed',   paymentType: 'cash',      serviceId: 's-007', durationMin: 30 },
+  { doctorId: 'd-001', patientId: 'p-002', status: 'scheduled',   paymentType: 'card',      serviceId: 's-001', durationMin: 30 },
+  { doctorId: 'd-001', patientId: 'p-003', status: 'no_show',     paymentType: 'insurance', serviceId: 's-002', durationMin: 20 },
+  { doctorId: 'd-002', patientId: 'p-001', status: 'completed',   paymentType: 'card',      serviceId: 's-007', durationMin: 20 },
+  { doctorId: 'd-002', patientId: 'p-002', status: 'scheduled',   paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
+  { doctorId: 'd-002', patientId: 'p-003', status: 'arrived',     paymentType: 'card',      serviceId: 's-002', durationMin: 20 },
+  { doctorId: 'd-002', patientId: 'p-004', status: 'in_progress', paymentType: 'insurance', serviceId: 's-001', durationMin: 30 },
+  { doctorId: 'd-002', patientId: 'p-001', status: 'cancelled',   paymentType: 'cash',      serviceId: 's-003', durationMin: 15 },
+  { doctorId: 'd-003', patientId: 'p-002', status: 'scheduled',   paymentType: 'card',      serviceId: 's-001', durationMin: 30 },
+  { doctorId: 'd-003', patientId: 'p-003', status: 'completed',   paymentType: 'cash',      serviceId: 's-007', durationMin: 20 },
+  { doctorId: 'd-003', patientId: 'p-004', status: 'no_show',     paymentType: 'insurance', serviceId: 's-005', durationMin: 10 },
+  { doctorId: 'd-004', patientId: 'p-001', status: 'scheduled',   paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
+  { doctorId: 'd-004', patientId: 'p-002', status: 'arrived',     paymentType: 'card',      serviceId: 's-006', durationMin: 15 },
+  { doctorId: 'd-005', patientId: 'p-003', status: 'completed',   paymentType: 'cash',      serviceId: 's-007', durationMin: 20 },
+  { doctorId: 'd-005', patientId: 'p-004', status: 'scheduled',   paymentType: 'insurance', serviceId: 's-001', durationMin: 30 },
+  { doctorId: 'd-006', patientId: 'p-001', status: 'scheduled',   paymentType: 'cash',      serviceId: 's-004', durationMin: 30 },
+  { doctorId: 'd-006', patientId: 'p-002', status: 'completed',   paymentType: 'card',      serviceId: 's-007', durationMin: 20 },
+];
 
-  const plan = [
-    { doctorId: 'd-001', patientId: 'p-001', status: 'scheduled',   paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
-    { doctorId: 'd-002', patientId: 'p-002', status: 'arrived',     paymentType: 'card',      serviceId: 's-002', durationMin: 20 },
-    { doctorId: 'd-002', patientId: 'p-003', status: 'in_progress', paymentType: 'insurance', serviceId: 's-001', durationMin: 30 },
-    { doctorId: 'd-003', patientId: 'p-004', status: 'scheduled',   paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
-    { doctorId: 'd-004', patientId: 'p-001', status: 'completed',   paymentType: 'card',      serviceId: 's-007', durationMin: 30 },
-    { doctorId: 'd-005', patientId: 'p-002', status: 'no_show',     paymentType: 'cash',      serviceId: 's-001', durationMin: 30 },
-    { doctorId: 'd-002', patientId: 'p-004', status: 'completed',   paymentType: 'cash',      serviceId: 's-007', durationMin: 20 },
-    { doctorId: 'd-002', patientId: 'p-001', status: 'cancelled',   paymentType: 'card',      serviceId: 's-001', durationMin: 30 },
-  ];
+// Статусы, которые могут появиться на конкретном дне относительно sysDate.
+// Прошедший день — только терминальные статусы; сегодня — смесь; будущий — scheduled.
+const STATUS_POOL_FOR_DAY = (date, sysDate) => {
+  const cmp = compareDate(date, sysDate);
+  if (cmp < 0) return ['completed', 'no_show', 'completed', 'cancelled', 'completed'];
+  if (cmp > 0) return ['scheduled', 'scheduled', 'scheduled', 'scheduled', 'scheduled', 'scheduled', 'scheduled'];
+  return ['scheduled', 'arrived', 'in_progress', 'completed', 'scheduled', 'scheduled', 'completed', 'no_show', 'scheduled'];
+};
+
+const STATUSES_ALLOWED_IN_PAST = new Set(['completed', 'no_show', 'cancelled']);
+const STATUSES_ALLOWED_IN_FUTURE = new Set(['scheduled']);
+
+const clampStatusForDay = (date, sysDate, status) => {
+  const cmp = compareDate(date, sysDate);
+  if (cmp < 0 && !STATUSES_ALLOWED_IN_PAST.has(status)) return 'completed';
+  if (cmp > 0 && !STATUSES_ALLOWED_IN_FUTURE.has(status)) return 'scheduled';
+  return status;
+};
+
+const patientIds = patients.map((p) => p.id);
+
+const seedAppointments = (date, sysDate) => {
+  const dIdx = dayIndex(date);
+  const statusPool = STATUS_POOL_FOR_DAY(date, sysDate);
 
   const usedMinutes = [];
-  const base = plan.map((p) => {
-    const startMin = findSeedSlot(date, p.doctorId, dayIdx, p.durationMin, usedMinutes);
-    if (startMin == null) return null;
+  const placed = [];
+
+  for (let i = 0; i < SEED_PLAN.length; i += 1) {
+    const p = SEED_PLAN[i];
+    const startMin = findSeedSlot(p.doctorId, dIdx, p.durationMin, usedMinutes);
+    if (startMin == null) continue;
     usedMinutes.push({ doctorId: p.doctorId, startMin, endMin: startMin + p.durationMin });
     const hh = String(Math.floor(startMin / 60)).padStart(2, '0');
     const mm = String(startMin % 60).padStart(2, '0');
-    return {
+    const status = clampStatusForDay(date, sysDate, p.status);
+    placed.push({
       doctorId: p.doctorId,
       patientId: p.patientId,
       start: isoAt(date, hh, mm),
       durationMin: p.durationMin,
-      status: p.status,
+      status,
       paymentType: p.paymentType,
       serviceId: p.serviceId,
-    };
-  }).filter(Boolean);
+    });
+  }
 
-  return base.map((a, i) => ({
-    id: `a-${String(i + 1).padStart(3, '0')}`,
+  // Добиваем минимум до 5 записей, повторно используя пациентов и укорачивая
+  // длительность до первого доступного слота. Это страхует дни, когда в
+  // SEED_PLAN почти все цели — врачи, которые в этот день не работают.
+  let safety = 0;
+  while (placed.length < 5 && safety < 200) {
+    safety += 1;
+    let grown = false;
+    for (const doc of doctors) {
+      for (const durationMin of [30, 20, 15, 10]) {
+        const startMin = findSeedSlot(doc.id, dIdx, durationMin, usedMinutes);
+        if (startMin == null) continue;
+        usedMinutes.push({ doctorId: doc.id, startMin, endMin: startMin + durationMin });
+        const hh = String(Math.floor(startMin / 60)).padStart(2, '0');
+        const mm = String(startMin % 60).padStart(2, '0');
+        const status = clampStatusForDay(date, sysDate, statusPool[placed.length % statusPool.length]);
+        const patientId = patientIds[(placed.length + safety) % patientIds.length];
+        placed.push({
+          doctorId: doc.id,
+          patientId,
+          start: isoAt(date, hh, mm),
+          durationMin,
+          status,
+          paymentType: 'cash',
+          serviceId: null,
+        });
+        grown = true;
+        break;
+      }
+      if (placed.length >= 5) break;
+    }
+    if (!grown) break;
+  }
+
+  const out = placed.map((a) => ({
     ...a,
     complaints: null,
     diagnosis: null,
@@ -101,7 +191,17 @@ const seedAppointments = (date) => {
     recommendations: [],
     nextVisit: null,
   }));
+  for (const r of out) {
+    globalSeedSeq += 1;
+    r.id = `a-${String(globalSeedSeq).padStart(3, '0')}`;
+  }
+  for (const r of out) {
+    pushDemoTarget(r);
+  }
+  return out;
 };
+
+let globalSeedSeq = 0;
 
 // Карточки врачей справочника администратора. Часть карточек намеренно неполная:
 // счётчик «Незаполненных карточек» в АРМ администратора обязан считаться по данным,
@@ -256,12 +356,10 @@ const countWeekSlots = (weekStart) => {
     for (const row of rows) {
       const intervals = (row.days[dayIdx] && row.days[dayIdx].intervals) || [];
       for (const interval of intervals) {
-        if (interval.kind !== 'work' && interval.kind !== 'break') continue;
-        const span = toMinutes(interval.end) - toMinutes(interval.start);
-        if (span <= 0) continue;
+        if (!isWorkingInterval(interval)) continue;
         doctors.add(row.doctorId);
         const workStart = toMinutes(interval.start);
-        const workEnd = workStart + Math.floor(span / stepMinutes) * stepMinutes;
+        const workEnd = workStart + Math.floor((toMinutes(interval.end) - workStart) / stepMinutes) * stepMinutes;
         for (let m = workStart; m < workEnd; m += stepMinutes) {
           const hh = String(Math.floor(m / 60)).padStart(2, '0');
           const mm = String(m % 60).padStart(2, '0');
@@ -277,16 +375,25 @@ const countWeekSlots = (weekStart) => {
 
 const buildState = () => {
   const sysDate = today();
-  const sysDayIdx = dayIndex(sysDate);
-  const effectiveDate = sysDayIdx === 6 ? addDays(sysDate, 1) : sysDate;
   const currentWeekStart = weekStartOf(sysDate);
+  const priorWeekStart = addDays(currentWeekStart, -7);
   const nextWeekStart = addDays(currentWeekStart, 7);
-  const publishedWeeks = [currentWeekStart];
-  if (effectiveDate !== sysDate) {
-    const effectiveWeekStart = weekStartOf(effectiveDate);
-    if (!publishedWeeks.includes(effectiveWeekStart)) {
-      publishedWeeks.push(effectiveWeekStart);
+  const publishedWeeks = [priorWeekStart, currentWeekStart, nextWeekStart];
+  const demoAppointments = [];
+  pushDemoTarget = (record) => { demoAppointments.push(record); };
+  for (const ws of publishedWeeks) {
+    for (let i = 0; i < 7; i += 1) {
+      seedAppointments(addDays(ws, i), sysDate);
     }
+  }
+  pushDemoTarget = (record) => { state.demoAppointments.push(record); };
+  let maxDemoSeq = 0;
+  const re = /^a-(\d+)$/;
+  for (const a of demoAppointments) {
+    const m = re.exec(a.id);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > maxDemoSeq) maxDemoSeq = n;
   }
   return {
     doctors: doctors.map((d) => ({ ...d })),
@@ -299,13 +406,16 @@ const buildState = () => {
     })),
     services: services.map((s) => ({ ...s })),
     patients: patients.map((p) => ({ ...p })),
-    date: effectiveDate,
+    date: sysDate,
     sysDate,
-    appointments: seedAppointments(effectiveDate),
+    appointments: [],
+    demoAppointments,
     publishedWeeks,
-    seq: 7,
+    seq: maxDemoSeq,
   };
 };
+
+let pushDemoTarget;
 
 // Статусы, в которых запись реально занимает слот в сетке расписания.
 // `cancelled` и `no_show` — терминальные, но слот НЕ блокируют: их можно
@@ -329,6 +439,12 @@ const newId = () => {
   let maxSeq = state.seq;
   const re = /^a-(\d+)$/;
   for (const a of state.appointments) {
+    const m = re.exec(a.id);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > maxSeq) maxSeq = n;
+  }
+  for (const a of state.demoAppointments) {
     const m = re.exec(a.id);
     if (!m) continue;
     const n = Number(m[1]);
@@ -366,11 +482,9 @@ const buildSlots = (date) => {
   for (const doc of state.doctors) {
     const intervals = intervalsByDoctor.get(doc.id) || [];
     for (const interval of intervals) {
-      if (interval.kind !== 'work' && interval.kind !== 'break') continue;
-      const span = toMinutes(interval.end) - toMinutes(interval.start);
-      if (span <= 0) continue;
+      if (!isWorkingInterval(interval)) continue;
       const workStart = toMinutes(interval.start);
-      const workEnd = workStart + Math.floor(span / stepMinutes) * stepMinutes;
+      const workEnd = workStart + Math.floor((toMinutes(interval.end) - workStart) / stepMinutes) * stepMinutes;
       for (let m = workStart; m < workEnd; m += stepMinutes) {
         const hh = String(Math.floor(m / 60)).padStart(2, '0');
         const mm = String(m % 60).padStart(2, '0');
@@ -388,9 +502,7 @@ const buildSlots = (date) => {
       const intervals = intervalsByDoctor.get(doc.id) || [];
       let inWork = false;
       for (const interval of intervals) {
-        if (interval.kind !== 'work' && interval.kind !== 'break') continue;
-        const span = toMinutes(interval.end) - toMinutes(interval.start);
-        if (span <= 0) continue;
+        if (!isWorkingInterval(interval)) continue;
         const wStart = new Date(`${date}T${interval.start}:00`).getTime();
         const wEnd = new Date(`${date}T${interval.end}:00`).getTime();
         if (slotStart.getTime() >= wStart && slotEnd.getTime() <= wEnd) {
@@ -434,6 +546,7 @@ module.exports = {
   today,
   newId,
   buildSlots,
+  seedAppointments,
   stepMinutes,
   dayStart,
   dayEnd,
@@ -441,7 +554,10 @@ module.exports = {
   overlaps,
   isoAt,
   weekStartOf,
+  addDays,
   buildWeekTemplates,
   countWeekSlots,
   weekTemplateSeed,
+  isWorkingInterval,
+  hasWorkingDay,
 };

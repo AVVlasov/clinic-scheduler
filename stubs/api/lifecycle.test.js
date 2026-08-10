@@ -300,10 +300,12 @@ describe('stubs/api/lifecycle — согласованность демо-дан
     app = buildApp();
   });
 
-  test('seedAppointments: каждая стартовая запись попадает в опубликованный рабочий интервал своего врача на свой день', async () => {
+  test('seedAppointments: каждая посеянная запись попадает в опубликованный рабочий интервал своего врача на свой день', async () => {
     const items = await fetchList(app);
 
-    const seedRecords = items.filter((a) => /^a-00[1-9]$/.test(a.id));
+    // Демо-данные засеяны сразу по двум неделям (текущая + предыдущая),
+    // поэтому id заполняют весь диапазон a-001..a-NNN без жёсткого шаблона.
+    const seedRecords = items.filter((a) => /^a-\d+$/.test(a.id));
     expect(seedRecords.length).toBeGreaterThan(0);
 
     const today = data.state.date;
@@ -316,8 +318,9 @@ describe('stubs/api/lifecycle — согласованность демо-дан
       const intervals = data.weekTemplateSeed[a.doctorId][dayIdx] || [];
       const startTime = new Date(a.start).getTime();
       const endTime = startTime + a.durationMin * 60000;
+      // Единая предикатная проверка: kind=work И положительная длительность.
       const fits = intervals.some((iv) => {
-        if (iv.kind !== 'work' && iv.kind !== 'break') return false;
+        if (!data.isWorkingInterval(iv)) return false;
         const ivStart = new Date(`${aDate}T${iv.start}:00`).getTime();
         const ivEnd = new Date(`${aDate}T${iv.end}:00`).getTime();
         return startTime >= ivStart && endTime <= ivEnd;
@@ -334,14 +337,14 @@ describe('stubs/api/lifecycle — согласованность демо-дан
   });
 });
 
-describe('stubs/api/lifecycle — break-интервал не выбрасывается генератором', () => {
+describe('stubs/api/lifecycle — обед отрезан от смены и от валидации', () => {
   let app;
 
   beforeAll(async () => {
     app = buildApp();
   });
 
-  test('isWithinPublishedShift возвращает true для интервала внутри kind=break', () => {
+  test('isWithinPublishedShift возвращает false для интервала внутри kind=break', () => {
     const date = '2026-08-13';
     const weekStart = data.weekStartOf(date);
     expect(lifecycle.isWithinPublishedShift(
@@ -352,10 +355,10 @@ describe('stubs/api/lifecycle — break-интервал не выбрасыва
       weekStart,
       data.weekTemplateSeed,
       [weekStart],
-    )).toBe(true);
+    )).toBe(false);
   });
 
-  test('break не считается outside_shift: слот 10:00–10:30 у d-001 в четверг (08:00–12:00 break) принимается', async () => {
+  test('break считается outside_shift: POST на обеде d-001 в четверг (08:00–12:00 break) отклоняется', async () => {
     const date = '2026-08-13';
     const weekStart = data.weekStartOf(date);
     const pubRes = await request(app)
@@ -369,9 +372,7 @@ describe('stubs/api/lifecycle — break-интервал не выбрасыва
       start: `${date}T10:00:00`,
       durationMin: 30,
     });
-    expect([201, 409]).toContain(res.status);
-    if (res.status === 409) {
-      expect(res.body.error).not.toBe('outside_shift');
-    }
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('outside_shift');
   });
 });
