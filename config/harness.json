@@ -28,6 +28,17 @@
         "authCheck": "claude auth status",
         "authOkPattern": "\"loggedIn\"\\s*:\\s*true"
       },
+      "claude-ro": {
+        "$comment": "Тот же claude, но без права правки. Заведён 2026-08-10: узел «ревизия-плана» (роль planner) дважды за час зашёл в tasks/ и поменял в ЗАКРЫТОЙ TASK-25 «- [x]» на «- [V]». Два символа в чужом файле отменили слияние TASK-48, дошедшей до PASS. Правило «роль, обязанная только смотреть, живёт на песочнице только на чтение» записано в комментарии к graph.roles ниже — critic ему следовал, planner нет.",
+        "command": "claude -p --output-format stream-json --verbose --permission-mode acceptEdits --disallowedTools Edit,Write,NotebookEdit,MultiEdit --model {model}",
+        "format": "claude",
+        "env": [
+          "CLAUDE_CODE_OAUTH_TOKEN"
+        ],
+        "probeModel": "sonnet",
+        "authCheck": "claude auth status",
+        "authOkPattern": "\"loggedIn\"\\s*:\\s*true"
+      },
       "opencode": {
         "command": "opencode run --dangerously-skip-permissions --thinking --format json --model {model}",
         "format": "opencode"
@@ -50,7 +61,8 @@
     "roles": {
       "$comment": "Три правила, за которые тут заплачено осознанно: (1) critic сидит НЕ на модели worker — несколько агентов одной модели на одном контексте приходят к одной ошибке и подтверждают её друг другу; (2) planner и critic из разных семейств, чтобы критик не защищал решение собственного планировщика; (3) роль, обязанная только смотреть, живёт на бэкенде с песочницей только на чтение.",
       "planner": {
-        "backend": "claude",
+        "$comment": "Только чтение: все узлы этой роли — анализ (ревизия плана, оценка риска правки, сведение отчёта). Писать ей незачем, а возможность писать уже стоила одного слияния.",
+        "backend": "claude-ro",
         "model": "opus"
       },
       "arbiter": {
