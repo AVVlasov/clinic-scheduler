@@ -1,33 +1,36 @@
 {
-  "_doc": "Scope maps. (1) testers: which LLM tester is relevant to which product paths — verify.ps1/loop.ps1 drops a tester from VERIFY-REQUEST when its paths were not touched by this iteration's diff (override with '# all-testers' in VERIFY-REQUEST). (2) vision: which visual slug depends on which paths — used to scope the optional visual phase. Edit both for your project; the entries below are generic examples.",
+  "_doc": "Скоуп-карты проекта. (1) testers: какой LLM-тестер относится к каким продуктовым путям — verify.ps1/loop.ps1 выбрасывает тестера из VERIFY-REQUEST, если его пути не затронуты диффом итерации (перекрыть: '# all-testers' в VERIFY-REQUEST). (2) vision: какой визуальный slug зависит от каких путей. ПРАВИЛО: каждый patterns обязан указывать на реально существующий путь этого репозитория. Шаблон из bcf init указывал на src/api/, server/, routes/, src/pages/home/ — ничего этого здесь нет, и скоуп молча не матчился ни на что: тестеры отбрасывались, визуальная фаза схлопывалась в __none__. Проверяется: bcf doctor.",
 
   "testers": [
     {
       "tester": "architecture",
-      "_what_it_checks": "Layer boundaries, banned deps, orphan handlers, tech-stack drift. Structural analysis.",
-      "patterns": ["src/", "package.json", "tsconfig.json", "ARCHITECTURE.md"]
+      "_what_it_checks": "Границы слоёв, запрещённые зависимости (redux, tailwind, MUI, классовые компоненты), осиротевшие компоненты, дрейф стека.",
+      "patterns": ["src/", "package.json", "tsconfig.json", "CLAUDE.md"]
     },
     {
       "tester": "api",
-      "_what_it_checks": "API/contract wiring (routes, handlers, schemas).",
-      "patterns": ["src/api/", "src/lib/ipc", "server/", "routes/"]
+      "_what_it_checks": "Контракт клиент↔сервер: маршруты стабов, клиент API, типы домена, жизненный цикл записи.",
+      "patterns": ["stubs/api/", "src/__data__/"]
     },
     {
       "tester": "performance",
-      "_what_it_checks": "Performance-sensitive paths.",
-      "patterns": ["src/perf/", "benchmarks/"]
+      "_what_it_checks": "Сетка расписания — единственное место с реальным объёмом: 48 строк × 6 врачей на день, перерисовка на каждый выбор слота.",
+      "patterns": ["src/pages/operator/schedule-grid.tsx", "src/pages/operator/operator-page.tsx"]
     }
   ],
 
   "vision": {
-    "_doc": "slug -> product paths. Slugs must match the targets of your visual test runner. If a change maps to no slug, the visual phase is skipped (incremental).",
+    "_doc": "slug -> продуктовые пути. Slug'и совпадают с рабочими местами: именно по ним заказчик сверяет экран с макетом из ai/05-дизайн/.",
     "rules": [
-      { "slug": "home",     "patterns": ["src/pages/home/", "src/components/Home/"] },
-      { "slug": "settings", "patterns": ["src/pages/settings/", "src/components/Settings/"] }
+      { "slug": "operator",  "patterns": ["src/pages/operator/"] },
+      { "slug": "doctor",    "patterns": ["src/pages/doctor/"] },
+      { "slug": "registrar", "patterns": ["src/pages/registrar/"] },
+      { "slug": "admin",     "patterns": ["src/pages/admin/"] },
+      { "slug": "main",      "patterns": ["src/pages/main/"] }
     ],
     "shared": {
-      "_doc": "Changes under these paths touch ALL slugs (shared components, themes, layout) -> full visual run.",
-      "patterns": ["src/styles/", "src/lib/theme", "src/App.tsx", "tailwind.config", "src/index.css"]
+      "_doc": "Правки здесь задевают ВСЕ slug'и (тема, оболочка, роутинг) -> полный визуальный прогон.",
+      "patterns": ["src/theme.tsx", "src/pages/app-shell.tsx", "src/dashboard.tsx", "src/app.tsx"]
     }
   }
 }

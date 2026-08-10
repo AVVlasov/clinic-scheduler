@@ -33,11 +33,11 @@
         "format": "opencode"
       },
       "codex": {
-        "command": "& 'C:\\Users\\Andrey\\AppData\\Local\\OpenAI\\Codex\\bin\\68de26ad08be95cd\\codex.exe' exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -m {model}",
+        "command": "& 'C:\\Users\\Andrey\\AppData\\Local\\OpenAI\\Codex\\bin\\cfac6bda2d141e07\\codex.exe' exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -m {model}",
         "format": "codex"
       },
       "codex-ro": {
-        "command": "& 'C:\\Users\\Andrey\\AppData\\Local\\OpenAI\\Codex\\bin\\68de26ad08be95cd\\codex.exe' exec --json --skip-git-repo-check -s read-only -m {model}",
+        "command": "& 'C:\\Users\\Andrey\\AppData\\Local\\OpenAI\\Codex\\bin\\cfac6bda2d141e07\\codex.exe' exec --json --skip-git-repo-check -s read-only -m {model}",
         "format": "codex"
       },
       "cursor": {
