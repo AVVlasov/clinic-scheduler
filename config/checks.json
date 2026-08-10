@@ -193,7 +193,7 @@
   ],
   "TASK-46": [
     "npx --no-install vitest run",
-    "pwsh harness/lint-gate.ps1"
+    "pwsh -NoProfile -Command \"$env:BCF_TIME_DEPENDENT_TESTS='1'; & pwsh -NoProfile -File harness/lint-gate.ps1\""
   ],
   "TASK-47": [
     "npx --no-install vitest run stubs/api",
