@@ -69,3 +69,31 @@ export const apiGet = async <T>(server: JourneyServer, path: string): Promise<T>
   const res = await fetch(`${server.url}${path}`)
   return (await res.json()) as T
 }
+
+export const apiPatch = async <T>(
+  server: JourneyServer,
+  path: string,
+  body: unknown,
+): Promise<{ status: number; body: T }> => {
+  const res = await fetch(`${server.url}${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json().catch(() => ({}))) as T
+  return { status: res.status, body: json }
+}
+
+export const apiPost = async <T>(
+  server: JourneyServer,
+  path: string,
+  body: unknown,
+): Promise<{ status: number; body: T }> => {
+  const res = await fetch(`${server.url}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json().catch(() => ({}))) as T
+  return { status: res.status, body: json }
+}

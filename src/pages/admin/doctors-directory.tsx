@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Box, Button, Flex, Input, Stack, Text } from '@chakra-ui/react'
 
-import type { DoctorCard, SaveDoctorCardInput } from '../../__data__/types'
+import type { DoctorCard, DoctorServiceWindow, SaveDoctorCardInput } from '../../__data__/types'
 
 /**
  * Черновик карточки: те же поля, что и в карточке, но без серверной части записи
@@ -15,6 +15,11 @@ export interface DoctorCardDraft {
   temporarySites: string[]
   admissionRules: string[]
   equipmentAccess: string[]
+  patientAge: string
+  preferentialLimit: string
+  pairWork: string
+  serviceWindows: DoctorServiceWindow[]
+  specializationTags: string[]
 }
 
 export const draftFromCard = (card: DoctorCard): DoctorCardDraft => ({
@@ -24,10 +29,19 @@ export const draftFromCard = (card: DoctorCard): DoctorCardDraft => ({
   temporarySites: [...card.temporarySites],
   admissionRules: [...card.admissionRules],
   equipmentAccess: [...card.equipmentAccess],
+  patientAge: card.patientAge ?? '',
+  preferentialLimit: card.preferentialLimit ?? '',
+  pairWork: card.pairWork ?? '',
+  serviceWindows: (card.serviceWindows ?? []).map((w) => ({ ...w })),
+  specializationTags: [...(card.specializationTags ?? [])],
 })
 
 const sameList = (a: string[], b: string[]): boolean =>
   a.length === b.length && a.every((value, i) => value === b[i])
+
+const sameWindows = (a: DoctorServiceWindow[], b: DoctorServiceWindow[]): boolean =>
+  a.length === b.length
+  && a.every((value, i) => value.what === b[i].what && value.when === b[i].when)
 
 /** Только изменённые поля: пустой объект означает, что сохранять нечего. */
 export const draftDiff = (card: DoctorCard, draft: DoctorCardDraft): SaveDoctorCardInput => {
@@ -38,11 +52,36 @@ export const draftDiff = (card: DoctorCard, draft: DoctorCardDraft): SaveDoctorC
   if (!sameList(card.temporarySites, draft.temporarySites)) diff.temporarySites = draft.temporarySites
   if (!sameList(card.admissionRules, draft.admissionRules)) diff.admissionRules = draft.admissionRules
   if (!sameList(card.equipmentAccess, draft.equipmentAccess)) diff.equipmentAccess = draft.equipmentAccess
+  if ((card.patientAge ?? '') !== draft.patientAge) diff.patientAge = draft.patientAge
+  if ((card.preferentialLimit ?? '') !== draft.preferentialLimit) {
+    diff.preferentialLimit = draft.preferentialLimit
+  }
+  if ((card.pairWork ?? '') !== draft.pairWork) diff.pairWork = draft.pairWork
+  if (!sameWindows(card.serviceWindows ?? [], draft.serviceWindows)) {
+    diff.serviceWindows = draft.serviceWindows
+  }
+  if (!sameList(card.specializationTags ?? [], draft.specializationTags)) {
+    diff.specializationTags = draft.specializationTags
+  }
   return diff
 }
 
 export const isDraftDirty = (card: DoctorCard, draft: DoctorCardDraft): boolean =>
   Object.keys(draftDiff(card, draft)).length > 0
+
+/** Сравнение двух черновиков — чтобы не затирать правки, введённые во время save. */
+export const sameDraft = (a: DoctorCardDraft, b: DoctorCardDraft): boolean =>
+  sameList(a.specialties, b.specialties)
+  && a.site === b.site
+  && a.cabinet === b.cabinet
+  && sameList(a.temporarySites, b.temporarySites)
+  && sameList(a.admissionRules, b.admissionRules)
+  && sameList(a.equipmentAccess, b.equipmentAccess)
+  && a.patientAge === b.patientAge
+  && a.preferentialLimit === b.preferentialLimit
+  && a.pairWork === b.pairWork
+  && sameWindows(a.serviceWindows, b.serviceWindows)
+  && sameList(a.specializationTags, b.specializationTags)
 
 /**
  * Карточка считается незаполненной, если у врача не назначена основная площадка
@@ -164,6 +203,108 @@ const ListField = ({ label, hint, testId, values, emptyText, onChange }: ListFie
           {hint}
         </Text>
       ) : null}
+    </Stack>
+  )
+}
+
+interface ServiceWindowsFieldProps {
+  values: DoctorServiceWindow[]
+  onChange: (next: DoctorServiceWindow[]) => void
+}
+
+const ServiceWindowsField = ({ values, onChange }: ServiceWindowsFieldProps) => {
+  const [what, setWhat] = useState('')
+  const [when, setWhen] = useState('')
+
+  const add = () => {
+    const wWhat = what.trim()
+    const wWhen = when.trim()
+    if (!wWhat || !wWhen) return
+    if (values.some((v) => v.what === wWhat && v.when === wWhen)) return
+    onChange([...values, { what: wWhat, when: wWhen }])
+    setWhat('')
+    setWhen('')
+  }
+
+  return (
+    <Stack gap="6px" data-testid="field-service-windows">
+      <Text fontSize="11px" color="textSecondary">
+        Доступность услуг во времени
+      </Text>
+      {values.length === 0 ? (
+        <Text fontSize="12px" color="textSecondary" data-testid="field-service-windows-empty">
+          Ограничений по услугам нет
+        </Text>
+      ) : (
+        <Stack gap="4px">
+          {values.map((row) => (
+            <Flex
+              key={`${row.what}-${row.when}`}
+              align="center"
+              gap="8px"
+              px="9px"
+              py="4px"
+              bg="brandGreenFaint"
+              borderWidth="1px"
+              borderColor="borderLight"
+              borderRadius="compact"
+              data-testid="field-service-windows-item"
+            >
+              <Text fontSize="12px" flex="1">{row.what}</Text>
+              <Text fontSize="12px" color="textSecondary" fontFamily="mono">{row.when}</Text>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                minW="auto"
+                h="auto"
+                p="0"
+                color="textSecondary"
+                aria-label={`Удалить «${row.what}»`}
+                onClick={() => onChange(values.filter((v) => v !== row))}
+              >
+                ×
+              </Button>
+            </Flex>
+          ))}
+        </Stack>
+      )}
+      <Flex gap="6px" flexWrap="wrap">
+        <Input
+          size="sm"
+          flex="1"
+          minW="140px"
+          borderColor="borderDark"
+          borderRadius="compact"
+          value={what}
+          placeholder="Услуга или ресурс"
+          aria-label="Услуга или ресурс"
+          onChange={(e) => setWhat(e.target.value)}
+          data-testid="field-service-windows-what"
+        />
+        <Input
+          size="sm"
+          w="150px"
+          borderColor="borderDark"
+          borderRadius="compact"
+          value={when}
+          placeholder="Когда"
+          aria-label="Когда доступно"
+          onChange={(e) => setWhen(e.target.value)}
+          data-testid="field-service-windows-when"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          borderColor="borderDark"
+          borderRadius="compact"
+          onClick={add}
+          data-testid="field-service-windows-add"
+        >
+          Добавить
+        </Button>
+      </Flex>
     </Stack>
   )
 }
@@ -327,8 +468,10 @@ export const DoctorsDirectory = ({
               <Text fontSize="24px" lineHeight="32px" fontWeight="700" letterSpacing="-0.018em">
                 {selected.name}
               </Text>
-              <Text fontSize="12px" color="textSecondary">
-                {selected.specialty}
+              <Text fontSize="12px" color="textSecondary" data-testid="doctor-card-specialty">
+                {selected.specialties.length > 0
+                  ? selected.specialties[0]
+                  : 'Специальность не указана'}
               </Text>
               <Box flex="1" />
               <Button
@@ -363,6 +506,7 @@ export const DoctorsDirectory = ({
             <Stack p="16px" gap="20px">
               <ListField
                 label="Специальности"
+                hint="Первая в списке — основная: она уходит в общий справочник врачей и видна в сетке и списках."
                 testId="field-specialties"
                 values={draft.specialties}
                 emptyText="Специальности не указаны"
@@ -411,6 +555,39 @@ export const DoctorsDirectory = ({
                 onChange={(next) => update('temporarySites', next)}
               />
 
+              <Flex gap="12px" flexWrap="wrap">
+                <Stack gap="6px" flex="1" minW="220px">
+                  <Box as="label" fontSize="11px" color="textSecondary">
+                    Возраст пациента
+                  </Box>
+                  <Input
+                    size="sm"
+                    borderColor="borderDark"
+                    borderRadius="compact"
+                    aria-label="Возраст пациента"
+                    value={draft.patientAge}
+                    onChange={(e) => update('patientAge', e.target.value)}
+                    placeholder="Например, с 18 лет"
+                    data-testid="field-patient-age"
+                  />
+                </Stack>
+                <Stack gap="6px" w="190px" flex="none">
+                  <Box as="label" fontSize="11px" color="textSecondary">
+                    Лимит льготных на смену
+                  </Box>
+                  <Input
+                    size="sm"
+                    borderColor="borderDark"
+                    borderRadius="compact"
+                    fontFamily="mono"
+                    aria-label="Лимит льготных на смену"
+                    value={draft.preferentialLimit}
+                    onChange={(e) => update('preferentialLimit', e.target.value)}
+                    data-testid="field-preferential-limit"
+                  />
+                </Stack>
+              </Flex>
+
               <ListField
                 label="Правила приёма"
                 testId="field-admission-rules"
@@ -425,6 +602,35 @@ export const DoctorsDirectory = ({
                 values={draft.equipmentAccess}
                 emptyText="Допусков к оборудованию нет"
                 onChange={(next) => update('equipmentAccess', next)}
+              />
+
+              <Stack gap="6px">
+                <Box as="label" fontSize="11px" color="textSecondary">
+                  Работа в паре
+                </Box>
+                <Input
+                  size="sm"
+                  borderColor="borderDark"
+                  borderRadius="compact"
+                  aria-label="Работа в паре"
+                  value={draft.pairWork}
+                  onChange={(e) => update('pairWork', e.target.value)}
+                  placeholder="Например, только с анестезиологом"
+                  data-testid="field-pair-work"
+                />
+              </Stack>
+
+              <ServiceWindowsField
+                values={draft.serviceWindows}
+                onChange={(next) => update('serviceWindows', next)}
+              />
+
+              <ListField
+                label="Теги специализации"
+                testId="field-specialization-tags"
+                values={draft.specializationTags}
+                emptyText="Теги не заданы"
+                onChange={(next) => update('specializationTags', next)}
               />
             </Stack>
           </>

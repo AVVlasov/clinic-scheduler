@@ -112,12 +112,12 @@ describe('stubs/api/immutability — терминальная запись не�
 
   test('PATCH {paymentType: card} на cancelled-записи отклоняется', async () => {
     const id = await createScheduled(app, 'd-002', 'p-001', '2030-12-09T09:00:00');
-    const cancel = await request(app).patch(`/appointments/${id}`).send({ status: 'cancelled' });
+    const cancel = await request(app).patch(`/appointments/${id}`).send({ status: 'cancelled', cancelReason: 'тест' });
     expect(cancel.status).toBe(200);
     const before = await fetchAppointment(app, id);
     expect(before.status).toBe('cancelled');
 
-    const patch = await request(app).patch(`/appointments/${id}`).send({ paymentType: 'card' });
+    const patch = await request(app).patch(`/appointments/${id}`).send({ paymentType: 'promo' });
     expect(patch.status).toBe(409);
     expect(patch.body.error).toBe('terminal_status');
 
@@ -183,11 +183,11 @@ describe('stubs/api/immutability — терминальная запись не�
 
     const patch = await request(app)
       .patch(`/appointments/${id}`)
-      .send({ complaints: 'жалобы', diagnosis: 'ОРВИ', nextVisit: '2031-01-01' });
+      .send({ complaints: 'жалобы', diagnosis: 'ОРВИ', nextVisit: { date: '2031-01-01', serviceId: 's-002' } });
     expect(patch.status).toBe(200);
     expect(patch.body.complaints).toBe('жалобы');
     expect(patch.body.diagnosis).toBe('ОРВИ');
-    expect(patch.body.nextVisit).toBe('2031-01-01');
+    expect(patch.body.nextVisit).toEqual({ date: '2031-01-01', serviceId: 's-002' });
   });
 });
 
@@ -311,9 +311,9 @@ describe('stubs/api/immutability — null для необязательных п
 
     const setValue = await request(app)
       .patch(`/appointments/${id}`)
-      .send({ nextVisit: '2031-04-01' });
+      .send({ nextVisit: { date: '2031-04-01', serviceId: 's-002' } });
     expect(setValue.status).toBe(200);
-    expect(setValue.body.nextVisit).toBe('2031-04-01');
+    expect(setValue.body.nextVisit).toEqual({ date: '2031-04-01', serviceId: 's-002' });
 
     const clear = await request(app)
       .patch(`/appointments/${id}`)

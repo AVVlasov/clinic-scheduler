@@ -1,10 +1,16 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DoctorPage } from './doctor-page'
 import type { Appointment, Service } from '../../__data__/types'
+
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+const dateFromUrl = (url: string) => (url.match(/date=([^&]+)/) || [null, '2026-08-10'])[1] as string
+
+
 
 const mockGetConfigValue = vi.fn()
 
@@ -22,7 +28,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T09:00:00',
     durationMin: 30,
     status: 'scheduled',
-    paymentType: 'cash',
+    paymentType: 'regular',
     serviceId: 's-001',
     doctorName: 'Иванова Елена Сергеевна',
     patientName: 'Алексеев Игорь Николаевич',
@@ -43,7 +49,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T10:30:00',
     durationMin: 20,
     status: 'arrived',
-    paymentType: 'insurance',
+    paymentType: 'dms',
     serviceId: 's-002',
     doctorName: 'Иванова Елена Сергеевна',
     patientName: 'Белова Татьяна Викторовна',
@@ -64,7 +70,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T11:00:00',
     durationMin: 30,
     status: 'no_show',
-    paymentType: 'card',
+    paymentType: 'promo',
     serviceId: 's-003',
     doctorName: 'Петров Андрей Викторович',
     patientName: 'Григорьев Артём Дмитриевич',
@@ -81,9 +87,9 @@ const baseAppointments: Appointment[] = [
 ]
 
 const baseServices: Service[] = [
-  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
-  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 },
-  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 },
+  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
 ]
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -92,9 +98,11 @@ const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringif
 })
 
 const renderPage = () => render(
-  <ChakraProvider value={defaultSystem}>
-    <DoctorPage />
-  </ChakraProvider>,
+  <MemoryRouter initialEntries={['/clinic-scheduler/doctor?date=2026-08-10&doctorId=d-001']}>
+    <ChakraProvider value={defaultSystem}>
+      <DoctorPage />
+    </ChakraProvider>
+  </MemoryRouter>,
 )
 
 const fillRequiredFields = () => {
@@ -118,8 +126,16 @@ describe('DoctorPage — завершение приёма: гард по ста
   it('для записи в статусе scheduled кнопка «Завершить приём» заблокирована и показано, чего не хватает', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 
@@ -141,8 +157,16 @@ describe('DoctorPage — завершение приёма: гард по ста
   it('для записи в статусе no_show кнопка заблокирована с пояснением', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 
@@ -167,29 +191,40 @@ describe('DoctorPage — завершение приёма: гард по ста
     expect(reason.toLowerCase()).toContain('не явился')
   })
 
-  it('после перевода в arrived кнопка разблокирована и PATCH уходит на сервер', async () => {
-    let patchedId: string | null = null
-    let patchedBody: unknown = null
+  it('после arrived→in_progress кнопка разблокирована и PATCH completed уходит на сервер', async () => {
+    let lastPatchBody: unknown = null
     let nextAppointments: Appointment[] = [...baseAppointments]
 
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
-      if (method === 'GET' && url.endsWith('/appointments')) {
-        return jsonResponse({ items: nextAppointments })
+      if (method === 'GET' && url.includes('/history')) {
+        return jsonResponse({ items: [] })
       }
+      if (method === 'GET' && isAppointmentsList(url)) {
+        return jsonResponse({ date: dateFromUrl(url), items: nextAppointments })
+      }
+      if (method === 'GET' && url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }] })
       if (method === 'GET' && url.endsWith('/services')) {
         return jsonResponse({ items: baseServices })
       }
+      if (method === 'GET' && url.includes('/history')) return jsonResponse({ items: [] })
       if (method === 'PATCH' && url.includes('/appointments/')) {
         const match = url.match(/\/appointments\/([^/?]+)/)
         const id = match?.[1] ?? ''
-        patchedId = id
-        patchedBody = init?.body
+        lastPatchBody = init?.body
+        const body = JSON.parse(String(init?.body ?? '{}')) as { status?: Appointment['status'] }
         const target = nextAppointments.find((a) => a.id === id) as Appointment
-        const updated: Appointment = { ...target, status: 'completed' }
+        const updated: Appointment = { ...target, status: body.status ?? target.status }
         nextAppointments = nextAppointments.map((a) => (a.id === id ? updated : a))
         return jsonResponse(updated)
+      }
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
       }
       throw new Error(`Unexpected fetch: ${method} ${url}`)
     })
@@ -200,29 +235,27 @@ describe('DoctorPage — завершение приёма: гард по ста
       expect(screen.getAllByText('Алексеев Игорь Николаевич').length).toBeGreaterThan(0)
     })
 
-    fillRequiredFields()
-
-    const finishScheduled = screen.getByTestId('visit-finish') as HTMLButtonElement
-    expect(finishScheduled.disabled).toBe(true)
-
     fireEvent.click(screen.getByTestId('day-visit-a-arrived'))
 
     await waitFor(() => {
       expect(screen.getAllByText('Белова Татьяна Викторовна').length).toBeGreaterThan(0)
     })
 
-    fillRequiredFields()
+    expect((screen.getByTestId('visit-finish') as HTMLButtonElement).disabled).toBe(true)
 
-    const finishArrived = screen.getByTestId('visit-finish') as HTMLButtonElement
-    expect(finishArrived.disabled).toBe(false)
-
-    fireEvent.click(finishArrived)
-
+    fireEvent.click(screen.getByTestId('visit-advance-status'))
     await waitFor(() => {
-      expect(patchedId).toBe('a-arrived')
+      expect(screen.getByTestId('visit-status-badge').textContent).toBe('На приёме')
     })
 
-    expect(JSON.parse(String(patchedBody))).toMatchObject({ status: 'completed' })
+    fillRequiredFields()
+    const finish = screen.getByTestId('visit-finish') as HTMLButtonElement
+    expect(finish.disabled).toBe(false)
+    fireEvent.click(finish)
+
+    await waitFor(() => {
+      expect(JSON.parse(String(lastPatchBody))).toMatchObject({ status: 'completed' })
+    })
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/appointments/a-arrived'),
       expect.objectContaining({ method: 'PATCH' }),
@@ -230,23 +263,35 @@ describe('DoctorPage — завершение приёма: гард по ста
   })
 
   it('при 409 invalid_state_transition введённый протокол сохраняется и показывается текст ошибки', async () => {
+    const withInProgress: Appointment[] = baseAppointments.map((a) =>
+      a.id === 'a-arrived' ? { ...a, status: 'in_progress' } : a,
+    )
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
-      if (method === 'GET' && url.endsWith('/appointments')) {
-        return jsonResponse({ items: baseAppointments })
+      if (method === 'GET' && isAppointmentsList(url)) {
+        return jsonResponse({ date: dateFromUrl(url), items: withInProgress })
       }
+      if (method === 'GET' && url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }] })
       if (method === 'GET' && url.endsWith('/services')) {
         return jsonResponse({ items: baseServices })
       }
+      if (method === 'GET' && url.includes('/history')) return jsonResponse({ items: [] })
       if (method === 'PATCH' && url.includes('/appointments/')) {
         return jsonResponse(
           {
             error: 'invalid_state_transition',
-            message: 'Переход статуса из «arrived» в «completed» запрещён',
+            message: 'Переход статуса из «in_progress» в «completed» запрещён',
           },
           409,
         )
+      }
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
       }
       throw new Error(`Unexpected fetch: ${method} ${url}`)
     })
@@ -274,8 +319,11 @@ describe('DoctorPage — завершение приёма: гард по ста
     })
     fireEvent.click(screen.getByTestId('visit-service-s-001'))
     fireEvent.click(screen.getByTestId('visit-rec-Контрольный осмотр через 7 дней'))
-    fireEvent.change(screen.getByTestId('visit-next'), {
-      target: { value: 'через 14 дней' },
+    fireEvent.change(screen.getByTestId('visit-next-date'), {
+      target: { value: '2026-08-24' },
+    })
+    fireEvent.change(screen.getByTestId('visit-next-service'), {
+      target: { value: 's-002' },
     })
 
     const finish = screen.getByTestId('visit-finish') as HTMLButtonElement
@@ -284,7 +332,7 @@ describe('DoctorPage — завершение приёма: гард по ста
     fireEvent.click(finish)
 
     await waitFor(() => {
-      expect(screen.getByTestId('visit-submit-error-text').textContent).toContain('arrived')
+      expect(screen.getByTestId('visit-submit-error-text').textContent).toContain('in_progress')
     })
 
     const complaintsField = screen.getByTestId('visit-complaints') as HTMLTextAreaElement
@@ -299,8 +347,8 @@ describe('DoctorPage — завершение приёма: гард по ста
     const rec = screen.getByTestId('visit-rec-Контрольный осмотр через 7 дней')
     expect(rec.getAttribute('data-active')).toBe('true')
 
-    const next = screen.getByTestId('visit-next') as HTMLInputElement
-    expect(next.value).toBe('через 14 дней')
+    const next = screen.getByTestId('visit-next-date') as HTMLInputElement
+    expect(next.value).toBe('2026-08-24')
 
     const finishAfter = screen.getByTestId('visit-finish') as HTMLButtonElement
     expect(finishAfter.disabled).toBe(false)

@@ -1,7 +1,15 @@
 'use strict';
 
 const { Router } = require('express');
-const { state, newId, overlaps, weekStartOf, weekTemplateSeed } = require('./data');
+const {
+  state,
+  newId,
+  overlaps,
+  weekStartOf,
+  ensureWeekTemplates,
+  normalizeStartIso,
+  dateOnly,
+} = require('./data');
 const {
   APPOINTMENT_STATUSES,
   PAYMENT_TYPES,
@@ -14,12 +22,56 @@ const {
 
 const router = Router();
 
-const PROTOCOL_STRING_FIELDS = ['complaints', 'diagnosis', 'nextVisit'];
+// Занятость слота на сетке (buildSlots) считается по обоим спискам сразу. Проверка коллизии
+// обязана смотреть туда же: иначе оператор видит слот занятым, а POST/PATCH пускает в него
+// второго пациента — расхождение живёт ровно на границе «экран ↔ сервер».
+const appointmentPool = () => state.appointments.concat(state.demoAppointments || []);
+
+const ensureHistory = (a) => {
+  if (!Array.isArray(a.history)) a.history = [];
+  return a.history;
+};
+
+const appendHistory = (a, fromStatus, toStatus, actor) => {
+  ensureHistory(a).push({
+    from: fromStatus,
+    to: toStatus,
+    at: new Date().toISOString(),
+    actor: actor || 'system',
+  });
+};
+
+
+const PROTOCOL_STRING_FIELDS = ['complaints', 'diagnosis'];
 const PROTOCOL_STRING_LIST_FIELDS = ['performedServiceIds', 'recommendations'];
 const PROTOCOL_VISIT_TYPES = new Set(['first', 'repeat']);
 
+const isDate = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return false;
+  const [y, m, d] = String(value).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+};
+
+const normalizeNextVisit = (raw) => {
+  if (raw === null) return { ok: true, value: null };
+  if (raw === undefined) return { ok: true, value: undefined };
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'nextVisit' };
+  }
+  const date = raw.date != null ? String(raw.date) : '';
+  const serviceId = raw.serviceId != null ? String(raw.serviceId) : '';
+  if (!isDate(date) || !serviceId) {
+    return { ok: false, field: 'nextVisit' };
+  }
+  if (!state.services.some((s) => s.id === serviceId)) {
+    return { ok: false, field: 'nextVisit' };
+  }
+  return { ok: true, value: { date, serviceId } };
+};
+
 const checkShift = (doctorId, start, durationMin) => {
-  const date = String(start).slice(0, 10);
+  const date = dateOnly(start);
   const weekStart = weekStartOf(date);
   if (!isWithinPublishedShift(
     date,
@@ -27,7 +79,7 @@ const checkShift = (doctorId, start, durationMin) => {
     durationMin,
     doctorId,
     weekStart,
-    weekTemplateSeed,
+    ensureWeekTemplates(weekStart),
     state.publishedWeeks,
   )) {
     return {
@@ -66,6 +118,11 @@ const tryApplyProtocolPatch = (draft, body) => {
   } else if (body.visitType === null) {
     draft.visitType = null;
   }
+  if (body.nextVisit !== undefined) {
+    const nv = normalizeNextVisit(body.nextVisit);
+    if (!nv.ok) return { ok: false, field: 'nextVisit' };
+    if (nv.value !== undefined) draft.nextVisit = nv.value;
+  }
   return { ok: true };
 };
 
@@ -75,10 +132,16 @@ const decorate = (a) => {
   return {
     ...a,
     doctorName: doctor ? doctor.name : null,
+    doctorCabinet: doctor ? doctor.cabinet : null,
     patientName: patient ? patient.name : null,
     patientPhone: patient ? patient.phone : null,
     patientBirthDate: patient ? patient.birthDate : null,
-    patientUid: patient ? `UID ${patient.id.replace(/^[a-z]-/, '').padStart(4, '0')} ${Math.abs(hashCode(patient.id)).toString().padStart(4, '0')}` : null,
+    patientUid: patient
+      ? (patient.cardNumber || `UID ${patient.id.replace(/^[a-z]-/, '').padStart(4, '0')} ${Math.abs(hashCode(patient.id)).toString().padStart(4, '0')}`)
+      : null,
+    createdByName: a.createdByName != null ? a.createdByName : null,
+    createdByUnit: a.createdByUnit != null ? a.createdByUnit : null,
+    confirmed: Boolean(a.confirmed),
   };
 };
 
@@ -90,20 +153,44 @@ const hashCode = (s) => {
   return h;
 };
 
-const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value)) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
-
 router.get('/appointments', (req, res) => {
   const rawDate = req.query.date;
-  const requested = rawDate != null && rawDate !== '' ? String(rawDate) : state.date;
+  if (rawDate == null || rawDate === '') {
+    res.status(400).json({
+      error: 'missing_date',
+      message: 'Параметр date обязателен (ГГГГ-ММ-ДД)',
+    });
+    return;
+  }
+  const requested = String(rawDate);
   if (!isDate(requested)) {
     res.status(400).json({ error: 'invalid_date', message: 'Дата должна быть в формате ГГГГ-ММ-ДД' });
     return;
   }
+
+  const rawDoctorId = req.query.doctorId;
+  let doctorId = null;
+  if (rawDoctorId != null && rawDoctorId !== '') {
+    doctorId = String(rawDoctorId);
+    if (!state.doctors.find((d) => d.id === doctorId)) {
+      res.status(400).json({ error: 'doctor_not_found', message: 'Врач не найден' });
+      return;
+    }
+  }
+
   const items = state.appointments
     .concat(state.demoAppointments || [])
-    .filter((a) => String(a.start).slice(0, 10) === requested)
+    .filter((a) => dateOnly(a.start) === requested)
+    .filter((a) => (doctorId == null ? true : a.doctorId === doctorId))
     .map(decorate);
-  res.json({ items, date: requested });
+  res.json({ items, date: requested, doctorId: doctorId || null });
+});
+
+router.get('/appointments/:id/history', (req, res) => {
+  const a = state.appointments.find((x) => x.id === req.params.id)
+    || (state.demoAppointments || []).find((x) => x.id === req.params.id);
+  if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
+  res.json({ items: ensureHistory(a).slice() });
 });
 
 router.get('/appointments/:id', (req, res) => {
@@ -152,34 +239,65 @@ router.post('/appointments', (req, res) => {
     }
   }
 
-  const shift = checkShift(doctorId, start, numericDuration);
+  let resolvedServiceId = serviceId || null;
+  if (resolvedServiceId) {
+    const svc = state.services.find((s) => s.id === resolvedServiceId);
+    if (!svc) {
+      return res.status(400).json({
+        error: 'service_not_found',
+        message: `Услуга «${resolvedServiceId}» не найдена`,
+      });
+    }
+    const allowed = Array.isArray(svc.doctorIds) ? svc.doctorIds : [];
+    if (allowed.length > 0 && !allowed.includes(doctorId)) {
+      return res.status(409).json({
+        error: 'service_not_offered',
+        message: `Врач ${doctorId} не оказывает услугу «${svc.name}»`,
+      });
+    }
+  }
+
+  const startIso = normalizeStartIso(start);
+
+  const shift = checkShift(doctorId, startIso, numericDuration);
   if (!shift.ok) {
     return res.status(409).json(shift.body);
   }
 
-  const collision = state.appointments.find((a) => overlaps(a, doctorId, start, numericDuration));
+  const collision = appointmentPool().find((a) => overlaps(a, doctorId, startIso, numericDuration));
   if (collision) {
     return res.status(409).json({
       error: 'slot_taken',
-      message: `Слот ${start} у врача ${doctorId} уже занят (запись ${collision.id})`,
+      message: `Слот ${startIso} у врача ${doctorId} уже занят (запись ${collision.id})`,
     });
   }
 
+  const initialStatus = status || 'scheduled';
   const record = {
     id: newId(),
     doctorId,
     patientId,
-    start,
+    start: startIso,
     durationMin: numericDuration,
-    status: status || 'scheduled',
-    paymentType: paymentType || 'cash',
-    serviceId: serviceId || null,
+    status: initialStatus,
+    paymentType: paymentType || 'regular',
+    serviceId: resolvedServiceId,
     complaints: null,
     diagnosis: null,
-    visitType: null,
+    visitType: body.visitType === 'first' || body.visitType === 'repeat' ? body.visitType : null,
     performedServiceIds: [],
     recommendations: [],
     nextVisit: null,
+    cancelReason: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    operatorComment: body.operatorComment != null ? String(body.operatorComment) : null,
+    paidAmount: null,
+    paidAt: null,
+    createdByName: body.createdByName != null ? String(body.createdByName) : 'Оператор колл-центра',
+    createdByUnit: body.createdByUnit != null ? String(body.createdByUnit) : 'Колл-центр',
+    confirmed: Boolean(body.confirmed),
+    history: [],
   };
   const protocol = tryApplyProtocolPatch(record, body);
   if (!protocol.ok) {
@@ -188,16 +306,29 @@ router.post('/appointments', (req, res) => {
       message: `Поле «${protocol.field}» имеет неверный формат`,
     });
   }
+  appendHistory(record, null, initialStatus, body.actor || 'operator');
   state.appointments.push(record);
   res.status(201).json(decorate(record));
 });
 
 router.patch('/appointments/:id', (req, res) => {
   const id = req.params.id;
-  const a = state.appointments.find((x) => x.id === id);
+  const a = state.appointments.find((x) => x.id === id)
+    || (state.demoAppointments || []).find((x) => x.id === id);
   if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
 
   const body = req.body || {};
+
+  // Актёр врача (АРМ врача): нельзя менять чужую запись.
+  const actorDoctorId = body.asDoctorId != null && body.asDoctorId !== ''
+    ? String(body.asDoctorId)
+    : (req.query.asDoctorId != null && req.query.asDoctorId !== '' ? String(req.query.asDoctorId) : null);
+  if (actorDoctorId != null && actorDoctorId !== a.doctorId) {
+    return res.status(409).json({
+      error: 'foreign_doctor',
+      message: `Запись принадлежит другому врачу (${a.doctorId}), актёр ${actorDoctorId}`,
+    });
+  }
 
   if (isTerminalStatus(a.status)) {
     return res.status(409).json({
@@ -211,7 +342,7 @@ router.patch('/appointments/:id', (req, res) => {
   draft.recommendations = [...a.recommendations];
 
   const nextDoctorId = body.doctorId || a.doctorId;
-  const nextStart = body.start || a.start;
+  const nextStart = body.start != null ? normalizeStartIso(body.start) : a.start;
   const nextDuration = body.durationMin != null ? Number(body.durationMin) : a.durationMin;
 
   if (!Number.isFinite(nextDuration) || nextDuration <= 0) {
@@ -233,7 +364,7 @@ router.patch('/appointments/:id', (req, res) => {
     }
   }
 
-  const collision = state.appointments.find((other) =>
+  const collision = appointmentPool().find((other) =>
     overlaps(other, nextDoctorId, nextStart, nextDuration, id),
   );
   if (collision) {
@@ -256,7 +387,23 @@ router.patch('/appointments/:id', (req, res) => {
         message: `Переход статуса из «${a.status}» в «${body.status}» запрещён`,
       });
     }
+    if (body.status === 'cancelled') {
+      const reason = body.cancelReason != null ? String(body.cancelReason).trim() : '';
+      if (!reason) {
+        return res.status(400).json({
+          error: 'missing_cancel_reason',
+          message: 'Укажите причину отмены',
+        });
+      }
+      draft.cancelReason = reason;
+      draft.cancelledAt = new Date().toISOString();
+      draft.cancelledBy = body.cancelledBy != null && String(body.cancelledBy).trim()
+        ? String(body.cancelledBy).trim()
+        : (body.actor != null && String(body.actor).trim() ? String(body.actor).trim() : 'operator');
+    }
+    const fromStatus = a.status;
     draft.status = body.status;
+    draft._historyPending = { from: fromStatus, to: body.status, actor: body.actor || body.cancelledBy || 'operator' };
   }
 
   if (body.paymentType !== undefined && body.paymentType !== null) {
@@ -267,6 +414,9 @@ router.patch('/appointments/:id', (req, res) => {
       });
     }
     draft.paymentType = body.paymentType;
+  }
+  if (body.operatorComment !== undefined) {
+    draft.operatorComment = body.operatorComment === null ? null : String(body.operatorComment);
   }
 
   draft.doctorId = nextDoctorId;
@@ -282,24 +432,55 @@ router.patch('/appointments/:id', (req, res) => {
     });
   }
 
+  const historyPending = draft._historyPending;
+  delete draft._historyPending;
   Object.assign(a, draft);
+  ensureHistory(a);
+  if (historyPending) {
+    if (a.history.length === 0 && historyPending.from != null) {
+      appendHistory(a, null, historyPending.from, 'system');
+    }
+    appendHistory(a, historyPending.from, historyPending.to, historyPending.actor);
+  }
   res.status(200).json(decorate(a));
 });
 
-router.delete('/appointments/:id', (req, res) => {
-  const a = state.appointments.find((x) => x.id === req.params.id);
-  if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
 
-  if (isTerminalStatus(a.status)) {
+router.post('/appointments/:id/confirm', (req, res) => {
+  const a = state.appointments.find((x) => x.id === req.params.id)
+    || (state.demoAppointments || []).find((x) => x.id === req.params.id);
+  if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
+  a.confirmed = true;
+  res.status(200).json(decorate(a));
+});
+
+router.post('/appointments/:id/pay', (req, res) => {
+  const a = state.appointments.find((x) => x.id === req.params.id)
+    || (state.demoAppointments || []).find((x) => x.id === req.params.id);
+  if (!a) return res.status(404).json({ error: 'not_found', message: 'Запись не найдена' });
+  if (a.paidAt) {
     return res.status(409).json({
-      error: 'terminal_status',
-      message: `Запись ${a.id} в статусе «${a.status}» неизменяема`,
+      error: 'already_paid',
+      message: `Запись ${a.id} уже оплачена`,
     });
   }
-
-  const idx = state.appointments.indexOf(a);
-  state.appointments.splice(idx, 1);
-  res.status(204).send();
+  const body = req.body || {};
+  const amount = Number(body.amount);
+  if (!Number.isFinite(amount) || amount < 0) {
+    return res.status(400).json({ error: 'invalid_amount', message: 'Сумма оплаты должна быть числом ≥ 0' });
+  }
+  if (body.paymentType != null && body.paymentType !== '') {
+    if (!isPaymentType(body.paymentType)) {
+      return res.status(400).json({
+        error: 'invalid_payment_type',
+        message: `Тип оплаты «${body.paymentType}» не поддерживается`,
+      });
+    }
+    a.paymentType = body.paymentType;
+  }
+  a.paidAmount = amount;
+  a.paidAt = new Date().toISOString();
+  res.status(200).json(decorate(a));
 });
 
 module.exports = router;

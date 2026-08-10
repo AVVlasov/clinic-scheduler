@@ -11,7 +11,8 @@ export interface VisitFormState {
   visitType: VisitType
   selectedServiceIds: string[]
   recommendations: string[]
-  nextVisit: string
+  nextVisitDate: string
+  nextVisitServiceId: string
 }
 
 export const emptyVisitFormState: VisitFormState = {
@@ -20,7 +21,8 @@ export const emptyVisitFormState: VisitFormState = {
   visitType: 'first',
   selectedServiceIds: [],
   recommendations: [],
-  nextVisit: '',
+  nextVisitDate: '',
+  nextVisitServiceId: '',
 }
 
 interface VisitFormProps {
@@ -93,7 +95,7 @@ export const VisitForm = ({
   const chosenServices = services.filter((s) => state.selectedServiceIds.includes(s.id))
 
   return (
-    <Box display="flex" flexDirection="column" gap="5" maxW="760px">
+    <Box display="flex" flexDirection="column" gap="5" maxW="760px" data-arm-section="protocol">
       <Box display="flex" flexDirection="column" gap="1">
         <Text fontSize="13px" fontWeight="700" color="textPrimary">Жалобы</Text>
         <Textarea
@@ -125,8 +127,8 @@ export const VisitForm = ({
               size="sm"
               borderRadius="pill"
               variant={state.visitType === 'first' ? 'solid' : 'outline'}
-              bg={state.visitType === 'first' ? 'brandGreen' : 'transparent'}
-              color={state.visitType === 'first' ? 'white' : 'textPrimary'}
+              bg={state.visitType === 'first' ? 'brandGreenDark' : 'transparent'}
+              color={state.visitType === 'first' ? 'textOnGreen' : 'textPrimary'}
               borderColor="borderDark"
               onClick={() => update('visitType', 'first')}
               data-testid="visit-type-first"
@@ -140,8 +142,8 @@ export const VisitForm = ({
               size="sm"
               borderRadius="pill"
               variant={state.visitType === 'repeat' ? 'solid' : 'outline'}
-              bg={state.visitType === 'repeat' ? 'brandGreen' : 'transparent'}
-              color={state.visitType === 'repeat' ? 'white' : 'textPrimary'}
+              bg={state.visitType === 'repeat' ? 'brandGreenDark' : 'transparent'}
+              color={state.visitType === 'repeat' ? 'textOnGreen' : 'textPrimary'}
               borderColor="borderDark"
               onClick={() => update('visitType', 'repeat')}
               data-testid="visit-type-repeat"
@@ -195,8 +197,8 @@ export const VisitForm = ({
                           borderWidth="1px"
                           borderStyle="solid"
                           borderColor={selected ? 'brandGreen' : 'borderDark'}
-                          bg={selected ? 'brandGreen' : 'white'}
-                          color="white"
+                          bg={selected ? 'brandGreenDark' : 'white'}
+                          color={selected ? 'textOnGreen' : 'textPrimary'}
                           fontSize="10px"
                           lineHeight="12px"
                           textAlign="center"
@@ -300,8 +302,8 @@ export const VisitForm = ({
                 size="sm"
                 borderRadius="pill"
                 variant={on ? 'solid' : 'outline'}
-                bg={on ? 'brandGreen' : 'transparent'}
-                color={on ? 'white' : 'textPrimary'}
+                bg={on ? 'brandGreenDark' : 'transparent'}
+                color={on ? 'textOnGreen' : 'textPrimary'}
                 borderColor="borderDark"
                 onClick={() => toggleRecommendation(label)}
                 data-testid={`visit-rec-${label}`}
@@ -315,17 +317,37 @@ export const VisitForm = ({
         </Flex>
       </Box>
 
-      <Box display="flex" flexDirection="column" gap="1">
+      <Box display="flex" flexDirection="column" gap="2">
         <Text fontSize="13px" fontWeight="700" color="textPrimary">Следующий визит</Text>
-        <Input
-          type="text"
-          value={state.nextVisit}
-          onChange={(e) => update('nextVisit', e.target.value)}
-          placeholder="Например, через 14 дней"
-          data-testid="visit-next"
-          borderColor="borderDark"
-          maxW="320px"
-        />
+        <Flex gap="2" flexWrap="wrap" align="center">
+          <Input
+            type="date"
+            value={state.nextVisitDate}
+            onChange={(e) => update('nextVisitDate', e.target.value)}
+            placeholder="Дата"
+            data-testid="visit-next-date"
+            borderColor="borderDark"
+            maxW="180px"
+          />
+          <select
+            data-testid="visit-next-service"
+            value={state.nextVisitServiceId}
+            onChange={(e) => update('nextVisitServiceId', e.target.value)}
+            style={{
+              maxWidth: 280,
+              padding: '4px 8px',
+              border: '1px solid var(--chakra-colors-borderDark, #ccc)',
+              borderRadius: 6,
+              background: 'white',
+              fontSize: 13,
+            }}
+          >
+            <option value="">Услуга повторного визита</option>
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </Flex>
       </Box>
 
       <Flex align="center" gap="2" pt="2" borderTopWidth="1px" borderTopStyle="solid" borderTopColor="borderLight">
@@ -335,20 +357,20 @@ export const VisitForm = ({
           data-testid="visit-block-reason"
         >
           {alreadyCompleted
-            ? 'Протокол закрыт и передан в МИС'
+            ? 'Протокол закрыт'
             : blockReason !== null
               ? blockReason
               : isValid
-                ? 'Черновик сохраняется автоматически'
+                ? 'Заполните протокол и завершите приём'
                 : 'Заполните жалобы и диагноз, чтобы закрыть приём'}
         </Text>
         <Box flex="1" />
         <Button
           type="button"
           borderRadius="pill"
-          bg="brandGreen"
-          color="white"
-          _hover={{ bg: 'brandGreenDark' }}
+          bg="brandGreenDark"
+          color="textOnGreen"
+          _hover={{ bg: 'brandGreen700' }}
           onClick={onFinish}
           disabled={!canSubmit}
           data-testid="visit-finish"

@@ -1,12 +1,15 @@
 import React from 'react'
 import { Box, Flex, Text } from '@chakra-ui/react'
 
+import { appointmentStatusLabel } from '../../__data__/status-labels'
 import type { Appointment, AppointmentStatus } from '../../__data__/types'
 
 interface DayListProps {
   appointments: Appointment[]
   selectedId: string | null
   onSelect: (id: string) => void
+  doctorName?: string | null
+  doctorSwitcher?: React.ReactNode
 }
 
 const formatTime = (iso: string): string => {
@@ -23,26 +26,16 @@ const formatDate = (iso: string): string => {
   return `${d.getDate()} ${months[d.getMonth()]}`
 }
 
-const statusLabel = (s: AppointmentStatus): string => {
-  switch (s) {
-    case 'scheduled': return 'Ожидает'
-    case 'arrived': return 'Пришёл'
-    case 'in_progress': return 'Идёт приём'
-    case 'completed': return 'Завершён'
-    case 'no_show': return 'Не явился'
-    default: return s
-  }
-}
-
 const statusTone = (s: AppointmentStatus): 'neutral' | 'attention' | 'booked' | 'danger' => {
-  switch (s) {
-    case 'scheduled': return 'neutral'
-    case 'arrived': return 'attention'
-    case 'in_progress': return 'attention'
-    case 'completed': return 'booked'
-    case 'no_show': return 'danger'
-    default: return 'neutral'
+  const map: { [K in AppointmentStatus]: 'neutral' | 'attention' | 'booked' | 'danger' } = {
+    scheduled: 'neutral',
+    arrived: 'attention',
+    in_progress: 'attention',
+    completed: 'booked',
+    cancelled: 'danger',
+    no_show: 'danger',
   }
+  return map[s]
 }
 
 const toneBg = (tone: 'neutral' | 'attention' | 'booked' | 'danger'): string => {
@@ -65,8 +58,12 @@ const toneColor = (tone: 'neutral' | 'attention' | 'booked' | 'danger'): string 
   }
 }
 
-export const DayList = ({ appointments, selectedId, onSelect }: DayListProps) => {
-  const doneCount = appointments.filter((a) => a.status === 'completed').length
+export const DayList = ({
+  appointments, selectedId, onSelect, doctorName, doctorSwitcher,
+}: DayListProps) => {
+  const counted = appointments.filter((a) => a.status !== 'cancelled' && a.status !== 'no_show')
+  const doneCount = counted.filter((a) => a.status === 'completed').length
+  const totalCount = counted.length
 
   return (
     <Box
@@ -79,6 +76,7 @@ export const DayList = ({ appointments, selectedId, onSelect }: DayListProps) =>
       borderRadius="compact"
       display="flex"
       flexDirection="column"
+      data-arm-section="day"
     >
       <Flex
         align="center"
@@ -88,13 +86,20 @@ export const DayList = ({ appointments, selectedId, onSelect }: DayListProps) =>
         borderBottomWidth="1px"
         borderBottomStyle="solid"
         borderBottomColor="borderLight"
+        flexWrap="wrap"
       >
         <Text fontSize="18px" fontWeight="700" lineHeight="24px" letterSpacing="-0.022em">
           День приёма
         </Text>
-        <Text fontSize="12px" color="textSecondary">
-          {doneCount} из {appointments.length} завершено
+        <Text fontSize="12px" color="textSecondary" data-testid="doctor-progress">
+          {doneCount} из {totalCount} завершено
         </Text>
+        {doctorSwitcher}
+        {doctorName ? (
+          <Text fontSize="12px" color="textSecondary" data-testid="doctor-day-subject">
+            {doctorName}
+          </Text>
+        ) : null}
       </Flex>
       <Box flex="1" overflowY="auto" p="2">
         {appointments.length === 0 && (
@@ -171,7 +176,7 @@ export const DayList = ({ appointments, selectedId, onSelect }: DayListProps) =>
                 color={toneColor(tone)}
                 data-testid={`day-visit-status-${a.id}`}
               >
-                {statusLabel(a.status)}
+                {appointmentStatusLabel(a.status)}
               </Box>
             </button>
           )

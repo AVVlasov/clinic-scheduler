@@ -33,7 +33,7 @@ const ACTIVE_APPOINTMENT_STATUSES = new Set([
   'completed',
 ]);
 
-const PAYMENT_TYPES = Object.freeze(['cash', 'card', 'insurance']);
+const PAYMENT_TYPES = Object.freeze(['regular', 'dms', 'promo', 'discount', 'certificate']);
 
 const isStatusTransitionAllowed = (from, to) => {
   if (!STATUS_TRANSITIONS[from]) return false;
@@ -48,7 +48,12 @@ const isAppointmentStatus = (status) => APPOINTMENT_STATUSES.includes(status);
 
 const isPaymentType = (value) => PAYMENT_TYPES.includes(value);
 
-const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value)) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+const isValidDate = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return false;
+  const [y, m, d] = String(value).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+};
 
 const isWithinPublishedShift = (
   date,
@@ -75,12 +80,11 @@ const isWithinPublishedShift = (
   if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) return false;
 
   // Единая предикатная проверка с data.buildSlots: рабочий интервал = kind=work И
-  // положительная длительность. off/absent/block/break здесь НЕ считаются сменой,
-  // и data.js, и lifecycle.js спрашивают один и тот же isWorkingInterval.
+  // положительная длительность. Границы — в зоне клиники (+03:00), не в зоне процесса.
   for (const interval of intervals) {
     if (!data.isWorkingInterval(interval)) continue;
-    const ivStart = new Date(`${date}T${interval.start}:00`).getTime();
-    const ivEnd = new Date(`${date}T${interval.end}:00`).getTime();
+    const ivStart = data.clinicDateTimeMs(date, interval.start);
+    const ivEnd = data.clinicDateTimeMs(date, interval.end);
     if (startTime.getTime() >= ivStart && endTime.getTime() <= ivEnd) {
       return true;
     }

@@ -36,7 +36,7 @@ const shiftDate = (from: string, days: number): string => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-const CURRENT_WEEK_START = weekStartOf(new Date())
+const CURRENT_WEEK_START = weekStartOf(new Date('2026-08-10T12:00:00'))
 const NEXT_WEEK_START = shiftDate(CURRENT_WEEK_START, 7)
 
 const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница']
@@ -158,10 +158,13 @@ const postPublish = (log: FetchLog[]) =>
 
 describe('AdminPage — выбор недели (TASK-29)', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00'))
     mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 

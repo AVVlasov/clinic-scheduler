@@ -1,10 +1,16 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DoctorPage } from './doctor-page'
 import type { Appointment, Service } from '../../__data__/types'
+
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+const dateFromUrl = (url: string) => (url.match(/date=([^&]+)/) || [null, '2026-08-10'])[1] as string
+
+
 
 const mockGetConfigValue = vi.fn()
 
@@ -22,7 +28,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T09:00:00',
     durationMin: 30,
     status: 'in_progress',
-    paymentType: 'cash',
+    paymentType: 'regular',
     serviceId: 's-001',
     doctorName: 'Иванова Елена Сергеевна',
     patientName: 'Алексеев Игорь Николаевич',
@@ -43,7 +49,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T10:30:00',
     durationMin: 20,
     status: 'scheduled',
-    paymentType: 'insurance',
+    paymentType: 'dms',
     serviceId: 's-002',
     doctorName: 'Иванова Елена Сергеевна',
     patientName: 'Белова Татьяна Викторовна',
@@ -64,7 +70,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T11:00:00',
     durationMin: 30,
     status: 'completed',
-    paymentType: 'card',
+    paymentType: 'promo',
     serviceId: 's-003',
     doctorName: 'Петров Андрей Викторович',
     patientName: 'Григорьев Артём Дмитриевич',
@@ -81,10 +87,10 @@ const baseAppointments: Appointment[] = [
 ]
 
 const baseServices: Service[] = [
-  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
-  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 },
-  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 },
-  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 },
+  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
 ]
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -93,9 +99,11 @@ const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringif
 })
 
 const renderPage = () => render(
-  <ChakraProvider value={defaultSystem}>
-    <DoctorPage />
-  </ChakraProvider>,
+  <MemoryRouter initialEntries={['/clinic-scheduler/doctor?date=2026-08-10&doctorId=d-001']}>
+    <ChakraProvider value={defaultSystem}>
+      <DoctorPage />
+    </ChakraProvider>
+  </MemoryRouter>,
 )
 
 describe('DoctorPage', () => {
@@ -110,8 +118,16 @@ describe('DoctorPage', () => {
   it('получает список приёмов и услуг из API и отрисовывает оба', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 
@@ -121,19 +137,27 @@ describe('DoctorPage', () => {
       expect(screen.getAllByText('Алексеев Игорь Николаевич').length).toBeGreaterThan(0)
     })
 
-    expect(screen.getByText('Первичная консультация')).toBeInTheDocument()
-    expect(screen.getByText('ЭКГ')).toBeInTheDocument()
+    expect(screen.getAllByText('Первичная консультация').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ЭКГ').length).toBeGreaterThan(0)
 
     const calledUrls = fetchMock.mock.calls.map((c) => String(c[0]))
-    expect(calledUrls.some((u) => u.endsWith('/appointments'))).toBe(true)
+    expect(calledUrls.some((u) => isAppointmentsList(u))).toBe(true)
     expect(calledUrls.some((u) => u.endsWith('/services'))).toBe(true)
   })
 
   it('выбор приёма в списке меняет карточку пациента', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 
@@ -144,7 +168,7 @@ describe('DoctorPage', () => {
     })
 
     expect(screen.getByTestId('visit-phone').textContent).toBe('+7 900 100-00-01')
-    expect(screen.getByTestId('visit-payer').textContent).toContain('Наличные')
+    expect(screen.getByTestId('visit-payer').textContent).toContain('Обычный')
 
     fireEvent.click(screen.getByTestId('day-visit-a-002'))
 
@@ -163,12 +187,14 @@ describe('DoctorPage', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
-      if (method === 'GET' && url.endsWith('/appointments')) {
-        return jsonResponse({ items: nextAppointments })
+      if (method === 'GET' && isAppointmentsList(url)) {
+        return jsonResponse({ date: dateFromUrl(url), items: nextAppointments })
       }
+      if (method === 'GET' && url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }] })
       if (method === 'GET' && url.endsWith('/services')) {
         return jsonResponse({ items: baseServices })
       }
+      if (method === 'GET' && url.includes('/history')) return jsonResponse({ items: [] })
       if (method === 'PATCH' && url.includes('/appointments/')) {
         const match = url.match(/\/appointments\/([^/?]+)/)
         const id = match?.[1] ?? ''
@@ -180,6 +206,13 @@ describe('DoctorPage', () => {
         }
         nextAppointments = nextAppointments.map((a) => (a.id === id ? updated : a))
         return jsonResponse(updated)
+      }
+      if (String(input).includes('/history') || url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
       }
       throw new Error(`Unexpected fetch: ${method} ${url}`)
     })
@@ -199,8 +232,11 @@ describe('DoctorPage', () => {
     fireEvent.click(screen.getByTestId('visit-type-repeat'))
     fireEvent.click(screen.getByTestId('visit-service-s-001'))
     fireEvent.click(screen.getByTestId('visit-rec-Контрольный осмотр через 7 дней'))
-    fireEvent.change(screen.getByTestId('visit-next'), {
-      target: { value: 'через 14 дней' },
+    fireEvent.change(screen.getByTestId('visit-next-date'), {
+      target: { value: '2026-08-24' },
+    })
+    fireEvent.change(screen.getByTestId('visit-next-service'), {
+      target: { value: 's-002' },
     })
 
     const finish = screen.getByTestId('visit-finish') as HTMLButtonElement
@@ -215,12 +251,14 @@ describe('DoctorPage', () => {
     expect(patchedId).toBe('a-001')
     expect(JSON.parse(String(patchedBody))).toEqual({
       status: 'completed',
+      asDoctorId: 'd-001',
+      actor: 'doctor',
       complaints: 'Боль в области 38 зуба третьи сутки',
       diagnosis: 'K01.1 Ретенированный зуб',
       visitType: 'repeat',
       performedServiceIds: ['s-001'],
       recommendations: ['Контрольный осмотр через 7 дней'],
-      nextVisit: 'через 14 дней',
+      nextVisit: { date: '2026-08-24', serviceId: 's-002' },
     })
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/appointments/a-001'),
@@ -240,14 +278,16 @@ describe('DoctorPage', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
-      if (method === 'GET' && url.endsWith('/appointments')) {
+      if (method === 'GET' && isAppointmentsList(url)) {
         const list = storedAppointments.map((a) => ({ ...a }))
         refetchedLists.push(list)
-        return jsonResponse({ items: list })
+        return jsonResponse({ date: dateFromUrl(url), items: list })
       }
+      if (method === 'GET' && url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }] })
       if (method === 'GET' && url.endsWith('/services')) {
         return jsonResponse({ items: baseServices })
       }
+      if (method === 'GET' && url.includes('/history')) return jsonResponse({ items: [] })
       if (method === 'PATCH' && url.includes('/appointments/')) {
         const match = url.match(/\/appointments\/([^/?]+)/)
         const id = match?.[1] ?? ''
@@ -266,11 +306,18 @@ describe('DoctorPage', () => {
           recommendations: Array.isArray(body.recommendations)
             ? body.recommendations.filter((v): v is string => typeof v === 'string')
             : target.recommendations,
-          nextVisit: typeof body.nextVisit === 'string' ? body.nextVisit : target.nextVisit,
+          nextVisit: body.nextVisit !== undefined ? body.nextVisit as Appointment['nextVisit'] : target.nextVisit,
         }
         const idx = storedAppointments.findIndex((a) => a.id === id)
         storedAppointments[idx] = updated
         return jsonResponse(updated)
+      }
+      if (String(input).includes('/history') || url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
       }
       throw new Error(`Unexpected fetch: ${method} ${url}`)
     })
@@ -291,8 +338,11 @@ describe('DoctorPage', () => {
     fireEvent.click(screen.getByTestId('visit-service-s-003'))
     fireEvent.click(screen.getByTestId('visit-rec-КТ контрольная через 14 дней'))
     fireEvent.click(screen.getByTestId('visit-rec-Снятие швов через 10 дней'))
-    fireEvent.change(screen.getByTestId('visit-next'), {
-      target: { value: 'через 7 дней' },
+    fireEvent.change(screen.getByTestId('visit-next-date'), {
+      target: { value: '2026-08-17' },
+    })
+    fireEvent.change(screen.getByTestId('visit-next-service'), {
+      target: { value: 's-002' },
     })
 
     fireEvent.click(screen.getByTestId('visit-finish'))
@@ -321,9 +371,12 @@ describe('DoctorPage', () => {
       'КТ контрольная через 14 дней',
       'Снятие швов через 10 дней',
     ])
-    expect(persisted.nextVisit).toBe('через 7 дней')
+    expect(persisted.nextVisit).toEqual({ date: '2026-08-17', serviceId: 's-002' })
 
-    expect(screen.getByTestId('visit-status-badge').textContent).toBe('Завершён')
+    fireEvent.click(screen.getByTestId('day-visit-a-001'))
+    await waitFor(() => {
+      expect(screen.getByTestId('visit-status-badge').textContent).toBe('Завершён')
+    })
 
     const reloadComplaints = screen.getByTestId('visit-complaints') as HTMLTextAreaElement
     expect(reloadComplaints.value).toBe('Головная боль в височной области третьи сутки')
@@ -345,14 +398,14 @@ describe('DoctorPage', () => {
     const reloadRec2 = screen.getByTestId('visit-rec-Снятие швов через 10 дней')
     expect(reloadRec2.getAttribute('data-active')).toBe('true')
 
-    const reloadNextVisit = screen.getByTestId('visit-next') as HTMLInputElement
-    expect(reloadNextVisit.value).toBe('через 7 дней')
+    const reloadNextVisit = screen.getByTestId('visit-next-date') as HTMLInputElement
+    expect(reloadNextVisit.value).toBe('2026-08-17')
 
     const reloadFinish = screen.getByTestId('visit-finish') as HTMLButtonElement
     expect(reloadFinish.disabled).toBe(true)
 
     const getAppointmentCalls = fetchMock.mock.calls.filter(
-      (c) => String(c[0]).endsWith('/appointments') && (c[1]?.method ?? 'GET') === 'GET',
+      (c) => isAppointmentsList(String(c[0])) && (c[1]?.method ?? 'GET') === 'GET',
     )
     expect(getAppointmentCalls.length).toBeGreaterThan(1)
   })
@@ -360,8 +413,16 @@ describe('DoctorPage', () => {
   it('«Завершить приём» заблокирована, пока жалобы или диагноз пусты', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 

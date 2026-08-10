@@ -28,3 +28,10 @@ export const URLs = {
     admin: `${baseUrl}/admin`,
   },
 }
+
+/** Путь АРМ с датой в query (?date=ГГГГ-ММ-ДД). */
+export const armPath = (slug: ArmSlug, date?: string): string => {
+  const path = URLs.arms[slug]
+  if (!date) return path
+  return `${path}?date=${encodeURIComponent(date)}`
+}

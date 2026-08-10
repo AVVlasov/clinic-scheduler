@@ -31,7 +31,7 @@ const SWITCHERS = [
 ] as const
 
 const baseSchedule = {
-  date: new Date().toISOString().slice(0, 10),
+  date: '2026-08-10',
   startTime: '08:00',
   endTime: '09:00',
   stepMinutes: 15,
@@ -46,18 +46,21 @@ const baseSchedule = {
 }
 
 const apiBody = (path: string): unknown => {
-  if (path.includes('/schedule/')) return baseSchedule
-  if (path.endsWith('/appointments')) {
+  const date = (path.match(/[?&]date=([^&]+)/) || [null, baseSchedule.date])[1] as string
+  if (path.includes('/schedule/')) return { ...baseSchedule, date }
+  if (/\/appointments\/[^/?]+\/history/.test(path)) return { items: [] }
+  if (path.includes('/appointments') && !/\/appointments\/[^?]/.test(path.split('?')[0])) {
     return {
+      date,
       items: [
         {
           id: 'a-001',
           doctorId: 'd-001',
           patientId: 'p-001',
-          start: `${baseSchedule.date}T08:00:00+03:00`,
+          start: `${date}T08:00:00+03:00`,
           durationMin: 30,
           status: 'scheduled',
-          paymentType: 'cash',
+          paymentType: 'regular',
           serviceId: null,
           doctorName: 'Иванова Е.С.',
           patientName: 'Алексеев Игорь Николаевич',
@@ -79,9 +82,9 @@ const apiBody = (path: string): unknown => {
   if (path.endsWith('/doctor-cards')) return { items: [] }
   if (path.includes('/week-templates')) {
     return {
-      weekStart: baseSchedule.date,
-      weekEnd: baseSchedule.date,
-      days: [{ date: baseSchedule.date, weekday: 'Пн' }],
+      weekStart: date,
+      weekEnd: date,
+      days: [{ date, weekday: 'Пн' }],
       rows: [],
       published: false,
     }
@@ -169,7 +172,11 @@ describe('AppShell — каркас и навигация между АРМ', ()
             : 'admin-page'
 
       await waitFor(() => {
-        expect(screen.getByTestId(probe)).toBeInTheDocument()
+        const found = screen.queryByTestId(probe)
+          || (sw.slug === 'doctor' ? screen.queryByTestId('doctor-empty') : null)
+          || (sw.slug === 'registrar' ? screen.queryByTestId('registrar-empty') : null)
+          || (sw.slug === 'operator' ? screen.queryByTestId('operator-empty') : null)
+        expect(found).toBeInTheDocument()
       })
 
       expect(screen.getByTestId(sw.testId)).toHaveAttribute('aria-selected', 'true')
@@ -194,10 +201,88 @@ describe('AppShell — каркас и навигация между АРМ', ()
     })
 
     await waitFor(() => {
-      expect(screen.getByTestId('doctor-page')).toBeInTheDocument()
+      const found = screen.queryByTestId('doctor-page') || screen.queryByTestId('doctor-empty')
+      expect(found).toBeInTheDocument()
     })
 
     expect(screen.getByTestId('switcher-doctor')).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('switcher-operator')).toHaveAttribute('aria-selected', 'false')
+  })
+
+  it('на каждом АРМ есть внутренняя nav и явные недоступные разделы с причиной', async () => {
+    const { container } = render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('main-page')).toBeInTheDocument()
+    })
+
+    const cases = [
+      { switcher: 'switcher-operator', unavailable: 'arm-nav-cart', reasonBits: ['границей', 'очеред'] },
+      { switcher: 'switcher-doctor', unavailable: 'arm-nav-sick-leave', reasonBits: ['границей'] },
+      { switcher: 'switcher-admin', unavailable: 'arm-nav-equipment', reasonBits: ['пробел'] },
+    ] as const
+
+    for (const c of cases) {
+      await act(async () => {
+        fireEvent.click(container.querySelector(`[data-testid="${c.switcher}"]`) as HTMLElement)
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('arm-nav')).toBeInTheDocument()
+      })
+
+      expect(container.querySelectorAll('nav').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByTestId(c.unavailable)).toHaveAttribute('data-status', 'unavailable')
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(c.unavailable))
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('arm-nav-unavailable-reason')).toBeInTheDocument()
+      })
+      const reason = screen.getByTestId('arm-nav-unavailable-reason').textContent ?? ''
+      for (const bit of c.reasonBits) {
+        expect(reason).toContain(bit)
+      }
+    }
+
+    await act(async () => {
+      fireEvent.click(container.querySelector('[data-testid="switcher-registrar"]') as HTMLElement)
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('arm-nav-new-patient')).toHaveAttribute('data-status', 'available')
+    })
+  })
+
+  it('на АРМ с дневными данными есть переключатель даты без ограничения назад', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00'))
+    window.history.replaceState({}, '', '/clinic-scheduler/operator?date=2026-08-10')
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('app-shell-date-switcher')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('app-shell-date')).toHaveTextContent('10 августа')
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('date-prev'))
+    })
+
+    await waitFor(() => {
+      expect(window.location.search).toContain('date=2026-08-09')
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('date-today'))
+    })
+
+    await waitFor(() => {
+      expect(window.location.search).toContain('date=2026-08-10')
+    })
+
+    vi.useRealTimers()
   })
 })

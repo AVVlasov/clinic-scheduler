@@ -1,10 +1,16 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DoctorPage } from './doctor-page'
 import type { Appointment, Service } from '../../__data__/types'
+
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+const dateFromUrl = (url: string) => (url.match(/date=([^&]+)/) || [null, '2026-08-10'])[1] as string
+
+
 
 const mockGetConfigValue = vi.fn()
 
@@ -22,7 +28,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T09:00:00',
     durationMin: 30,
     status: 'completed',
-    paymentType: 'cash',
+    paymentType: 'regular',
     serviceId: 's-001',
     doctorName: 'Иванова Елена Сергеевна',
     patientName: 'Алексеев Игорь Николаевич',
@@ -34,7 +40,7 @@ const baseAppointments: Appointment[] = [
     visitType: 'repeat',
     performedServiceIds: ['s-001', 's-003'],
     recommendations: ['Контрольный осмотр через 7 дней', 'КТ контрольная через 14 дней'],
-    nextVisit: 'через 14 дней',
+    nextVisit: { date: '2026-08-24', serviceId: 's-002' },
   },
   {
     id: 'a-002',
@@ -43,7 +49,7 @@ const baseAppointments: Appointment[] = [
     start: '2026-08-06T10:30:00',
     durationMin: 20,
     status: 'in_progress',
-    paymentType: 'insurance',
+    paymentType: 'dms',
     serviceId: 's-002',
     doctorName: 'Иванова Елена Сергеевна',
     patientName: 'Белова Татьяна Викторовна',
@@ -60,10 +66,10 @@ const baseAppointments: Appointment[] = [
 ]
 
 const baseServices: Service[] = [
-  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
-  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 },
-  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 },
-  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 },
+  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
 ]
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -72,9 +78,11 @@ const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringif
 })
 
 const renderPage = () => render(
-  <ChakraProvider value={defaultSystem}>
-    <DoctorPage />
-  </ChakraProvider>,
+  <MemoryRouter initialEntries={['/clinic-scheduler/doctor?date=2026-08-10&doctorId=d-001']}>
+    <ChakraProvider value={defaultSystem}>
+      <DoctorPage />
+    </ChakraProvider>
+  </MemoryRouter>,
 )
 
 describe('DoctorPage — протокол из визита', () => {
@@ -89,13 +97,26 @@ describe('DoctorPage — протокол из визита', () => {
   it('форма подтягивает сохранённый протокол из данных визита (DOM)', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 
     renderPage()
 
+    await waitFor(() => {
+      expect(screen.getByTestId('day-visit-a-001')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('day-visit-a-001'))
     await waitFor(() => {
       expect(screen.getAllByText('Алексеев Игорь Николаевич').length).toBeGreaterThan(0)
     })
@@ -130,20 +151,33 @@ describe('DoctorPage — протокол из визита', () => {
     const recOff = screen.getByTestId('visit-rec-Снятие швов через 10 дней')
     expect(recOff.getAttribute('data-active')).toBe('false')
 
-    const nextVisit = screen.getByTestId('visit-next') as HTMLInputElement
-    expect(nextVisit.value).toBe('через 14 дней')
+    expect((screen.getByTestId('visit-next-date') as HTMLInputElement).value).toBe('2026-08-24')
+    expect((screen.getByTestId('visit-next-service') as HTMLSelectElement).value).toBe('s-002')
   })
 
   it('локальные правки сохраняются при переключении между визитами и возврате', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 
     renderPage()
 
+    // экран открывается на рабочей записи (a-002), затем правим a-001
+    await waitFor(() => {
+      expect(screen.getByTestId('day-visit-a-002')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('day-visit-a-001'))
     await waitFor(() => {
       expect(screen.getAllByText('Алексеев Игорь Николаевич').length).toBeGreaterThan(0)
     })
@@ -175,15 +209,27 @@ describe('DoctorPage — протокол из визита', () => {
   it('для завершённого визита кнопка «Завершить приём» заблокирована', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input)
-      if (url.endsWith('/appointments')) return jsonResponse({ items: baseAppointments })
+      if (url.includes('/history')) return jsonResponse({ items: [] })
+      if (isAppointmentsList(url)) return jsonResponse({ date: dateFromUrl(url), items: baseAppointments })
+      if (url.includes('/doctors')) return jsonResponse({ items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }, { id: 'd-002', name: 'Петров А.В.', specialty: 'Кардиолог', cabinet: '305' }] })
       if (url.endsWith('/services')) return jsonResponse({ items: baseServices })
+      if (url.includes('/waitlist') && method === 'POST') {
+        return jsonResponse({ id: 'W-9999', kind: 'from_doctor', status: 'open', priority: 'high', patientId: 'p-001', patientName: null, patientPhone: null, serviceId: 's-002', doctorId: 'd-001', dateFrom: '2026-08-24', dateTo: '2026-08-24', comment: '', insuranceAppointmentId: null, createdAt: '2026-08-10T10:00:00Z', createdBy: 'doctor', fulfilledAppointmentId: null, fulfilledAt: null })
+      }
+      if (url.includes('/waitlist')) {
+        return jsonResponse({ items: [], openCount: 0 })
+      }
       throw new Error(`Unexpected fetch: ${url}`)
     })
 
     renderPage()
 
     await waitFor(() => {
-      expect(screen.getAllByText('Алексеев Игорь Николаевич').length).toBeGreaterThan(0)
+      expect(screen.getByTestId('day-visit-a-001')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('day-visit-a-001'))
+    await waitFor(() => {
+      expect(screen.getByTestId('visit-status-badge').textContent).toBe('Завершён')
     })
 
     const finish = screen.getByTestId('visit-finish') as HTMLButtonElement

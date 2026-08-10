@@ -41,7 +41,7 @@ const shiftDate = (from: string, days: number): string => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-const CURRENT_WEEK_START = weekStartOf(new Date())
+const CURRENT_WEEK_START = weekStartOf(new Date('2026-08-10T12:00:00'))
 
 const WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница']
 
@@ -106,6 +106,11 @@ const card = (over: Partial<DoctorCard> & Pick<DoctorCard, 'id' | 'name'>): Doct
   temporarySites: [],
   admissionRules: [],
   equipmentAccess: [],
+  patientAge: '',
+  preferentialLimit: '',
+  pairWork: '',
+  serviceWindows: [],
+  specializationTags: [],
   ...over,
 })
 
@@ -192,10 +197,13 @@ const postPublishCalls = (fetchMock: ReturnType<typeof mockApi>) =>
 
 describe('AdminPage — шаблоны недели', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00'))
     mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -239,7 +247,8 @@ describe('AdminPage — шаблоны недели', () => {
     // запрос не ушёл — сначала подтверждение
     expect(postPublishCalls(fetchMock)).toHaveLength(0)
     const confirm = await screen.findByTestId('publish-confirm')
-    expect(confirm).toHaveTextContent('Отменить')
+    expect(confirm).toHaveTextContent('Отмена')
+    expect(confirm).toHaveTextContent('снять')
     expect(screen.queryByTestId('publish-result')).not.toBeInTheDocument()
 
     // отказ от подтверждения тоже не публикует
@@ -295,10 +304,13 @@ describe('AdminPage — шаблоны недели', () => {
 
 describe('AdminPage — справочник врачей', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00'))
     mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -381,10 +393,13 @@ describe('AdminPage — справочник врачей', () => {
 
 describe('AdminPage — счётчик незаполненных карточек', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00'))
     mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -436,10 +451,13 @@ describe('AdminPage — счётчик незаполненных карточе
 
 describe('AdminPage — поздний ответ saveDoctorCard не подменяет свежий черновик', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00'))
     mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -516,6 +534,57 @@ describe('AdminPage — поздний ответ saveDoctorCard не подме
     expect(screen.getByTestId('field-site')).toHaveValue('Площадка №9 · Свежий ответ')
     expect(screen.getByTestId('doctor-item-d-004')).toHaveTextContent('Площадка №9 · Свежий ответ')
     expect(screen.getByTestId('doctor-item-d-004')).not.toHaveTextContent('Площадка №1 · Старый ответ')
+  })
+
+  it('правки, введённые после нажатия «Сохранить», не затираются ответом', async () => {
+    const deferreds: Array<{
+      resolve: (body: Record<string, unknown>) => void
+    }> = []
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    fetchMock.mockImplementation((input, init) => {
+      const url = typeof input === 'string' ? input : (input as Request).url
+      const method = init?.method ?? 'GET'
+      if (url.includes('/week-templates')) return json(templatesPayload)
+      if (url.includes('/doctor-cards/') && method === 'PATCH') {
+        return new Promise<Response>((resolve) => {
+          deferreds.push({ resolve: (b) => resolve(json(b, 200)) })
+        })
+      }
+      if (url.includes('/doctor-cards')) return json(cardsPayload)
+      return json({ error: 'not_found', message: 'Не найдено' }, 404)
+    })
+
+    renderPage()
+    await openDoctors()
+
+    fireEvent.click(screen.getByTestId('doctor-item-d-004'))
+    fireEvent.change(await screen.findByTestId('field-site'), {
+      target: { value: 'Площадка · отправлено' },
+    })
+    fireEvent.click(screen.getByTestId('doctor-save'))
+
+    await waitFor(() => {
+      expect(deferreds.length).toBe(1)
+    })
+
+    fireEvent.change(screen.getByTestId('field-site'), {
+      target: { value: 'Площадка · дописано во время save' },
+    })
+    fireEvent.change(screen.getByTestId('field-cabinet'), {
+      target: { value: '777' },
+    })
+
+    deferreds[0].resolve({
+      ...cardsPayload.items.find((c) => c.id === 'd-004')!,
+      site: 'Площадка · отправлено',
+      cabinet: '410',
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('doctor-save')).not.toBeDisabled()
+    })
+    expect(screen.getByTestId('field-site')).toHaveValue('Площадка · дописано во время save')
+    expect(screen.getByTestId('field-cabinet')).toHaveValue('777')
   })
 
   /**

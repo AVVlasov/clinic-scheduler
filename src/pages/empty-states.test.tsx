@@ -1,4 +1,5 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
@@ -15,8 +16,15 @@ import type {
   ServiceList,
 } from '../__data__/types'
 
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+
 vi.mock('@brojs/cli', () => ({
   getConfigValue: vi.fn(),
+  getNavigation: vi.fn(() => ({})),
+  getNavigationValue: vi.fn((key: string) => {
+    if (key === 'clinic-scheduler.main') return '/clinic-scheduler'
+    return ''
+  }),
 }))
 
 const mockedGetConfigValue = vi.mocked(getConfigValue)
@@ -40,11 +48,11 @@ const deferred = <T,>(): DeferredRequest<T> => {
 
 const baseServices: ServiceList = {
   items: [
-    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
   ],
 }
 
-const emptyAppointments: AppointmentList = { items: [] }
+const emptyAppointments: AppointmentList = { items: [], date: '2026-08-10' }
 
 const emptySchedule = (date: string): Schedule => ({
   date,
@@ -64,8 +72,12 @@ const basePatients: PatientList = {
   ],
 }
 
-const renderWithProviders = (ui: React.ReactNode) =>
-  render(<Provider>{ui}</Provider>)
+const renderWithProviders = (ui: React.ReactNode, initialPath = '/clinic-scheduler/operator') =>
+  render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Provider>{ui}</Provider>
+    </MemoryRouter>,
+  )
 
 describe('TASK-35 — loading vs empty vs error на трёх АРМ', () => {
   beforeEach(() => {
@@ -77,18 +89,21 @@ describe('TASK-35 — loading vs empty vs error на трёх АРМ', () => {
   })
 
   describe('DoctorPage', () => {
+    const doctorPath = '/clinic-scheduler/doctor?date=2026-08-10&doctorId=d-001'
+
     it('до ответа API показывает loading, после пустого ответа — empty-state с причиной, без «Загрузка приёмов»', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch')
       const apptsSlot = deferred<Response>()
       const svcSlot = deferred<Response>()
       fetchMock.mockImplementation((input) => {
         const url = String(input)
-        if (url.endsWith('/appointments')) return apptsSlot.promise
+        if (url.includes('/doctors')) return jsonResponse(baseDoctors)
+        if (isAppointmentsList(url)) return apptsSlot.promise
         if (url.endsWith('/services')) return svcSlot.promise
         return jsonResponse({ error: 'not_found' }, 404)
       })
 
-      renderWithProviders(<DoctorPage />)
+      renderWithProviders(<DoctorPage />, doctorPath)
 
       expect(await screen.findByTestId('doctor-loading')).toBeInTheDocument()
       expect(screen.queryByTestId('doctor-empty')).not.toBeInTheDocument()
@@ -114,18 +129,20 @@ describe('TASK-35 — loading vs empty vs error на трёх АРМ', () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch')
       fetchMock.mockImplementation((input) => {
         const url = String(input)
-        if (url.endsWith('/appointments')) {
+        if (url.includes('/doctors')) return jsonResponse(baseDoctors)
+        if (isAppointmentsList(url)) {
           return jsonResponse({ error: 'server_error', message: 'База данных временно недоступна' }, 500)
         }
         if (url.endsWith('/services')) return jsonResponse(baseServices)
         return jsonResponse({ error: 'not_found' }, 404)
       })
 
-      renderWithProviders(<DoctorPage />)
+      renderWithProviders(<DoctorPage />, doctorPath)
 
       const err = await screen.findByTestId('doctor-error')
       expect(err.textContent).toContain('База данных временно недоступна')
       expect(screen.queryByTestId('doctor-loading')).not.toBeInTheDocument()
+      expect(screen.getByTestId('doctor-retry')).toBeInTheDocument()
     })
   })
 
@@ -136,12 +153,13 @@ describe('TASK-35 — loading vs empty vs error на трёх АРМ', () => {
       const svcSlot = deferred<Response>()
       fetchMock.mockImplementation((input) => {
         const url = String(input)
-        if (url.endsWith('/appointments')) return apptsSlot.promise
+        if (isAppointmentsList(url)) return apptsSlot.promise
         if (url.endsWith('/services')) return svcSlot.promise
+        if (url.endsWith('/doctors')) return jsonResponse(baseDoctors)
         return jsonResponse({ error: 'not_found' }, 404)
       })
 
-      renderWithProviders(<RegistrarPage />)
+      renderWithProviders(<RegistrarPage />, '/clinic-scheduler/registrar?date=2026-08-10')
 
       expect(await screen.findByTestId('registrar-loading')).toBeInTheDocument()
       expect(screen.queryByTestId('registrar-empty')).not.toBeInTheDocument()
@@ -171,24 +189,81 @@ describe('TASK-35 — loading vs empty vs error на трёх АРМ', () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch')
       fetchMock.mockImplementation((input) => {
         const url = String(input)
-        if (url.endsWith('/appointments')) {
+        if (isAppointmentsList(url)) {
           return jsonResponse({ error: 'server_error', message: 'Сервер недоступен' }, 500)
         }
         if (url.endsWith('/services')) return jsonResponse(baseServices)
+        if (url.endsWith('/doctors')) return jsonResponse(baseDoctors)
         return jsonResponse({ error: 'not_found' }, 404)
       })
 
-      renderWithProviders(<RegistrarPage />)
+      renderWithProviders(<RegistrarPage />, '/clinic-scheduler/registrar?date=2026-08-10')
 
       const err = await screen.findByTestId('registrar-error')
       expect(err.textContent).toContain('Сервер недоступен')
       expect(screen.queryByTestId('registrar-loading')).not.toBeInTheDocument()
+      expect(screen.getByTestId('registrar-retry')).toHaveTextContent('Повторить')
+    })
+
+    it('отказ действия не стирает очередь: таблица на месте, показан action-error', async () => {
+      const date = '2026-08-10'
+      const appointments: AppointmentList = {
+        date,
+        items: [{
+          id: 'a-001',
+          doctorId: 'd-001',
+          patientId: 'p-001',
+          start: `${date}T09:00:00+03:00`,
+          durationMin: 30,
+          status: 'scheduled',
+          paymentType: 'regular',
+          serviceId: 's-001',
+          doctorName: 'Иванова Е.С.',
+          patientName: 'Алексеев Игорь Николаевич',
+          patientPhone: '+7 900 100-00-01',
+          patientBirthDate: '1985-03-12',
+          patientUid: 'UID-1',
+          complaints: null,
+          diagnosis: null,
+          visitType: null,
+          performedServiceIds: [],
+          recommendations: [],
+          nextVisit: null,
+        }],
+      }
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+      fetchMock.mockImplementation((input, init) => {
+        const url = String(input)
+        const method = (init?.method ?? 'GET').toUpperCase()
+        if (method === 'PATCH' && url.includes('/appointments/')) {
+          return jsonResponse({
+            error: 'invalid_state_transition',
+            message: 'Переход статуса запрещён',
+          }, 409)
+        }
+        if (isAppointmentsList(url)) return jsonResponse(appointments)
+        if (url.endsWith('/services')) return jsonResponse(baseServices)
+        if (url.endsWith('/doctors')) return jsonResponse(baseDoctors)
+        return jsonResponse({ error: 'not_found' }, 404)
+      })
+
+      renderWithProviders(<RegistrarPage />, '/clinic-scheduler/registrar?date=2026-08-10')
+      await screen.findByTestId('queue-row-a-001')
+      await act(async () => {
+        screen.getByTestId('mark-arrived-a-001').click()
+      })
+      await waitFor(() => {
+        expect(screen.getByTestId('registrar-action-error')).toHaveTextContent('Переход статуса запрещён')
+      })
+      expect(screen.getByTestId('queue-row-a-001')).toBeInTheDocument()
+      expect(screen.getByTestId('counter-waiting')).toBeInTheDocument()
+      expect(screen.queryByTestId('registrar-error')).not.toBeInTheDocument()
     })
   })
 
   describe('OperatorPage', () => {
     it('до ответа API показывает loading, после пустого расписания — empty-state с причиной', async () => {
-      const date = new Date().toISOString().slice(0, 10)
+      const date = '2026-08-10'
       const fetchMock = vi.spyOn(globalThis, 'fetch')
       const scheduleSlot = deferred<Response>()
       const apptsSlot = deferred<Response>()
@@ -199,14 +274,15 @@ describe('TASK-35 — loading vs empty vs error на трёх АРМ', () => {
       fetchMock.mockImplementation((input) => {
         const url = String(input)
         if (url.includes('/schedule/')) return scheduleSlot.promise
-        if (url.endsWith('/appointments')) return apptsSlot.promise
+        if (isAppointmentsList(url)) return apptsSlot.promise
         if (url.endsWith('/doctors')) return docsSlot.promise
         if (url.endsWith('/services')) return svcSlot.promise
         if (url.endsWith('/patients')) return patsSlot.promise
+        if (url.includes('/waitlist')) return jsonResponse({ items: [] })
         return jsonResponse({ error: 'not_found' }, 404)
       })
 
-      renderWithProviders(<OperatorPage />)
+      renderWithProviders(<OperatorPage />, '/clinic-scheduler/operator?date=2026-08-10')
 
       expect(await screen.findByTestId('operator-loading')).toBeInTheDocument()
       expect(screen.queryByTestId('operator-empty')).not.toBeInTheDocument()
@@ -236,14 +312,15 @@ describe('TASK-35 — loading vs empty vs error на трёх АРМ', () => {
         if (url.includes('/schedule/')) {
           return jsonResponse({ error: 'server_error', message: 'База данных временно недоступна' }, 500)
         }
-        if (url.endsWith('/appointments')) return jsonResponse(emptyAppointments)
+        if (isAppointmentsList(url)) return jsonResponse(emptyAppointments)
         if (url.endsWith('/doctors')) return jsonResponse(baseDoctors)
         if (url.endsWith('/services')) return jsonResponse(baseServices)
         if (url.endsWith('/patients')) return jsonResponse(basePatients)
+        if (url.includes('/waitlist')) return jsonResponse({ items: [] })
         return jsonResponse({ error: 'not_found' }, 404)
       })
 
-      renderWithProviders(<OperatorPage />)
+      renderWithProviders(<OperatorPage />, '/clinic-scheduler/operator?date=2026-08-10')
 
       const err = await screen.findByTestId('operator-error')
       expect(err.textContent).toContain('База данных временно недоступна')

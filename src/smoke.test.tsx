@@ -1,9 +1,11 @@
 import React from 'react'
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import App from './app'
+
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
 
 vi.mock('@brojs/cli', () => ({
   getConfigValue: vi.fn(),
@@ -27,17 +29,23 @@ const mockFetchOk = () => {
   const fetchMock = vi.spyOn(globalThis, 'fetch')
   fetchMock.mockImplementation((input) => {
     const url = typeof input === 'string' ? input : (input as Request).url
+    const date = (url.match(/[?&]date=([^&]+)/) || [null, '2026-08-10'])[1]
+    if (/\/appointments\/[^/?]+\/history/.test(url)) {
+      return Promise.resolve(new Response(JSON.stringify({ items: [] }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+    }
     if (url.includes('/schedule/')) {
       return Promise.resolve(new Response(JSON.stringify({
-        date: new Date().toISOString().slice(0, 10),
+        date,
         startTime: '08:00',
         endTime: '09:00',
         stepMinutes: 15,
         slots: [],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
-    if (url.endsWith('/appointments')) {
-      return Promise.resolve(new Response('{"items":[]}', {
+    if (isAppointmentsList(url)) {
+      return Promise.resolve(new Response(JSON.stringify({ items: [], date }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
@@ -81,5 +89,14 @@ describe('App', () => {
     expect(screen.getByTestId('switcher-doctor')).toBeInTheDocument()
     expect(screen.getByTestId('switcher-registrar')).toBeInTheDocument()
     expect(screen.getByTestId('switcher-admin')).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('switcher-operator'))
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('arm-nav')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('arm-nav-grid')).toHaveAttribute('data-status', 'available')
+    expect(screen.getByTestId('arm-nav-cart')).toHaveAttribute('data-status', 'unavailable')
   })
 })

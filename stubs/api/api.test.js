@@ -30,15 +30,35 @@ describe('stubs/api — express-стабы расписания, записей 
 
   describe('GET /schedule', () => {
     test('latency — ответ проходит через timer 300ms', async () => {
-      const t0 = Date.now();
-      const res = await request(app).get(`/schedule?date=${stateRef.date}`);
-      const dt = Date.now() - t0;
+      const t0 = performance.now();
+      const res = await request(app).get(`/schedule/${stateRef.date}`);
+      const dt = performance.now() - t0;
       expect(res.status).toBe(200);
       expect(dt).toBeGreaterThanOrEqual(TIMER_MS - TIMER_TOLERANCE_MS);
     });
 
+    test('демо-окно привязано к state.sysDate: слоты есть в sysDate±окно, а не только «сегодня процесса»', async () => {
+      const sysDate = stateRef.sysDate;
+      expect(sysDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // окно демо из TASK-36: sysDate-2 .. sysDate+7 — хотя бы середина окна непуста
+      const mid = (() => {
+        const [y, m, d] = sysDate.split('-').map(Number);
+        const dt = new Date(y, m - 1, d + 1);
+        const yyyy = dt.getFullYear();
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+      const res = await request(app).get(`/schedule/${mid}`);
+      expect(res.status).toBe(200);
+      // день может быть off у всех врачей — тогда смотрим appointments окна
+      const appts = await request(app).get(`/appointments?date=${sysDate}`);
+      expect(appts.status).toBe(200);
+      expect(appts.body.items.length).toBeGreaterThanOrEqual(5);
+    });
+
     test('schedule — отдаёт непустую сетку слотов, шаг 15 минут, слоты привязаны к опубликованным шаблонам', async () => {
-      const res = await request(app).get(`/schedule?date=${stateRef.date}`);
+      const res = await request(app).get(`/schedule/${stateRef.date}`);
       expect(res.status).toBe(200);
       expect(res.body.date).toBe(stateRef.date);
       expect(res.body.stepMinutes).toBe(15);
@@ -62,7 +82,7 @@ describe('stubs/api — express-стабы расписания, записей 
     });
 
     test('schedule — busy как логический атрибут врача в слоте (может быть true или false, но не undefined)', async () => {
-      const res = await request(app).get(`/schedule?date=${stateRef.date}`);
+      const res = await request(app).get(`/schedule/${stateRef.date}`);
       const doctors = res.body.slots.flatMap((s) => s.doctors);
       expect(doctors.length).toBeGreaterThan(0);
       for (const d of doctors) {
@@ -79,9 +99,14 @@ describe('stubs/api — express-стабы расписания, записей 
   });
 
   describe('GET /appointments', () => {
-    test('appointments list — возвращает непустой массив с разными status/paymentType', async () => {
-      const res = await request(app).get('/appointments');
+    test('appointments list — без date → 400; с date — непустой массив с разными status/paymentType', async () => {
+      const missing = await request(app).get('/appointments');
+      expect(missing.status).toBe(400);
+      expect(missing.body.error).toBe('missing_date');
+
+      const res = await request(app).get(`/appointments?date=${require('./data').state.date}`);
       expect(res.status).toBe(200);
+      expect(res.body.date).toBe(require('./data').state.date);
       expect(Array.isArray(res.body.items)).toBe(true);
       expect(res.body.items.length).toBeGreaterThanOrEqual(3);
       const statuses = new Set(res.body.items.map((a) => a.status));
@@ -105,7 +130,7 @@ describe('stubs/api — express-стабы расписания, записей 
           start: '2030-04-15T17:00:00',
           durationMin: 30,
           status: 'scheduled',
-          paymentType: 'cash',
+          paymentType: 'regular',
           serviceId: 's-001',
         });
       expect(res.status).toBe(201);
@@ -145,6 +170,20 @@ describe('stubs/api — express-стабы расписания, записей 
         });
       expect(dup.status).toBe(409);
       expect(dup.body.error).toBe('slot_taken');
+    });
+
+    test('create appointment — услуга к врачу без компетенции → 409 service_not_offered', async () => {
+      const res = await request(app)
+        .post('/appointments')
+        .send({
+          doctorId: 'd-001',
+          patientId: 'p-001',
+          start: '2030-04-16T11:00:00',
+          durationMin: 15,
+          serviceId: 's-003',
+        });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('service_not_offered');
     });
 
     test('create appointment — параллельные слоты разных врачей не конфликтуют', async () => {
@@ -252,7 +291,7 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(typeof first.specialty).toBe('string');
     });
 
-    test('directories services — массив >=6 и у каждой есть цена', async () => {
+    test('directories services — массив >=6 и у каждой есть цена и doctorIds', async () => {
       const res = await request(app).get('/services');
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.items)).toBe(true);
@@ -263,6 +302,10 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(typeof first.duration).toBe('number');
       expect(typeof first.price).toBe('number');
       expect(first.price).toBeGreaterThan(0);
+      expect(Array.isArray(first.doctorIds)).toBe(true);
+      expect(first.doctorIds.length).toBeGreaterThan(0);
+      const ecg = res.body.items.find((s) => s.id === 's-003');
+      expect(ecg.doctorIds).toEqual(['d-002', 'd-004']);
     });
 
     test('directories patients — массив >=2 и у каждого есть id/name/phone', async () => {
@@ -299,7 +342,7 @@ describe('stubs/api — express-стабы расписания, записей 
           visitType: 'first',
           performedServiceIds: ['s-001', 's-003'],
           recommendations: ['Контрольный осмотр через 7 дней'],
-          nextVisit: '2030-09-08',
+          nextVisit: { date: '2030-09-08', serviceId: 's-002' },
         });
       expect(patch.status).toBe(200);
       expect(patch.body.complaints).toBe('Боль в области 38 зуба третьи сутки');
@@ -307,7 +350,7 @@ describe('stubs/api — express-стабы расписания, записей 
       expect(patch.body.visitType).toBe('first');
       expect(patch.body.performedServiceIds).toEqual(['s-001', 's-003']);
       expect(patch.body.recommendations).toEqual(['Контрольный осмотр через 7 дней']);
-      expect(patch.body.nextVisit).toBe('2030-09-08');
+      expect(patch.body.nextVisit).toEqual({ date: '2030-09-08', serviceId: 's-002' });
 
       const single = await request(app).get(`/appointments/${id}`);
       expect(single.status).toBe(200);

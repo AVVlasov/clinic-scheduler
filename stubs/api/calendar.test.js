@@ -65,7 +65,7 @@ describe('stubs/api/calendar — воскресенье как полноцен�
 
     test('GET /schedule?date=<воскресенье> → 200 c пустой сеткой (явный выходной, а не падение)', async () => {
       const sunday = sundayOfWeek(data.state.sysDate);
-      const res = await request(app).get(`/schedule?date=${sunday}`);
+      const res = await request(app).get(`/schedule/${sunday}`);
       expect(res.status).toBe(200);
       expect(res.body.date).toBe(sunday);
       expect(res.body.stepMinutes).toBe(15);
@@ -91,13 +91,10 @@ describe('stubs/api/calendar — воскресенье как полноцен�
   });
 
   describe('GET /appointments — фильтрация по дате', () => {
-    test('GET /appointments без ?date= возвращает только записи state.date', async () => {
+    test('GET /appointments без ?date= → 400 missing_date', async () => {
       const res = await request(app).get('/appointments');
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.items)).toBe(true);
-      for (const a of res.body.items) {
-        expect(dateOnly(a.start)).toBe(data.state.date);
-      }
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('missing_date');
     });
 
     test('GET /appointments?date=<воскресенье> → пустой массив items', async () => {
@@ -134,7 +131,7 @@ describe('stubs/api/calendar — воскресенье как полноцен�
           start: `${targetDate}T19:30:00`,
           durationMin: 30,
           status: 'scheduled',
-          paymentType: 'cash',
+          paymentType: 'regular',
         });
       expect(create.status).toBe(201);
       const id = create.body.id;
@@ -227,7 +224,7 @@ describe('stubs/api/calendar — воскресенье как полноцен�
           return arr.some((iv) => data.isWorkingInterval(iv));
         });
         if (!hasWorking) continue;
-        const res = await request(app).get(`/schedule?date=${dt}`);
+        const res = await request(app).get(`/schedule/${dt}`);
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body.slots)).toBe(true);
         expect(res.body.slots.length).toBeGreaterThan(0);
@@ -281,7 +278,11 @@ describe('stubs/api/calendar — воскресенье как полноцен�
       expect(todayStatuses.has('in_progress')).toBe(true);
     });
 
-    test('R4: POST /week-templates/publish на неопубликованной неделе создаёт записи на её дни', async () => {
+    // Решение владельца (TASK-36 п.4, редакция от 2026-08-10): публикация создаёт СЛОТЫ,
+    // а не записи. Первая редакция требовала обратного, и посеянная запись выдавала только
+    // что опубликованную неделю за частично распроданную: администратор публикует ради
+    // свободных слотов, а получает занятые. Демо-записи живут в окне вокруг текущей даты.
+    test('R4: POST /week-templates/publish на неопубликованной неделе создаёт свободные слоты, а не записи', async () => {
       const targetWeekStart = '2031-01-06';
       const beforePub = await request(app).get(`/appointments?date=2031-01-09`);
       expect(beforePub.status).toBe(200);
@@ -302,9 +303,20 @@ describe('stubs/api/calendar — воскресенье как полноцен�
           return arr.some((iv) => data.isWorkingInterval(iv));
         });
         if (!hasWorking) continue;
+
+        const schedule = await request(app).get(`/schedule/${dt}`);
+        expect(schedule.status).toBe(200);
+        expect(schedule.body.slots.length).toBeGreaterThan(0);
+        // Занятыми могут быть только обед и блокировка из шаблона — они часть расписания,
+        // а не проданное время. Записи не должно быть ни одной.
+        const cells = schedule.body.slots.flatMap((s) => s.doctors);
+        expect(cells.length).toBeGreaterThan(0);
+        expect(cells.every((c) => c.occupancyKind !== 'appointment')).toBe(true);
+        expect(cells.some((c) => c.busy === false)).toBe(true);
+
         const res = await request(app).get(`/appointments?date=${dt}`);
         expect(res.status).toBe(200);
-        expect(res.body.items.length).toBeGreaterThan(0);
+        expect(res.body.items.length).toBe(0);
         checked += 1;
       }
       expect(checked).toBeGreaterThan(0);

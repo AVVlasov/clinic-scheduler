@@ -41,7 +41,7 @@ describe('stubs/api/schedule — сетка строится по опублик
         return `${yyyy}-${mm}-${dd}`;
       })();
 
-      const res = await request(app).get(`/schedule?date=${friday}`);
+      const res = await request(app).get(`/schedule/${friday}`);
       expect(res.status).toBe(200);
       expect(res.body.stepMinutes).toBe(15);
       expect(Array.isArray(res.body.slots)).toBe(true);
@@ -63,7 +63,7 @@ describe('stubs/api/schedule — сетка строится по опублик
     });
 
     test('шаг между слотами ровно 15 минут', async () => {
-      const res = await request(app).get(`/schedule?date=${data.state.date}`);
+      const res = await request(app).get(`/schedule/${data.state.date}`);
       expect(res.status).toBe(200);
       expect(res.body.slots.length).toBeGreaterThanOrEqual(2);
       for (let i = 1; i < res.body.slots.length; i++) {
@@ -109,7 +109,7 @@ describe('stubs/api/schedule — сетка строится по опублик
   describe('buildSlots — неопубликованная неделя', () => {
     test('GET /schedule?date=<будущая неделя> возвращает пустую сетку', async () => {
       const date = '2099-01-01';
-      const res = await request(app).get(`/schedule?date=${date}`);
+      const res = await request(app).get(`/schedule/${date}`);
       expect(res.status).toBe(200);
       expect(res.body.date).toBe(date);
       expect(Array.isArray(res.body.slots)).toBe(true);
@@ -148,7 +148,7 @@ describe('stubs/api/schedule — сетка строится по опублик
       expect(interval).toBeDefined();
       expect(interval.every((iv) => iv.kind !== 'work')).toBe(true);
 
-      const res = await request(app).get(`/schedule?date=${friday}`);
+      const res = await request(app).get(`/schedule/${friday}`);
       expect(res.status).toBe(200);
       const d005 = res.body.slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-005'));
       expect(d005).toEqual([]);
@@ -165,7 +165,7 @@ describe('stubs/api/schedule — сетка строится по опублик
         return `${yyyy}-${mm}-${dd}`;
       })();
 
-      const res = await request(app).get(`/schedule?date=${tuesday}`);
+      const res = await request(app).get(`/schedule/${tuesday}`);
       expect(res.status).toBe(200);
       const slots = res.body.slots;
       const d006 = slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-006'));
@@ -174,7 +174,7 @@ describe('stubs/api/schedule — сетка строится по опублик
   });
 
   describe('POST /week-templates/publish ↔ GET /schedule — симметрия слотов', () => {
-    test('число slotsCreated в publish равно сумме slots.length по дням недели из GET /schedule', async () => {
+    test('число slotsCreated в publish равно сумме длин slots.doctors по дням недели', async () => {
       const testWeekStart = '2098-12-29';
       const before = (await request(app).get(`/week-templates?weekStart=${testWeekStart}`)).body;
 
@@ -189,9 +189,9 @@ describe('stubs/api/schedule — сетка строится по опублик
       const days = before.days;
       let sum = 0;
       for (const day of days) {
-        const dayRes = await request(app).get(`/schedule?date=${day.date}`);
+        const dayRes = await request(app).get(`/schedule/${day.date}`);
         expect(dayRes.status).toBe(200);
-        sum += dayRes.body.slots.length;
+        sum += dayRes.body.slots.reduce((acc, s) => acc + s.doctors.length, 0);
       }
       expect(sum).toBe(slotsCreated);
     });
@@ -208,11 +208,52 @@ describe('stubs/api/schedule — сетка строится по опублик
       expect(second.status).toBe(409);
       expect(second.body.error).toBe('week_already_published');
     });
+
+    test('правка интервала в одной неделе не меняет соседнюю', async () => {
+      const weekA = '2096-01-01';
+      const weekB = '2096-01-08';
+      const beforeB = (await request(app).get(`/week-templates?weekStart=${weekB}`)).body;
+      const tplA = (await request(app).get(`/week-templates?weekStart=${weekA}`)).body;
+      const doctorId = tplA.rows[0].doctorId;
+      const dateA = tplA.days[0].date;
+      const patch = await request(app)
+        .patch('/week-templates/interval')
+        .send({
+          weekStart: weekA,
+          doctorId,
+          date: dateA,
+          intervals: [{ start: '10:00', end: '11:00', kind: 'work' }],
+        });
+      expect(patch.status).toBe(200);
+      const cellA = patch.body.rows.find((r) => r.doctorId === doctorId).days[0].intervals[0];
+      expect(cellA).toEqual({ start: '10:00', end: '11:00', kind: 'work' });
+
+      const afterB = (await request(app).get(`/week-templates?weekStart=${weekB}`)).body;
+      const cellB = afterB.rows.find((r) => r.doctorId === doctorId).days[0].intervals;
+      const expectedB = beforeB.rows.find((r) => r.doctorId === doctorId).days[0].intervals;
+      expect(cellB).toEqual(expectedB);
+    });
+
+    test('unpublish снимает неделю и позволяет опубликовать снова', async () => {
+      const weekStart = '2095-06-06';
+      const first = await request(app).post('/week-templates/publish').send({ weekStart });
+      expect(first.status).toBe(200);
+      const unpub = await request(app).post('/week-templates/unpublish').send({ weekStart });
+      expect(unpub.status).toBe(200);
+      expect(unpub.body.published).toBe(false);
+      const day = unpub.body.days[0].date;
+      const empty = await request(app).get(`/schedule/${day}`);
+      expect(empty.status).toBe(200);
+      expect(empty.body.slots).toEqual([]);
+      const second = await request(app).post('/week-templates/publish').send({ weekStart });
+      expect(second.status).toBe(200);
+      expect(second.body.slotsCreated).toBeGreaterThan(0);
+    });
   });
 
   describe('тип и формат ответа', () => {
     test('поля date/startTime/endTime/stepMinutes присутствуют и корректного типа', async () => {
-      const res = await request(app).get(`/schedule?date=${data.state.date}`);
+      const res = await request(app).get(`/schedule/${data.state.date}`);
       expect(res.status).toBe(200);
       expect(typeof res.body.date).toBe('string');
       expect(typeof res.body.startTime).toBe('string');
@@ -243,7 +284,7 @@ describe('stubs/api/schedule — сетка строится по опублик
       const isWork = seed.some((iv) => iv.kind === 'work');
       expect(isWork).toBe(false);
 
-      const res = await request(app).get(`/schedule?date=${friday}`);
+      const res = await request(app).get(`/schedule/${friday}`);
       expect(res.status).toBe(200);
       const d005 = res.body.slots.flatMap((s) => s.doctors.filter((d) => d.id === 'd-005'));
       expect(d005.length).toBe(0);
@@ -252,7 +293,7 @@ describe('stubs/api/schedule — сетка строится по опублик
 
   describe('R5 — мусор в дате → 400 invalid_date', () => {
     test('GET /schedule?date=мусор → 400 invalid_date (не 200 c пустым массивом)', async () => {
-      const res = await request(app).get('/schedule?date=мусор');
+      const res = await request(app).get('/schedule/мусор');
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('invalid_date');
       expect(typeof res.body.message).toBe('string');
@@ -260,13 +301,13 @@ describe('stubs/api/schedule — сетка строится по опублик
     });
 
     test('GET /schedule?date=not-a-date → 400 invalid_date', async () => {
-      const res = await request(app).get('/schedule?date=not-a-date');
+      const res = await request(app).get('/schedule/not-a-date');
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('invalid_date');
     });
 
     test('GET /schedule?date=2026-13-99 → 400 invalid_date', async () => {
-      const res = await request(app).get('/schedule?date=2026-13-99');
+      const res = await request(app).get('/schedule/2026-13-99');
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('invalid_date');
     });
@@ -283,4 +324,110 @@ describe('stubs/api/schedule — сетка строится по опублик
       expect(res.body.error).toBe('invalid_date');
     });
   });
+
+  describe('TASK-52 — отсутствия, праздник, occupancyKind', () => {
+    beforeEach(() => {
+      data.resetState();
+    });
+
+    test('праздник холдинга: slots=[], holiday.name задан', async () => {
+      const sunday = (() => {
+        const ws = data.weekStartOf(data.state.date);
+        const d = new Date(`${ws}T00:00:00`);
+        d.setDate(d.getDate() + 6);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+      const res = await request(app).get(`/schedule/${sunday}`);
+      expect(res.status).toBe(200);
+      expect(res.body.slots).toEqual([]);
+      expect(res.body.holiday).toEqual({ name: 'Праздник холдинга' });
+    });
+
+    test('block/break дают occupancyKind blocked / tech_break с разными подписями', async () => {
+      const ws = data.weekStartOf(data.state.date);
+      const wednesday = (() => {
+        const d = new Date(`${ws}T00:00:00`);
+        d.setDate(d.getDate() + 2);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+      const thursday = (() => {
+        const d = new Date(`${ws}T00:00:00`);
+        d.setDate(d.getDate() + 3);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      })();
+
+      const wed = await request(app).get(`/schedule/${wednesday}`);
+      expect(wed.status).toBe(200);
+      const blocked = wed.body.slots.flatMap((s) => s.doctors.filter((d) => d.occupancyKind === 'blocked'));
+      expect(blocked.length).toBeGreaterThan(0);
+      expect(blocked[0].occupancyLabel).toBe('Блокировка');
+      expect(blocked[0].busy).toBe(true);
+
+      const thu = await request(app).get(`/schedule/${thursday}`);
+      expect(thu.status).toBe(200);
+      const breaks = thu.body.slots.flatMap((s) => s.doctors.filter((d) => d.occupancyKind === 'tech_break'));
+      expect(breaks.length).toBeGreaterThan(0);
+      expect(breaks[0].occupancyLabel).toBe('Техперерыв');
+      expect(breaks[0].occupancyLabel).not.toBe(blocked[0].occupancyLabel);
+    });
+
+    test('POST /absences отменяет записи и убирает слоты врача; GET /absences/:id/affected их показывает', async () => {
+      const date = data.state.date;
+      const list = await request(app).get(`/appointments?date=${date}`);
+      expect(list.status).toBe(200);
+      const active = list.body.items.filter((a) =>
+        ['scheduled', 'arrived', 'in_progress'].includes(a.status),
+      );
+      expect(active.length).toBeGreaterThanOrEqual(2);
+      const doctorId = active[0].doctorId;
+      const sameDoctor = active.filter((a) => a.doctorId === doctorId);
+      expect(sameDoctor.length).toBeGreaterThanOrEqual(1);
+
+      const preview = await request(app)
+        .get('/absences/preview')
+        .query({ doctorId, dateFrom: date, dateTo: date });
+      expect(preview.status).toBe(200);
+      expect(preview.body.affectedCount).toBeGreaterThanOrEqual(sameDoctor.length);
+
+      const before = await request(app).get(`/schedule/${date}`);
+      const beforeCount = before.body.slots.reduce(
+        (n, s) => n + s.doctors.filter((d) => d.id === doctorId).length,
+        0,
+      );
+      expect(beforeCount).toBeGreaterThan(0);
+
+      const created = await request(app).post('/absences').send({
+        doctorId,
+        dateFrom: date,
+        dateTo: date,
+        reason: 'sick',
+      });
+      expect(created.status).toBe(201);
+      expect(created.body.absence.id).toMatch(/^abs-/);
+      expect(created.body.affected.length).toBe(preview.body.affectedCount);
+
+      const after = await request(app).get(`/schedule/${date}`);
+      const afterCount = after.body.slots.reduce(
+        (n, s) => n + s.doctors.filter((d) => d.id === doctorId).length,
+        0,
+      );
+      expect(afterCount).toBe(0);
+
+      const affected = await request(app).get(`/absences/${created.body.absence.id}/affected`);
+      expect(affected.status).toBe(200);
+      expect(affected.body.items.length).toBe(created.body.affected.length);
+      expect(affected.body.items.every((a) => a.status === 'cancelled')).toBe(true);
+      expect(affected.body.items.every((a) => /Отсутствие/.test(a.cancelReason || ''))).toBe(true);
+    });
+  });
+
 });

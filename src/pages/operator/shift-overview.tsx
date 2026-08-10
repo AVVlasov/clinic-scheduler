@@ -58,6 +58,7 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
       p="4"
       borderRadius="compact"
       data-testid="shift-overview"
+      data-arm-section="shift"
     >
       <Text
         fontSize="13px"

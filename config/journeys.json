@@ -22,7 +22,7 @@
       "id": "operator-reschedule",
       "title": "Оператор переносит запись на другой слот и отменяет её",
       "arm": "operator",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/operator-reschedule.journey.test.tsx",
       "task": "TASK-39"
     },
@@ -30,7 +30,7 @@
       "id": "registrar-arrive-pay-ticket",
       "title": "Регистратор отмечает приход, проводит оплату и выдаёт талон",
       "arm": "registrar",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/registrar-arrive-pay-ticket.journey.test.tsx",
       "task": "TASK-41"
     },
@@ -38,7 +38,7 @@
       "id": "doctor-day-protocol",
       "title": "Врач ведёт свой день: начинает приём, заполняет протокол, завершает",
       "arm": "doctor",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/doctor-day-protocol.journey.test.tsx",
       "task": "TASK-39"
     },
@@ -46,7 +46,7 @@
       "id": "admin-publish-week",
       "title": "Администратор правит шаблон недели, публикует её, и слоты появляются у оператора",
       "arm": "admin",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/admin-publish-week.journey.test.tsx",
       "task": "TASK-44"
     },
@@ -54,7 +54,7 @@
       "id": "admin-doctor-card",
       "title": "Администратор заполняет карточку врача, и счётчик незаполненных уменьшается",
       "arm": "admin",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/admin-doctor-card.journey.test.tsx",
       "task": "TASK-45"
     },
@@ -65,7 +65,7 @@
       "id": "cross-role-handoff",
       "title": "Смена целиком: оператор записал → регистратор принял и оплатил → врач закрыл приём → регистратор видит результат",
       "arm": "cross",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/cross-role-handoff.journey.test.tsx",
       "task": "TASK-42",
       "why": "Ни один из шести сценариев не проверяет передачу работы между рабочими местами, а это и есть рабочий день клиники. Дефект «врач завершил приём, регистратор об этом не узнал» живёт ровно здесь и не виден ни одному одноролевому сценарию."
@@ -74,7 +74,7 @@
       "id": "operator-book-by-service",
       "title": "Оператор записывает от услуги: выбрал услугу — система показала подходящих врачей и слоты",
       "arm": "operator",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/operator-book-by-service.journey.test.tsx",
       "task": "TASK-50",
       "why": "ФТ ДКЦ1 — основной сценарий оператора: сейчас порядок обратный (сначала слот, потом услуга подставляется первой из справочника). Макет ARM-operator: экраны «Запись от услуги» и «Подбор врача и слота»."
@@ -83,7 +83,7 @@
       "id": "registrar-new-patient-card",
       "title": "Регистратор заводит карту первичного пациента на стойке и записывает его",
       "arm": "registrar",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/registrar-new-patient-card.journey.test.tsx",
       "task": "TASK-51",
       "why": "Макет ARM-registrar: экран «Новая карта пациента». Без него первичного пациента нельзя обслужить вообще: запись возможна только на четырёх демо-пациентов из справочника."
@@ -92,7 +92,7 @@
       "id": "admin-absence-block",
       "title": "Администратор ставит отсутствие или ремонт диапазоном дат, и слоты исчезают у оператора",
       "arm": "admin",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/admin-absence-block.journey.test.tsx",
       "task": "TASK-52",
       "why": "MUST HAVE: «Отпуск / больничный / ремонт диапазоном дат», «Блокировки слотов, типы занятости, визуальное различение». Макет ARM-admin: кнопка «Блокировка расписания» и её модалка — единственный вход в эту петлю."
@@ -101,7 +101,7 @@
       "id": "operator-waitlist",
       "title": "Оператор заводит заявку в лист ожидания и подбирает по ней слот, когда он освободился",
       "arm": "operator",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/operator-waitlist.journey.test.tsx",
       "task": "TASK-53",
       "why": "MVP MAP MUST HAVE: «Заявка на запись (лист ожидания)», четыре типа заявок. Наш PRD вынес это за MVP — расхождение разбирается в TASK-49. UI листа ожидания в смете помечен второй очередью, поэтому статус planned, а не required."
@@ -110,10 +110,19 @@
       "id": "operator-mass-reschedule",
       "title": "Оператор сносит расписание врача и разбирает пострадавшие записи",
       "arm": "operator",
-      "status": "planned",
+      "status": "required",
       "proof": "src/journeys/operator-mass-reschedule.journey.test.tsx",
       "task": "TASK-54",
       "why": "MUST HAVE: «Снос расписания (инструмент управления массовыми отменами)», ФТ 4.2. Отдельный экран в макете оператора со списком пострадавших, выгрузкой и автопредложениями."
+    },
+    {
+      "id": "keyboard-and-response",
+      "title": "Клавиатура, подтверждение действий и выход из ошибки на рабочих местах",
+      "arm": "cross",
+      "status": "required",
+      "proof": "src/journeys/keyboard-and-response.journey.test.tsx",
+      "task": "TASK-55",
+      "why": "Дизайн-система §§8–12: клавиатура, отклик, подтверждения, 1366×768. Без этого волны 36–54 оставляют продукт непригодным для смены."
     }
   ],
   "_task_field_comment": "Поле task — ВЛАДЕЛЕЦ пути: задача, после которой он обязан стать зелёным. Оно нагружено: verify.ps1 (Фаза J) блокирует по красному пути ТОЛЬКО его владельца. Перечислять здесь предшественников нельзя — 2026-08-10 у operator-book стояло «TASK-36, TASK-37», и TASK-36 (серверная задача) получила FAIL за путь, который без клиентской части TASK-37 зелёным быть не может: 385 строк готовой работы отправились в мусор. Владелец ровно один — тот, в чьих файлах лежит файл-доказательство."

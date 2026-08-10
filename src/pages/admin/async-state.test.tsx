@@ -36,7 +36,7 @@ const shiftDate = (from: string, days: number): string => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-const CURRENT_WEEK_START = weekStartOf(new Date())
+const CURRENT_WEEK_START = weekStartOf(new Date('2026-08-10T12:00:00'))
 const NEXT_WEEK_START = shiftDate(CURRENT_WEEK_START, 7)
 const WEEK_AFTER_NEXT = shiftDate(CURRENT_WEEK_START, 14)
 
@@ -78,6 +78,11 @@ const card = (over: Partial<DoctorCard> & Pick<DoctorCard, 'id' | 'name'>): Doct
   temporarySites: [],
   admissionRules: [],
   equipmentAccess: [],
+  patientAge: '',
+  preferentialLimit: '',
+  pairWork: '',
+  serviceWindows: [],
+  specializationTags: [],
   ...over,
 })
 
@@ -190,10 +195,13 @@ const patchCalls = (log: FetchLogEntry[]) =>
 
 describe('AdminPage — асинхронное состояние (TASK-31)', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-08-10T12:00:00'))
     mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 

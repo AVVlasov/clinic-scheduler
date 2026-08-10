@@ -1,11 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
+import { useLocation } from 'react-router-dom'
 
-import { getAppointments, getServices, rescheduleAppointment } from '../../__data__/api'
-import type { Appointment, AppointmentStatus, Service } from '../../__data__/types'
+import { confirmAppointment, getAppointments, getDoctors, getServices, payAppointment, rescheduleAppointment } from '../../__data__/api'
+import { formatShortDate, parseArmDate } from '../../__data__/dates'
+import type { Appointment, AppointmentStatus, Doctor, Patient, Service } from '../../__data__/types'
 
+import { PatientCardForm } from './patient-card-form'
+import { PatientCardView } from './patient-card-view'
+import { PatientSearch } from './patient-search'
 import { QueueFilter, QueueTable } from './queue-table'
+import { TicketPrint } from './ticket-print'
 import { VisitCard } from './visit-card'
+
+/** Интервал фонового обновления очереди (мс). В тестах можно ускорить vi.setSystemTime + advanceTimers. */
+export const REGISTRAR_POLL_MS = 3000
 
 const countByStatus = (items: Appointment[], status: AppointmentStatus): number =>
   items.reduce((acc, a) => (a.status === status ? acc + 1 : acc), 0)
@@ -34,23 +43,59 @@ const appointmentAmount = (a: Appointment, priceMap: Map<string, number>): numbe
   return sum
 }
 
+const formatUpdatedAt = (iso: string): string => {
+  const d = new Date(iso)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `${hh}:${mm}:${ss}`
+}
+
 export const RegistrarPage = () => {
+  const location = useLocation()
+  const selectedDate = parseArmDate(location.search)
+
   const [items, setItems] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>('all')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [payBusy, setPayBusy] = useState(false)
+  const [ticketVisitId, setTicketVisitId] = useState<string | null>(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
+  const [panel, setPanel] = useState<'queue' | 'new' | 'card'>('queue')
+  const [openedPatient, setOpenedPatient] = useState<Patient | null>(null)
+  const selectedIdRef = useRef<string | null>(null)
+  selectedIdRef.current = selectedId
+
+  const applyAppointments = useCallback((next: Appointment[]) => {
+    setItems(next)
+    setLastUpdatedAt(new Date().toISOString())
+    const keep = selectedIdRef.current
+    if (keep && next.some((a) => a.id === keep)) {
+      setSelectedId(keep)
+    } else if (next.length > 0) {
+      setSelectedId((prev) => (prev && next.some((a) => a.id === prev) ? prev : next[0].id))
+    } else {
+      setSelectedId(null)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getAppointments(), getServices()])
-      .then(([apptsRes, servicesRes]) => {
+    setIsLoaded(false)
+    setLoadError(null)
+    Promise.all([getAppointments(selectedDate), getServices(), getDoctors()])
+      .then(([apptsRes, servicesRes, doctorsRes]) => {
         if (cancelled) return
-        setItems(apptsRes.items)
+        applyAppointments(apptsRes.items)
         setServices(servicesRes.items)
-        if (apptsRes.items.length > 0) setSelectedId(apptsRes.items[0].id)
+        setDoctors(doctorsRes.items)
         setLoadError(null)
         setIsLoaded(true)
       })
@@ -62,25 +107,119 @@ export const RegistrarPage = () => {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedDate, reloadToken, applyAppointments])
+
+  const refreshSoft = useCallback(async () => {
+    const [apptsRes, servicesRes] = await Promise.all([
+      getAppointments(selectedDate),
+      getServices(),
+    ])
+    applyAppointments(apptsRes.items)
+    setServices(servicesRes.items)
+  }, [applyAppointments, selectedDate])
+
+  useEffect(() => {
+    if (!isLoaded || loadError) return undefined
+    let cancelled = false
+    const id = window.setInterval(() => {
+      if (cancelled) return
+      refreshSoft().catch(() => {
+        // мягкий poll не стирает экран
+      })
+    }, REGISTRAR_POLL_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [isLoaded, loadError, refreshSoft])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setTicketVisitId(null)
+      if (panel !== 'queue') {
+        setPanel('queue')
+        setOpenedPatient(null)
+        return
+      }
+      setSelectedId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [panel])
 
   const updateStatus = useCallback(async (id: string, status: AppointmentStatus) => {
     setBusy(true)
+    setActionError(null)
     try {
-      const updated = await rescheduleAppointment(id, { status })
-      setItems((prev) => prev.map((a) => (a.id === id ? updated : a)))
-      setLoadError(null)
+      await rescheduleAppointment(id, { status })
+      await refreshSoft()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Не удалось обновить статус'
-      setLoadError(message)
+      setActionError(message)
+      try {
+        await refreshSoft()
+      } catch {
+        // ignore
+      }
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [refreshSoft])
 
   const priceMap = useMemo(() => buildPriceMap(services), [services])
 
-  const visibleItems = useMemo(() => applyFilter(items, filter), [items, filter])
+  const payVisit = useCallback(async (id: string) => {
+    const visit = items.find((a) => a.id === id)
+    if (!visit || visit.paidAt) return
+    const amount = appointmentAmount(visit, priceMap)
+    if (amount <= 0) {
+      setActionError('Нет суммы к оплате')
+      return
+    }
+    setPayBusy(true)
+    setActionError(null)
+    try {
+      await payAppointment(id, { amount, paymentType: visit.paymentType })
+      await refreshSoft()
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось провести оплату')
+    } finally {
+      setPayBusy(false)
+    }
+  }, [items, priceMap, refreshSoft])
+
+  const [confirmBusy, setConfirmBusy] = useState(false)
+  const confirmVisit = useCallback(async (id: string) => {
+    const visit = items.find((a) => a.id === id)
+    if (!visit || visit.confirmed) return
+    setConfirmBusy(true)
+    setActionError(null)
+    try {
+      await confirmAppointment(id)
+      await refreshSoft()
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Не удалось подтвердить запись')
+    } finally {
+      setConfirmBusy(false)
+    }
+  }, [items, refreshSoft])
+
+  const ticketVisit = useMemo(
+    () => (ticketVisitId ? items.find((a) => a.id === ticketVisitId) ?? null : null),
+    [ticketVisitId, items],
+  )
+
+  const serviceNames = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const s of services) map.set(s.id, s.name)
+    return map
+  }, [services])
+
+  const visibleItems = useMemo(() => {
+    const filtered = applyFilter(items, filter)
+    return [...filtered].sort((a, b) => a.start.localeCompare(b.start))
+  }, [items, filter])
   const selected = useMemo(
     () => items.find((a) => a.id === selectedId) ?? null,
     [items, selectedId],
@@ -94,16 +233,34 @@ export const RegistrarPage = () => {
 
   const shiftCash = useMemo(
     () => items
-      .filter((a) => a.status === 'completed')
-      .reduce((acc, a) => acc + appointmentAmount(a, priceMap), 0),
+      .filter((a) => a.paidAt != null)
+      .reduce((acc, a) => acc + (typeof a.paidAmount === 'number' ? a.paidAmount : appointmentAmount(a, priceMap)), 0),
     [items, priceMap],
   )
 
-  if (loadError) {
+  if (loadError && !isLoaded) {
     return (
       <Stack h="100%" direction="column" gap="12px" p="12px" bg="surfaceLight" data-testid="registrar-error">
         <Text fontSize="16px" fontWeight="700" color="danger">Ошибка загрузки</Text>
         <Text fontSize="13px" color="textSecondary">{loadError}</Text>
+        <Box
+          as="button"
+          data-testid="registrar-retry"
+          onClick={() => {
+            setLoadError(null)
+            setReloadToken((n) => n + 1)
+          }}
+          alignSelf="flex-start"
+          h="32px"
+          px="12px"
+          borderRadius="4px"
+          bg="brandGreen"
+          color="white"
+          fontSize="13px"
+          cursor="pointer"
+        >
+          Повторить
+        </Box>
       </Stack>
     )
   }
@@ -121,7 +278,7 @@ export const RegistrarPage = () => {
   const emptyReason = 'Сегодня приёмов нет — очередь пуста.'
 
   return (
-    <Stack h="100%" direction="column" gap="12px" p="12px" bg="surfaceLight">
+    <Stack h="100%" direction="column" gap="12px" p="12px" bg="surfaceLight" data-date={selectedDate} data-testid="registrar-page">
       <Flex
         align="center"
         gap="16px"
@@ -133,9 +290,14 @@ export const RegistrarPage = () => {
       >
         <Stack gap="0">
           <Box fontSize="12px" color="textSecondary">АРМ регистратора</Box>
-          <Box fontSize="18px" fontWeight="700" color="brandGreen700">
-            Смена · {new Date().toLocaleDateString('ru-RU')}
+          <Box fontSize="18px" fontWeight="700" color="brandGreen700" data-testid="registrar-shift-date">
+            Смена · {formatShortDate(selectedDate)}
           </Box>
+          {lastUpdatedAt ? (
+            <Text fontSize="12px" color="textSecondary" data-testid="registrar-last-updated">
+              Обновлено {formatUpdatedAt(lastUpdatedAt)}
+            </Text>
+          ) : null}
         </Stack>
         <Box flex="1" />
         <Stack direction="row" gap="24px" align="center">
@@ -166,7 +328,7 @@ export const RegistrarPage = () => {
         </Stack>
       </Flex>
 
-      {loadError ? (
+      {actionError ? (
         <Box
           bg="danger"
           color="white"
@@ -174,13 +336,55 @@ export const RegistrarPage = () => {
           py="8px"
           borderRadius="compact"
           fontSize="14px"
-          data-testid="registrar-error"
+          data-testid="registrar-action-error"
         >
-          {loadError}
+          {actionError}
         </Box>
       ) : null}
 
-      {isEmpty ? (
+      <PatientSearch
+        onSelect={(patient) => {
+          setOpenedPatient(patient)
+          setPanel('card')
+        }}
+        onCreateNew={() => {
+          setOpenedPatient(null)
+          setPanel('new')
+        }}
+      />
+
+      {panel === 'new' ? (
+        <PatientCardForm
+          doctors={doctors}
+          services={services}
+          selectedDate={selectedDate}
+          onCreated={(patient) => {
+            setOpenedPatient(patient)
+            void refreshSoft()
+          }}
+          onOpenExisting={(patient) => {
+            setOpenedPatient(patient)
+            setPanel('card')
+          }}
+          onCancel={() => setPanel('queue')}
+        />
+      ) : null}
+
+      {panel === 'card' && openedPatient ? (
+        <PatientCardView
+          patient={openedPatient}
+          onBack={() => {
+            setPanel('queue')
+            setOpenedPatient(null)
+          }}
+          onCreateNew={() => {
+            setOpenedPatient(null)
+            setPanel('new')
+          }}
+        />
+      ) : null}
+
+      {panel === 'queue' && isEmpty ? (
         <Box
           bg="white"
           borderWidth="1px"
@@ -195,25 +399,44 @@ export const RegistrarPage = () => {
         </Box>
       ) : null}
 
-      <Flex flex="1" gap="12px" minH="0">
-        <QueueTable
-          items={visibleItems}
-          selectedId={selectedId}
-          filter={filter}
-          onFilterChange={setFilter}
-          onSelect={setSelectedId}
-          onMarkArrived={(id) => { void updateStatus(id, 'arrived') }}
-          onMarkWaiting={(id) => { void updateStatus(id, 'scheduled') }}
-          onMarkNoShow={(id) => { void updateStatus(id, 'no_show') }}
+      {panel === 'queue' ? (
+        <Flex flex="1" gap="12px" minH="0">
+          <QueueTable
+            items={visibleItems}
+            serviceNames={serviceNames}
+            selectedId={selectedId}
+            filter={filter}
+            onFilterChange={setFilter}
+            onSelect={setSelectedId}
+            onMarkArrived={(id) => { void updateStatus(id, 'arrived') }}
+            onMarkWaiting={(id) => { void updateStatus(id, 'scheduled') }}
+            onMarkNoShow={(id) => { void updateStatus(id, 'no_show') }}
+            onPrintTicket={(id) => setTicketVisitId(id)}
+          />
+          <VisitCard
+            visit={selected}
+            priceMap={priceMap}
+            serviceNames={serviceNames}
+            onMarkArrived={() => { if (selected) void updateStatus(selected.id, 'arrived') }}
+            onMarkWaiting={() => { if (selected) void updateStatus(selected.id, 'scheduled') }}
+            onMarkNoShow={() => { if (selected) void updateStatus(selected.id, 'no_show') }}
+            onPay={() => { if (selected) void payVisit(selected.id) }}
+            onPrintTicket={() => { if (selected) setTicketVisitId(selected.id) }}
+            onConfirm={() => { if (selected) void confirmVisit(selected.id) }}
+            payBusy={payBusy}
+            confirmBusy={confirmBusy}
+          />
+        </Flex>
+      ) : null}
+
+      {ticketVisit ? (
+        <TicketPrint
+          visit={ticketVisit}
+          doctor={doctors.find((d) => d.id === ticketVisit.doctorId) ?? null}
+          service={services.find((s) => s.id === ticketVisit.serviceId) ?? null}
+          onClose={() => setTicketVisitId(null)}
         />
-        <VisitCard
-          visit={selected}
-          priceMap={priceMap}
-          onMarkArrived={() => { if (selected) void updateStatus(selected.id, 'arrived') }}
-          onMarkWaiting={() => { if (selected) void updateStatus(selected.id, 'scheduled') }}
-          onMarkNoShow={() => { if (selected) void updateStatus(selected.id, 'no_show') }}
-        />
-      </Flex>
+      ) : null}
 
       {busy ? (
         <Box position="fixed" top="12px" right="12px" fontSize="12px" color="textSecondary">

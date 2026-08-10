@@ -1,18 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 
-import { getDoctorCards, getWeekTemplates, publishWeek, saveDoctorCard } from '../../__data__/api'
+import { getDoctorCards, getDoctors, getWeekTemplates, publishWeek, saveDoctorCard, saveWeekTemplateInterval, unpublishWeek } from '../../__data__/api'
 import type {
+  Doctor,
   DoctorCard,
   PublishWeekResult,
+  WeekTemplateInterval,
   WeekTemplates as WeekTemplatesData,
 } from '../../__data__/types'
 
+import { AbsenceDialog } from './absence-dialog'
 import {
   countIncompleteCards,
   draftDiff,
   draftFromCard,
   DoctorsDirectory,
+  sameDraft,
   type DoctorCardDraft,
 } from './doctors-directory'
 import { WeekTemplates } from './week-templates'
@@ -72,6 +76,12 @@ export const AdminPage = () => {
   const [publishState, setPublishState] = useState<PublishState>('idle')
   const [publishResult, setPublishResult] = useState<PublishWeekResult | null>(null)
   const [publishError, setPublishError] = useState<string | null>(null)
+  const [unpublishBusy, setUnpublishBusy] = useState(false)
+  const [saveIntervalBusy, setSaveIntervalBusy] = useState(false)
+  const [saveIntervalError, setSaveIntervalError] = useState<string | null>(null)
+  const [absenceOpen, setAbsenceOpen] = useState(false)
+  const [absenceDoctors, setAbsenceDoctors] = useState<Doctor[]>([])
+  const [absenceNotice, setAbsenceNotice] = useState<string | null>(null)
 
   const [cards, setCards] = useState<DoctorCard[]>([])
   const [cardsError, setCardsError] = useState<string | null>(null)
@@ -94,6 +104,7 @@ export const AdminPage = () => {
     setPublishResult(null)
     setPublishError(null)
     setPublishState('idle')
+    setSaveIntervalError(null)
     getWeekTemplates(weekStart)
       .then((res) => {
         if (cancelled) return
@@ -152,6 +163,7 @@ export const AdminPage = () => {
     if (Object.keys(input).length === 0) return
 
     const targetId = selectedId
+    const snapshot = draft
     saveSeqRef.current += 1
     const myToken = saveSeqRef.current
     currentSaveTokenRef.current = myToken
@@ -168,7 +180,12 @@ export const AdminPage = () => {
           setIsSaving(false)
           return
         }
-        setDraft(draftFromCard(saved))
+        setDraft((prev) => {
+          if (!prev) return draftFromCard(saved)
+          // правки, введённые после «Сохранить», не затираем ответом
+          if (sameDraft(prev, snapshot)) return draftFromCard(saved)
+          return prev
+        })
         setIsSaving(false)
       })
       .catch((err: unknown) => {
@@ -213,6 +230,50 @@ export const AdminPage = () => {
         setPublishState('idle')
       })
   }, [publishState, weekStart])
+
+  const handleUnpublish = useCallback(() => {
+    const targetWeekStart = weekStart
+    setUnpublishBusy(true)
+    setPublishError(null)
+    setPublishResult(null)
+    unpublishWeek(targetWeekStart)
+      .then((templatesNext) => {
+        if (weekStartRef.current !== targetWeekStart) return
+        setTemplates(templatesNext)
+        setUnpublishBusy(false)
+      })
+      .catch((err: unknown) => {
+        if (weekStartRef.current !== targetWeekStart) return
+        setPublishError(err instanceof Error ? err.message : 'Не удалось снять публикацию')
+        setUnpublishBusy(false)
+      })
+  }, [weekStart])
+
+  const handleSaveInterval = useCallback(async (input: {
+    doctorId: string
+    date: string
+    intervals: WeekTemplateInterval[]
+  }) => {
+    const targetWeekStart = weekStart
+    setSaveIntervalBusy(true)
+    setSaveIntervalError(null)
+    try {
+      const next = await saveWeekTemplateInterval({
+        weekStart: targetWeekStart,
+        doctorId: input.doctorId,
+        date: input.date,
+        intervals: input.intervals,
+      })
+      if (weekStartRef.current !== targetWeekStart) return
+      setTemplates(next)
+    } catch (err: unknown) {
+      if (weekStartRef.current !== targetWeekStart) return
+      setSaveIntervalError(err instanceof Error ? err.message : 'Не удалось сохранить интервал')
+      throw err
+    } finally {
+      if (weekStartRef.current === targetWeekStart) setSaveIntervalBusy(false)
+    }
+  }, [weekStart])
 
   return (
     <Stack h="100%" gap="12px" p="12px" bg="surfaceLight" data-testid="admin-page">
@@ -269,8 +330,49 @@ export const AdminPage = () => {
           >
             Справочник врачей
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            borderRadius="compact"
+            variant="outline"
+            borderColor="borderLight"
+            onClick={() => {
+              void getDoctors().then((res) => {
+                setAbsenceDoctors(res.items)
+                setAbsenceOpen(true)
+              })
+            }}
+            data-testid="section-absence-block"
+          >
+            Блокировка расписания
+          </Button>
         </Flex>
       </Flex>
+
+      {absenceNotice ? (
+        <Box
+          bg="brandGreenTint"
+          color="brandGreen700"
+          px="12px"
+          py="8px"
+          borderRadius="compact"
+          fontSize="13px"
+          data-testid="absence-applied-notice"
+        >
+          {absenceNotice}
+        </Box>
+      ) : null}
+
+      <AbsenceDialog
+        open={absenceOpen}
+        doctors={absenceDoctors}
+        onClose={() => setAbsenceOpen(false)}
+        onApplied={({ absenceId, affectedCount }) => {
+          setAbsenceNotice(
+            `Отсутствие ${absenceId} применено. Отменено записей: ${affectedCount}.`,
+          )
+        }}
+      />
 
       <Flex flex="1" gap="12px" minH="0">
         {section === 'templates' ? (
@@ -289,6 +391,11 @@ export const AdminPage = () => {
             onPublishClick={handlePublishClick}
             onPublishConfirm={handlePublishConfirm}
             onPublishCancel={handlePublishCancel}
+            onUnpublish={handleUnpublish}
+            unpublishBusy={unpublishBusy}
+            onSaveInterval={handleSaveInterval}
+            saveIntervalBusy={saveIntervalBusy}
+            saveIntervalError={saveIntervalError}
           />
         ) : (
           <DoctorsDirectory

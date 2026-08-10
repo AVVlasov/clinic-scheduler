@@ -1,15 +1,23 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Badge, Box, Button, Flex, Stack } from '@chakra-ui/react'
 
+import { paymentTypeLabel } from '../../__data__/booking'
+import { appointmentStatusLabel } from '../../__data__/status-labels'
 import type { Appointment } from '../../__data__/types'
 import { isRegistrarTerminal } from '../../__data__/lifecycle'
 
 export interface VisitCardProps {
   visit: Appointment | null
   priceMap: Map<string, number>
+  serviceNames: Map<string, string>
   onMarkArrived: () => void
   onMarkWaiting: () => void
   onMarkNoShow: () => void
+  onPay: () => void
+  onPrintTicket: () => void
+  onConfirm: () => void
+  payBusy?: boolean
+  confirmBusy?: boolean
 }
 
 const formatTime = (iso: string): string => {
@@ -20,23 +28,20 @@ const formatTime = (iso: string): string => {
   return `${hh}:${mm}`
 }
 
-const statusLabel = (s: Appointment['status']): string => {
-  switch (s) {
-    case 'scheduled': return 'Ожидает'
-    case 'arrived': return 'Пришёл'
-    case 'in_progress': return 'На приёме'
-    case 'completed': return 'Завершён'
-    case 'cancelled': return 'Отменён'
-    case 'no_show': return 'Не пришёл'
-  }
+const formatBirth = (iso: string | null): string => {
+  if (!iso) return '—'
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (!m) return iso
+  return `${m[3]}.${m[2]}.${m[1]}`
 }
 
-const paymentLabel = (p: Appointment['paymentType']): string => {
-  switch (p) {
-    case 'cash': return 'Наличные'
-    case 'card': return 'Карта'
-    case 'insurance': return 'Страховка'
-  }
+const formatAuthor = (name?: string | null, unit?: string | null): string => {
+  const n = (name ?? '').trim()
+  const u = (unit ?? '').trim()
+  if (n && u) return `${n} · ${u}`
+  if (n) return n
+  if (u) return u
+  return '—'
 }
 
 const formatRub = (amount: number): string =>
@@ -57,7 +62,15 @@ const visitAmount = (visit: Appointment, priceMap: Map<string, number>): number 
 }
 
 export const VisitCard = (props: VisitCardProps) => {
-  const { visit, priceMap, onMarkArrived, onMarkWaiting, onMarkNoShow } = props
+  const {
+    visit, priceMap, serviceNames, onMarkArrived, onMarkWaiting, onMarkNoShow, onPay, onPrintTicket,
+    onConfirm, payBusy = false, confirmBusy = false,
+  } = props
+  const [confirmNoShow, setConfirmNoShow] = useState(false)
+
+  React.useEffect(() => {
+    setConfirmNoShow(false)
+  }, [visit?.id])
 
   if (!visit) {
     return (
@@ -93,19 +106,24 @@ export const VisitCard = (props: VisitCardProps) => {
     <Box
       width="340px"
       flex="none"
+      maxH="100%"
+      minH="0"
       bg="white"
       borderWidth="1px"
       borderColor="borderLight"
       borderRadius="compact"
       display="flex"
       flexDirection="column"
+      overflowY="auto"
       data-testid="visit-card"
+      data-arm-section="visit"
       data-visit-id={visit.id}
+      data-scrollable="true"
     >
       <Box p="14px 16px" borderBottomWidth="1px" borderColor="borderLight">
         <Flex align="center" gap="8px">
           <Box fontSize="20px" lineHeight="26px" fontWeight="700" data-testid="visit-patient">
-            {visit.patientName ?? visit.patientId}
+            {visit.patientName ?? '—'}
           </Box>
           <Box flex="1" />
           <Badge
@@ -115,7 +133,7 @@ export const VisitCard = (props: VisitCardProps) => {
             borderRadius="compact"
             data-testid="visit-status-badge"
           >
-            {statusLabel(visit.status)}
+            {appointmentStatusLabel(visit.status)}
           </Badge>
         </Flex>
       </Box>
@@ -127,20 +145,52 @@ export const VisitCard = (props: VisitCardProps) => {
         </Flex>
         <Flex gap="10px" align="baseline">
           <Box w="104px" color="textSecondary" fontSize="12px">Врач</Box>
-          <Box fontSize="13px">{visit.doctorName ?? visit.doctorId}</Box>
+          <Box fontSize="13px" data-testid="visit-doctor">{visit.doctorName ?? '—'}</Box>
         </Flex>
         <Flex gap="10px" align="baseline">
           <Box w="104px" color="textSecondary" fontSize="12px">Услуга</Box>
-          <Box fontSize="13px">{visit.serviceId ?? '—'}</Box>
+          <Box fontSize="13px" data-testid="visit-service">
+            {visit.serviceId ? (serviceNames.get(visit.serviceId) ?? 'Услуга') : '—'}
+          </Box>
+        </Flex>
+        <Flex gap="10px" align="baseline">
+          <Box w="104px" color="textSecondary" fontSize="12px">UID</Box>
+          <Box fontSize="13px" fontFamily="mono" data-testid="visit-uid">{visit.patientUid ?? '—'}</Box>
+        </Flex>
+        <Flex gap="10px" align="baseline">
+          <Box w="104px" color="textSecondary" fontSize="12px">Дата рождения</Box>
+          <Box fontSize="13px" data-testid="visit-birth">{formatBirth(visit.patientBirthDate)}</Box>
+        </Flex>
+        <Flex gap="10px" align="baseline">
+          <Box w="104px" color="textSecondary" fontSize="12px">Кабинет</Box>
+          <Box fontSize="13px" data-testid="visit-cabinet">{visit.doctorCabinet ?? '—'}</Box>
+        </Flex>
+        <Flex gap="10px" align="baseline">
+          <Box w="104px" color="textSecondary" fontSize="12px">Автор</Box>
+          <Box fontSize="13px" data-testid="visit-author">
+            {formatAuthor(visit.createdByName, visit.createdByUnit)}
+          </Box>
+        </Flex>
+        <Flex gap="10px" align="baseline">
+          <Box w="104px" color="textSecondary" fontSize="12px">Подтверждение</Box>
+          <Box fontSize="13px" data-testid="visit-confirmed">
+            {visit.confirmed ? 'Запись подтверждена' : 'Не подтверждена'}
+          </Box>
         </Flex>
         <Flex gap="10px" align="baseline">
           <Box w="104px" color="textSecondary" fontSize="12px">Оплата</Box>
-          <Box fontSize="13px">{paymentLabel(visit.paymentType)}</Box>
+          <Box fontSize="13px">{paymentTypeLabel(visit.paymentType)}</Box>
         </Flex>
+        {visit.operatorComment ? (
+          <Flex gap="10px" align="baseline">
+            <Box w="104px" color="textSecondary" fontSize="12px">Комментарий</Box>
+            <Box fontSize="13px" data-testid="visit-operator-comment">{visit.operatorComment}</Box>
+          </Flex>
+        ) : null}
         <Flex gap="10px" align="baseline">
           <Box w="104px" color="textSecondary" fontSize="12px">К оплате</Box>
           <Box fontSize="13px" fontFamily="mono" fontWeight="700" data-testid="visit-amount">
-            {amountText}
+            {visit.paidAt ? `оплачено ${formatRub(visit.paidAmount ?? amount)}` : amountText}
           </Box>
         </Flex>
       </Stack>
@@ -152,9 +202,7 @@ export const VisitCard = (props: VisitCardProps) => {
               variant="outline"
               flex="1"
               size="sm"
-              disabled
-              aria-disabled
-              title="Печать талона недоступна"
+              onClick={onPrintTicket}
               data-testid="visit-print-button"
             >
               Талон
@@ -171,28 +219,27 @@ export const VisitCard = (props: VisitCardProps) => {
               width="100%"
               onClick={primaryAction}
               data-testid="visit-primary-action"
+              data-arm-primary-target="true"
             >
               {primaryLabel}
             </Button>
-            <Flex gap="6px">
+            <Flex gap="6px" data-arm-section="pay">
               <Button
                 variant="outline"
                 flex="1"
                 size="sm"
-                disabled
-                aria-disabled
-                title="Оплата недоступна"
+                onClick={onPay}
+                disabled={Boolean(visit.paidAt) || payBusy || amount <= 0}
+                title={visit.paidAt ? 'Уже оплачено' : (amount <= 0 ? 'Нет суммы к оплате' : undefined)}
                 data-testid="visit-pay-button"
               >
-                К оплате
+                {payBusy ? 'Оплата…' : (visit.paidAt ? 'Оплачено' : 'К оплате')}
               </Button>
               <Button
                 variant="outline"
                 flex="1"
                 size="sm"
-                disabled
-                aria-disabled
-                title="Печать талона недоступна"
+                onClick={onPrintTicket}
                 data-testid="visit-print-button"
               >
                 Талон
@@ -200,17 +247,37 @@ export const VisitCard = (props: VisitCardProps) => {
             </Flex>
             <Button
               variant="outline"
+              size="sm"
+              width="100%"
+              onClick={onConfirm}
+              disabled={Boolean(visit.confirmed) || confirmBusy}
+              data-testid="visit-confirm-button"
+            >
+              {visit.confirmed ? 'Запись подтверждена' : (confirmBusy ? 'Подтверждение…' : 'Подтвердить запись')}
+            </Button>
+            <Button
+              variant="outline"
               color="danger"
               borderColor="danger"
               _hover={{ bg: 'danger', color: 'white' }}
               size="sm"
               width="100%"
-              onClick={onMarkNoShow}
+              onClick={() => {
+                if (!confirmNoShow) {
+                  setConfirmNoShow(true)
+                  return
+                }
+                setConfirmNoShow(false)
+                onMarkNoShow()
+              }}
               disabled={noShowDisabled}
               aria-disabled={noShowDisabled}
               data-testid="visit-noshow-button"
+              data-confirming={confirmNoShow ? 'true' : 'false'}
             >
-              Не пришёл
+              {confirmNoShow
+                ? `Да, отметить неявку (${formatTime(visit.start)})`
+                : 'Не пришёл'}
             </Button>
           </>
         )}

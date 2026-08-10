@@ -1,4 +1,5 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -14,8 +15,18 @@ import type {
   ServiceList,
 } from '../../__data__/types'
 
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+const dateFromUrl = (url: string, fallback = '2026-08-10') =>
+  (url.match(/[?&]date=([^&]+)/) || [null, fallback])[1] as string
+
+
 vi.mock('@brojs/cli', () => ({
   getConfigValue: vi.fn(),
+  getNavigation: vi.fn(() => ({})),
+  getNavigationValue: vi.fn((key: string) => {
+    if (key === 'clinic-scheduler.main') return '/clinic-scheduler'
+    return ''
+  }),
 }))
 
 const mockedGetConfigValue = vi.mocked(getConfigValue)
@@ -29,7 +40,8 @@ const doctorsPayload: DoctorList = {
 
 const servicesPayload: ServiceList = {
   items: [
-    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+    { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
   ],
 }
 
@@ -81,7 +93,7 @@ const buildAppointment = (
   start: `${date}T${time}:00+03:00`,
   durationMin: 30,
   status,
-  paymentType: 'cash',
+  paymentType: 'regular',
   serviceId: 's-001',
   doctorName: doctorId === 'd-001' ? 'Иванова Е.С.' : 'Петров А.В.',
   patientName: 'Алексеев Игорь Николаевич',
@@ -96,12 +108,13 @@ const mockApi = (
   fetchMock.mockImplementation((input, init) => {
     const url = typeof input === 'string' ? input : (input as Request).url
     if (url.includes('/schedule/')) {
-      return Promise.resolve(new Response(JSON.stringify(buildSchedule(date)), {
+      const schedDate = (url.match(/schedule\/(\d{4}-\d{2}-\d{2})/) || [null, date])[1] as string
+      return Promise.resolve(new Response(JSON.stringify(buildSchedule(schedDate)), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
-    if (url.endsWith('/appointments') && init?.method !== 'PATCH') {
-      return Promise.resolve(new Response(JSON.stringify({ items: appointments }), {
+    if (isAppointmentsList(url) && init?.method !== 'PATCH') {
+      return Promise.resolve(new Response(JSON.stringify({ items: appointments, date: dateFromUrl(url) }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
@@ -110,7 +123,7 @@ const mockApi = (
       return Promise.resolve(new Response(JSON.stringify({
         id: 'a-001', doctorId: 'd-001', patientId: 'p-001',
         start: `${date}T10:00:00+03:00`, durationMin: 30,
-        status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+        status: 'scheduled', paymentType: 'regular', serviceId: 's-001',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
     if (url.endsWith('/doctors')) {
@@ -123,6 +136,14 @@ const mockApi = (
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
+    if (url.includes('/waitlist')) {
+
+      return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+
+    }
+
     if (url.endsWith('/patients')) {
       return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -133,8 +154,12 @@ const mockApi = (
   return fetchMock
 }
 
-const renderWithProviders = (ui: React.ReactNode) =>
-  render(<Provider>{ui}</Provider>)
+const renderWithProviders = (ui: React.ReactNode, date = '2026-08-10') =>
+  render(
+    <MemoryRouter initialEntries={[`/clinic-scheduler/operator?date=${date}`]}>
+      <Provider>{ui}</Provider>
+    </MemoryRouter>,
+  )
 
 describe('SlotCard — выбор цели переноса', () => {
   beforeEach(() => {
@@ -148,10 +173,11 @@ describe('SlotCard — выбор цели переноса', () => {
   it('исходный слот не предлагает выбрать себя целью', async () => {
     const date = '2030-04-05'
     const appts: AppointmentList = {
+      date: '2030-04-05',
       items: [buildAppointment('d-001', 'scheduled', date, '09:00')],
     }
     mockApi(date, appts.items)
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-09:00'))
     const card = await screen.findByTestId('slot-card')
@@ -164,6 +190,7 @@ describe('SlotCard — выбор цели переноса', () => {
   it('перенос без другой цели не отправляет PATCH', async () => {
     const date = '2030-04-05'
     const appts: AppointmentList = {
+      date: '2030-04-05',
       items: [buildAppointment('d-001', 'scheduled', date, '09:00')],
     }
     const patches: string[] = []
@@ -173,11 +200,11 @@ describe('SlotCard — выбор цели переноса', () => {
         return Promise.resolve(new Response(JSON.stringify({
           id: 'a-001', doctorId: 'd-001', patientId: 'p-001',
           start: `${date}T09:00:00+03:00`, durationMin: 30,
-          status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+          status: 'scheduled', paymentType: 'regular', serviceId: 's-001',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       },
     })
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-09:00'))
     const rescheduleBtn = await screen.findByTestId('card-reschedule')
@@ -192,10 +219,11 @@ describe('SlotCard — выбор цели переноса', () => {
   it('клик по слоту той же (time, doctor) что выбранный — не выбирает цель', async () => {
     const date = '2030-04-05'
     const appts: AppointmentList = {
+      date: '2030-04-05',
       items: [buildAppointment('d-001', 'scheduled', date, '09:00')],
     }
     mockApi(date, appts.items)
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-09:00'))
     await screen.findByTestId('slot-card')
@@ -212,6 +240,7 @@ describe('SlotCard — выбор цели переноса', () => {
   it('перенос в другой слот отправляет новые координаты и обновляет сетку', async () => {
     const date = '2030-04-05'
     const appts: AppointmentList = {
+      date: '2030-04-05',
       items: [buildAppointment('d-001', 'scheduled', date, '09:00')],
     }
     const patches: string[] = []
@@ -225,8 +254,8 @@ describe('SlotCard — выбор цели переноса', () => {
           status: 200, headers: { 'Content-Type': 'application/json' },
         }))
       }
-      if (url.endsWith('/appointments') && init?.method !== 'PATCH') {
-        return Promise.resolve(new Response(JSON.stringify({ items: appts.items }), {
+      if (isAppointmentsList(url) && init?.method !== 'PATCH') {
+        return Promise.resolve(new Response(JSON.stringify({ items: appts.items, date: dateFromUrl(url, appts.date) }), {
           status: 200, headers: { 'Content-Type': 'application/json' },
         }))
       }
@@ -235,7 +264,7 @@ describe('SlotCard — выбор цели переноса', () => {
         return Promise.resolve(new Response(JSON.stringify({
           id: 'a-001', doctorId: 'd-001', patientId: 'p-001',
           start: `${date}T10:00:00+03:00`, durationMin: 30,
-          status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+          status: 'scheduled', paymentType: 'regular', serviceId: 's-001',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       if (url.endsWith('/doctors')) {
@@ -248,6 +277,14 @@ describe('SlotCard — выбор цели переноса', () => {
           status: 200, headers: { 'Content-Type': 'application/json' },
         }))
       }
+      if (url.includes('/waitlist')) {
+
+        return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        }))
+
+      }
+
       if (url.endsWith('/patients')) {
         return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
           status: 200, headers: { 'Content-Type': 'application/json' },
@@ -256,7 +293,7 @@ describe('SlotCard — выбор цели переноса', () => {
       return Promise.resolve(new Response('not found', { status: 404 }))
     })
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-09:00'))
     await screen.findByTestId('slot-card')

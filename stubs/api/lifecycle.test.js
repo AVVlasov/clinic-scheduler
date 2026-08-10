@@ -30,8 +30,8 @@ const fetchAppointment = async (app, id) => {
   return res.body;
 };
 
-const fetchList = async (app) => {
-  const res = await request(app).get('/appointments');
+const fetchList = async (app, date = data.state.date) => {
+  const res = await request(app).get(`/appointments?date=${date}`);
   expect(res.status).toBe(200);
   return res.body.items;
 };
@@ -65,7 +65,7 @@ describe('stubs/api/lifecycle — единый источник правил ж�
     expect(lifecycle.ACTIVE_APPOINTMENT_STATUSES.has('scheduled')).toBe(true);
     expect(lifecycle.ACTIVE_APPOINTMENT_STATUSES.has('completed')).toBe(true);
     expect(lifecycle.ACTIVE_APPOINTMENT_STATUSES.has('cancelled')).toBe(false);
-    expect(lifecycle.PAYMENT_TYPES).toEqual(['cash', 'card', 'insurance']);
+    expect(lifecycle.PAYMENT_TYPES).toEqual(['regular', 'dms', 'promo', 'discount', 'certificate']);
     expect(typeof lifecycle.isStatusTransitionAllowed).toBe('function');
     expect(typeof lifecycle.isTerminalStatus).toBe('function');
     expect(typeof lifecycle.isActiveStatus).toBe('function');
@@ -210,11 +210,11 @@ describe('stubs/api/lifecycle — POST валидирует status и paymentTyp
       start: '2026-08-10T09:00:00',
       durationMin: 30,
       status: 'arrived',
-      paymentType: 'card',
+      paymentType: 'promo',
     });
     expect(res.status).toBe(201);
     expect(res.body.status).toBe('arrived');
-    expect(res.body.paymentType).toBe('card');
+    expect(res.body.paymentType).toBe('promo');
   });
 });
 

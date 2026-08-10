@@ -1,4 +1,5 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -13,8 +14,17 @@ import type {
   ServiceList,
 } from '../../__data__/types'
 
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+const dateFromUrl = (url: string, fallback = '2026-08-10') =>
+  (url.match(/[?&]date=([^&]+)/) || [null, fallback])[1] as string
+
 vi.mock('@brojs/cli', () => ({
   getConfigValue: vi.fn(),
+  getNavigation: vi.fn(() => ({})),
+  getNavigationValue: vi.fn((key: string) => {
+    if (key === 'clinic-scheduler.main') return '/clinic-scheduler'
+    return ''
+  }),
 }))
 
 const mockedGetConfigValue = vi.mocked(getConfigValue)
@@ -28,7 +38,8 @@ const doctorsPayload: DoctorList = {
 
 const servicesPayload: ServiceList = {
   items: [
-    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+    { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
   ],
 }
 
@@ -77,15 +88,16 @@ const buildSchedule = (date: string): Schedule => ({
 })
 
 const appointmentsPayload: AppointmentList = {
+  date: '2026-08-10',
   items: [
     {
       id: 'a-001',
       doctorId: 'd-001',
       patientId: 'p-001',
-      start: `${new Date().toISOString().slice(0, 10)}T08:15:00+03:00`,
+      start: `${'2026-08-10'}T08:15:00+03:00`,
       durationMin: 30,
       status: 'scheduled',
-      paymentType: 'cash',
+      paymentType: 'regular',
       serviceId: 's-001',
       doctorName: 'Иванова Е.С.',
       patientName: 'Алексеев Игорь Николаевич',
@@ -93,8 +105,12 @@ const appointmentsPayload: AppointmentList = {
   ],
 }
 
-const renderWithProviders = (ui: React.ReactNode) =>
-  render(<Provider>{ui}</Provider>)
+const renderWithProviders = (ui: React.ReactNode, date = '2026-08-10') =>
+  render(
+    <MemoryRouter initialEntries={[`/clinic-scheduler/operator?date=${date}`]}>
+      <Provider>{ui}</Provider>
+    </MemoryRouter>,
+  )
 
 const mockApiOk = (date: string) => {
   const fetchMock = vi.spyOn(globalThis, 'fetch')
@@ -105,8 +121,13 @@ const mockApiOk = (date: string) => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
-    if (url.endsWith('/appointments')) {
-      return Promise.resolve(new Response(JSON.stringify(appointmentsPayload), {
+    if (isAppointmentsList(url)) {
+      const d = dateFromUrl(url, date)
+      const items = appointmentsPayload.items.map((a) => ({
+        ...a,
+        start: `${d}${a.start.slice(10)}`,
+      }))
+      return Promise.resolve(new Response(JSON.stringify({ date: d, items }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
@@ -120,6 +141,14 @@ const mockApiOk = (date: string) => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
+    if (url.includes('/waitlist')) {
+
+      return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+
+    }
+
     if (url.endsWith('/patients')) {
       return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -134,7 +163,7 @@ const mockApiConflict = (date: string) => {
   const fetchMock = vi.spyOn(globalThis, 'fetch')
   fetchMock.mockImplementation((input, init) => {
     const url = typeof input === 'string' ? input : (input as Request).url
-    if (url.endsWith('/appointments') && init?.method === 'POST') {
+    if (isAppointmentsList(url) && init?.method === 'POST') {
       return Promise.resolve(new Response(JSON.stringify({
         error: 'slot_taken',
         message: 'Выбранный слот уже занят',
@@ -147,8 +176,13 @@ const mockApiConflict = (date: string) => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
-    if (url.endsWith('/appointments')) {
-      return Promise.resolve(new Response(JSON.stringify(appointmentsPayload), {
+    if (isAppointmentsList(url)) {
+      const d = dateFromUrl(url, date)
+      const items = appointmentsPayload.items.map((a) => ({
+        ...a,
+        start: `${d}${a.start.slice(10)}`,
+      }))
+      return Promise.resolve(new Response(JSON.stringify({ date: d, items }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
@@ -162,6 +196,14 @@ const mockApiConflict = (date: string) => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
+    if (url.includes('/waitlist')) {
+
+      return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+
+    }
+
     if (url.endsWith('/patients')) {
       return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -182,7 +224,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
   })
 
   it('строит сетку из данных стаба, а не из констант', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     mockApiOk(date)
     renderWithProviders(<OperatorPage />)
 
@@ -206,7 +248,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
   })
 
   it('открывает карточку при клике на свободный слот', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     mockApiOk(date)
     renderWithProviders(<OperatorPage />)
 
@@ -223,7 +265,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
   })
 
   it('показывает ошибку конфликта при записи в занятый слот (а не молча перезаписывает)', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     mockApiConflict(date)
     renderWithProviders(<OperatorPage />)
 
@@ -244,7 +286,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
   })
 
   it('открывает карточку busy-слота и показывает действия Перенести', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     mockApiOk(date)
     renderWithProviders(<OperatorPage />)
 
@@ -260,9 +302,10 @@ describe('OperatorPage — сетка из данных стаба', () => {
   })
 
   it('Shift overview считает статистику из данных, а не из констант', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
 
     const initialPayload: AppointmentList = {
+      date: '2026-08-10',
       items: [
         {
           id: 'a-001',
@@ -271,7 +314,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
           start: `${date}T08:15:00+03:00`,
           durationMin: 30,
           status: 'scheduled',
-          paymentType: 'cash',
+          paymentType: 'regular',
           serviceId: 's-001',
           doctorName: 'Иванова Е.С.',
           patientName: 'Алексеев Игорь Николаевич',
@@ -280,6 +323,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
     }
 
     const heavyPayload: AppointmentList = {
+      date: '2026-08-10',
       items: [
         {
           id: 'a-010',
@@ -288,7 +332,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
           start: `${date}T08:00:00+03:00`,
           durationMin: 45,
           status: 'scheduled',
-          paymentType: 'cash',
+          paymentType: 'regular',
           serviceId: 's-001',
           doctorName: 'Иванова Е.С.',
           patientName: 'Иванов Иван',
@@ -300,7 +344,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
           start: `${date}T08:15:00+03:00`,
           durationMin: 75,
           status: 'no_show',
-          paymentType: 'cash',
+          paymentType: 'regular',
           serviceId: 's-001',
           doctorName: 'Петров А.В.',
           patientName: 'Петров Пётр',
@@ -312,7 +356,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
           start: `${date}T08:30:00+03:00`,
           durationMin: 60,
           status: 'arrived',
-          paymentType: 'cash',
+          paymentType: 'regular',
           serviceId: 's-001',
           doctorName: 'Иванова Е.С.',
           patientName: 'Сидоров Сидор',
@@ -328,8 +372,8 @@ describe('OperatorPage — сетка из данных стаба', () => {
             status: 200, headers: { 'Content-Type': 'application/json' },
           }))
         }
-        if (url.endsWith('/appointments')) {
-          return Promise.resolve(new Response(JSON.stringify(payload), {
+        if (isAppointmentsList(url)) {
+          return Promise.resolve(new Response(JSON.stringify({ ...payload, date: (typeof url==='string' && (url.match(/date=([^&]+)/)||[])[1]) || payload.date }), {
             status: 200, headers: { 'Content-Type': 'application/json' },
           }))
         }
@@ -343,6 +387,14 @@ describe('OperatorPage — сетка из данных стаба', () => {
             status: 200, headers: { 'Content-Type': 'application/json' },
           }))
         }
+        if (url.includes('/waitlist')) {
+
+          return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+
+        }
+
         if (url.endsWith('/patients')) {
           return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
             status: 200, headers: { 'Content-Type': 'application/json' },
@@ -394,8 +446,8 @@ describe('OperatorPage — сетка из данных стаба', () => {
   })
 
   it('Shift overview на пустом списке даёт нули и «—», а не константы', async () => {
-    const date = new Date().toISOString().slice(0, 10)
-    const emptyPayload: AppointmentList = { items: [] }
+    const date = '2026-08-10'
+    const emptyPayload: AppointmentList = { items: [], date: '2026-08-10' }
 
     const buildFetch = (payload: AppointmentList) =>
       vi.fn((input: RequestInfo | URL) => {
@@ -405,8 +457,8 @@ describe('OperatorPage — сетка из данных стаба', () => {
             status: 200, headers: { 'Content-Type': 'application/json' },
           }))
         }
-        if (url.endsWith('/appointments')) {
-          return Promise.resolve(new Response(JSON.stringify(payload), {
+        if (isAppointmentsList(url)) {
+          return Promise.resolve(new Response(JSON.stringify({ ...payload, date: (typeof url==='string' && (url.match(/date=([^&]+)/)||[])[1]) || payload.date }), {
             status: 200, headers: { 'Content-Type': 'application/json' },
           }))
         }
@@ -420,6 +472,14 @@ describe('OperatorPage — сетка из данных стаба', () => {
             status: 200, headers: { 'Content-Type': 'application/json' },
           }))
         }
+        if (url.includes('/waitlist')) {
+
+          return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          }))
+
+        }
+
         if (url.endsWith('/patients')) {
           return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
             status: 200, headers: { 'Content-Type': 'application/json' },
@@ -445,7 +505,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
   })
 
   it('кнопка «Записать» disabled без выбранного пациента и не уходит на p-001', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     mockApiOk(date)
     renderWithProviders(<OperatorPage />)
 
@@ -459,12 +519,12 @@ describe('OperatorPage — сетка из данных стаба', () => {
     const orig = fetchMock.getMockImplementation()
     fetchMock.mockImplementation((input, init) => {
       const url = typeof input === 'string' ? input : (input as Request).url
-      if (url.endsWith('/appointments') && init?.method === 'POST') {
+      if (isAppointmentsList(url) && init?.method === 'POST') {
         posts.push(typeof init.body === 'string' ? init.body : '')
         return Promise.resolve(new Response(JSON.stringify({
           id: 'a-999', doctorId: 'd-001', patientId: 'p-999',
           start: `${date}T08:00:00+03:00`, durationMin: 30,
-          status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+          status: 'scheduled', paymentType: 'regular', serviceId: 's-001',
         }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
       }
       return orig ? orig(input as Request | string, init) : Promise.resolve(new Response('not found', { status: 404 }))
@@ -497,7 +557,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
   it('перенос уходит в целевой свободный слот с его временем и календарной датой (смена суток)', async () => {
     const date = '2030-03-09'
     mockApiOk(date)
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-08:15'))
 
@@ -523,7 +583,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
         return Promise.resolve(new Response(JSON.stringify({
           id: 'a-001', doctorId: 'd-002', patientId: 'p-001',
           start: `${date}T08:45:00+03:00`, durationMin: 30,
-          status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+          status: 'scheduled', paymentType: 'regular', serviceId: 's-001',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
       return orig ? orig(input as Request | string, init) : Promise.resolve(new Response('not found', { status: 404 }))

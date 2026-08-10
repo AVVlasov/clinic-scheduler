@@ -1,7 +1,7 @@
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, createAppointment, getSchedule, rescheduleAppointment } from './api'
+import { ApiError, createAppointment, getAppointments, getSchedule, rescheduleAppointment } from './api'
 import type { Appointment, CreateAppointmentInput, Schedule } from './types'
 
 vi.mock('@brojs/cli', () => ({
@@ -37,6 +37,40 @@ describe('API client', () => {
     expect(result).toEqual(schedule)
     expect(result.slots[0].doctors[0].busy).toBe(false)
     expect(fetchMock).toHaveBeenCalledWith('https://clinic.test/api/schedule/2026-08-06', undefined)
+  })
+
+  it('getAppointments передаёт date и сверяет ответ с запросом', async () => {
+    mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      date: '2026-08-10',
+      items: [],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    const result = await getAppointments('2026-08-10')
+    expect(result.date).toBe('2026-08-10')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://clinic.test/api/appointments?date=2026-08-10',
+      undefined,
+    )
+  })
+
+  it('getAppointments при date_mismatch бросает ApiError', async () => {
+    mockedGetConfigValue.mockReturnValue('https://clinic.test/api/')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      date: '2026-08-11',
+      items: [],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await expect(getAppointments('2026-08-10')).rejects.toMatchObject({
+      code: 'date_mismatch',
+    })
+    await expect(getAppointments('2026-08-10')).rejects.toBeInstanceOf(ApiError)
   })
 
   it('409 slot_taken: машинный код в code, человеческий текст — в message', async () => {
@@ -138,7 +172,7 @@ describe('API client', () => {
       start: '2030-04-15T09:00:00+03:00',
       durationMin: 30,
       status: 'completed',
-      paymentType: 'card',
+      paymentType: 'promo',
       serviceId: 's-001',
       doctorName: 'Иванова',
       patientName: 'Иванов',
@@ -150,7 +184,7 @@ describe('API client', () => {
       visitType: 'first',
       performedServiceIds: ['s-001', 's-003'],
       recommendations: ['Контрольный осмотр через 7 дней'],
-      nextVisit: '2030-04-22',
+      nextVisit: { date: '2030-04-22', serviceId: 's-002' },
     }
     let sentBody: unknown = null
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
@@ -167,7 +201,7 @@ describe('API client', () => {
       visitType: 'first',
       performedServiceIds: ['s-001', 's-003'],
       recommendations: ['Контрольный осмотр через 7 дней'],
-      nextVisit: '2030-04-22',
+      nextVisit: { date: '2030-04-22', serviceId: 's-002' },
     })
 
     expect(result.complaints).toBe('Боль в области 38 зуба третьи сутки')
@@ -181,6 +215,6 @@ describe('API client', () => {
     expect(parsed.visitType).toBe('first')
     expect(parsed.performedServiceIds).toEqual(['s-001', 's-003'])
     expect(parsed.recommendations).toEqual(['Контрольный осмотр через 7 дней'])
-    expect(parsed.nextVisit).toBe('2030-04-22')
+    expect(parsed.nextVisit).toEqual({ date: '2030-04-22', serviceId: 's-002' })
   })
 })

@@ -1,4 +1,5 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -8,6 +9,8 @@ vi.mock('../../__data__/api', () => ({
   getSchedule: vi.fn(),
   getDoctors: vi.fn(),
   getServices: vi.fn(),
+  payAppointment: vi.fn(),
+  confirmAppointment: vi.fn(),
   createAppointment: vi.fn(),
   ApiError: class ApiError extends Error {
     constructor(message: string, public readonly status: number, public readonly code: string) {
@@ -17,24 +20,30 @@ vi.mock('../../__data__/api', () => ({
   },
 }))
 
-import { getAppointments, getServices, rescheduleAppointment } from '../../__data__/api'
+import { getAppointments, getDoctors, getServices, payAppointment, rescheduleAppointment } from '../../__data__/api'
 import { Provider } from '../../theme'
 import type { Appointment, Service } from '../../__data__/types'
 
 import { RegistrarPage } from './registrar-page'
 
-const renderPage = () => render(<Provider><RegistrarPage /></Provider>)
+const renderPage = () => render(
+  <MemoryRouter initialEntries={['/clinic-scheduler/registrar']}>
+    <Provider><RegistrarPage /></Provider>
+  </MemoryRouter>,
+)
 
 const mockedGetAppointments = vi.mocked(getAppointments)
 const mockedGetServices = vi.mocked(getServices)
+const mockedGetDoctors = vi.mocked(getDoctors)
+const mockedPayAppointment = vi.mocked(payAppointment)
 const mockedRescheduleAppointment = vi.mocked(rescheduleAppointment)
 
 const baseServices: Service[] = [
-  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
-  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 },
-  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 },
-  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 },
-  { id: 's-007', name: 'Консультация по результатам', duration: 20, category: 'Приём', price: 1700 },
+  { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-002', name: 'Повторная консультация', duration: 20, category: 'Приём', price: 1800 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+  { id: 's-007', name: 'Консультация по результатам', duration: 20, category: 'Приём', price: 1700 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
 ]
 
 const makeAppointment = (overrides: Partial<Appointment>): Appointment => ({
@@ -44,10 +53,17 @@ const makeAppointment = (overrides: Partial<Appointment>): Appointment => ({
   start: '2026-08-06T09:00:00+03:00',
   durationMin: 30,
   status: 'scheduled',
-  paymentType: 'cash',
+  paymentType: 'regular',
   serviceId: 's-001',
   doctorName: 'Иванова Е. С.',
   patientName: 'Алексеев Игорь',
+  patientPhone: '+7 900 100-00-01',
+  patientBirthDate: '1985-03-12',
+  patientUid: 'UID 0001 1234',
+  doctorCabinet: '101',
+  createdByName: 'Смирнова А.И.',
+  createdByUnit: 'Колл-центр',
+  confirmed: false,
   complaints: null,
   diagnosis: null,
   visitType: null,
@@ -66,7 +82,7 @@ const APPOINTMENTS: Appointment[] = [
     doctorName: 'Петров А. В.',
     start: '2026-08-06T10:30:00+03:00',
     status: 'arrived',
-    paymentType: 'card',
+    paymentType: 'promo',
   }),
   makeAppointment({
     id: 'a-003',
@@ -75,7 +91,7 @@ const APPOINTMENTS: Appointment[] = [
     doctorName: 'Сидорова М. А.',
     start: '2026-08-06T11:00:00+03:00',
     status: 'in_progress',
-    paymentType: 'insurance',
+    paymentType: 'dms',
   }),
   makeAppointment({
     id: 'a-004',
@@ -84,14 +100,53 @@ const APPOINTMENTS: Appointment[] = [
     doctorName: 'Кузнецов Д. О.',
     start: '2026-08-06T14:00:00+03:00',
     status: 'completed',
-    paymentType: 'card',
+    paymentType: 'promo',
     serviceId: 's-007',
+    paidAt: '2026-08-06T14:30:00+03:00',
+    paidAmount: 1700,
   }),
 ]
 
 const setupMocks = (appointments: Appointment[], services: Service[] = baseServices) => {
-  mockedGetAppointments.mockResolvedValue({ items: appointments })
+  let current = appointments.map((a) => ({ ...a }))
+  mockedGetAppointments.mockImplementation(async () => ({
+    items: current.map((a) => ({ ...a })),
+    date: '2026-08-10',
+  }))
   mockedGetServices.mockResolvedValue({ items: services })
+  mockedGetDoctors.mockResolvedValue({
+    items: [
+      { id: 'd-001', name: 'Иванова Е. С.', specialty: 'Терапевт', cabinet: '201' },
+      { id: 'd-002', name: 'Петров А. В.', specialty: 'Кардиолог', cabinet: '305' },
+      { id: 'd-003', name: 'Сидорова М. А.', specialty: 'Педиатр', cabinet: '104' },
+      { id: 'd-004', name: 'Кузнецов Д. О.', specialty: 'Невролог', cabinet: '412' },
+    ],
+  })
+  mockedPayAppointment.mockImplementation(async (id, input) => {
+    const target = current.find((a) => a.id === id)
+    if (!target) throw new Error('not found')
+    if (target.paidAt) {
+      const err = new Error('already paid') as Error & { status?: number; code?: string }
+      err.status = 409
+      err.code = 'already_paid'
+      throw err
+    }
+    const updated = { ...target, paidAt: '2026-08-06T12:00:00+03:00', paidAmount: input.amount }
+    current = current.map((a) => (a.id === id ? updated : a))
+    return updated
+  })
+  mockedRescheduleAppointment.mockImplementation(async (id, input) => {
+    const original = current.find((a) => a.id === id)
+    if (!original) throw new Error('not_found')
+    const updated = { ...original, ...input, status: input.status ?? original.status }
+    current = current.map((a) => (a.id === id ? updated : a))
+    return updated
+  })
+  return {
+    setAppointments: (next: Appointment[]) => {
+      current = next.map((a) => ({ ...a }))
+    },
+  }
 }
 
 describe('RegistrarPage', () => {
@@ -144,11 +199,6 @@ describe('RegistrarPage', () => {
 
   it('«отметить приход» вызывает rescheduleAppointment и обновляет статус в UI', async () => {
     setupMocks(APPOINTMENTS)
-    mockedRescheduleAppointment.mockImplementation(async (id, input) => {
-      const original = APPOINTMENTS.find((a) => a.id === id)
-      if (!original) throw new Error('not_found')
-      return { ...original, status: input.status ?? original.status }
-    })
 
     renderPage()
 
@@ -212,7 +262,7 @@ describe('RegistrarPage', () => {
     })
   })
 
-  it('касса смены считается по выполненным визитам из справочника услуг', async () => {
+  it('касса смены считает только фактически оплаченные записи', async () => {
     setupMocks(APPOINTMENTS)
 
     renderPage()
@@ -231,7 +281,9 @@ describe('RegistrarPage', () => {
         patientName: 'Иванов Иван',
         serviceId: 's-002',
         status: 'completed',
-        paymentType: 'card',
+        paymentType: 'promo',
+        paidAt: '2026-08-06T12:00:00+03:00',
+        paidAmount: 1800,
       }),
     ]
     setupMocks(oneCompleted)
@@ -250,15 +302,17 @@ describe('RegistrarPage', () => {
         patientName: 'Петров Пётр',
         serviceId: 's-003',
         status: 'completed',
-        paymentType: 'cash',
+        paymentType: 'regular',
         start: '2026-08-06T15:00:00+03:00',
+        paidAt: '2026-08-06T15:30:00+03:00',
+        paidAmount: 1200,
       }),
       makeAppointment({
         id: 'a-102',
         patientName: 'Сидоров Сидор',
         serviceId: 's-001',
         status: 'scheduled',
-        paymentType: 'cash',
+        paymentType: 'regular',
         start: '2026-08-06T16:00:00+03:00',
       }),
     ]

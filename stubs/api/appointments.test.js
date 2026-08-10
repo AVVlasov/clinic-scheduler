@@ -37,6 +37,46 @@ describe('stubs/api — атомарность PATCH /appointments/:id', () => {
   let app;
   let stateRef;
 
+  test('GET /appointments без date → 400 missing_date', async () => {
+    const localApp = buildApp();
+    const res = await request(localApp).get('/appointments');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('missing_date');
+  });
+
+  test('GET /appointments?date=&doctorId= фильтрует по врачу; неизвестный врач → 400', async () => {
+    const localApp = buildApp();
+    const data = require('./data');
+    const date = data.state.date;
+    const doctorId = data.state.doctors[1]?.id || 'd-002';
+    const filtered = await request(localApp).get(`/appointments?date=${date}&doctorId=${doctorId}`);
+    expect(filtered.status).toBe(200);
+    expect(filtered.body.doctorId).toBe(doctorId);
+    expect(filtered.body.items.length).toBeGreaterThan(0);
+    for (const item of filtered.body.items) {
+      expect(item.doctorId).toBe(doctorId);
+    }
+    const missing = await request(localApp).get(`/appointments?date=${date}&doctorId=d-does-not-exist`);
+    expect(missing.status).toBe(400);
+    expect(missing.body.error).toBe('doctor_not_found');
+  });
+
+  test('PATCH с asDoctorId чужого врача → 409 foreign_doctor', async () => {
+    const localApp = buildApp();
+    const data = require('./data');
+    const owned = (data.state.appointments || [])
+      .concat(data.state.demoAppointments || [])
+      .find((a) => a.doctorId === 'd-001' && a.status === 'scheduled');
+    expect(owned, 'нужна scheduled-запись d-001').toBeTruthy();
+    const otherDoctor = data.state.doctors.find((d) => d.id !== 'd-001');
+    expect(otherDoctor).toBeTruthy();
+    const patch = await request(localApp)
+      .patch(`/appointments/${owned.id}`)
+      .send({ status: 'arrived', asDoctorId: otherDoctor.id });
+    expect(patch.status).toBe(409);
+    expect(patch.body.error).toBe('foreign_doctor');
+  });
+
   beforeAll(async () => {
     app = buildApp();
     stateRef = require('./data').state;
@@ -230,7 +270,7 @@ describe('stubs/api — машина состояний статуса запи�
     const after = await fetchAppointment(app, id);
     const before = snapshotCoreFields(after);
 
-    const patch = await request(app).patch(`/appointments/${id}`).send({ status: 'cancelled' });
+    const patch = await request(app).patch(`/appointments/${id}`).send({ status: 'cancelled', cancelReason: 'тест' });
     expect(patch.status).toBe(409);
     expect(patch.body.error).toBe('terminal_status');
 

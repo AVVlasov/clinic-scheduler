@@ -60,9 +60,9 @@ export const MainPage: React.FC = () => {
             </Text>
           </Stack>
           <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">Смена</Text>
-            <Text fontSize="18px" fontWeight="700" fontFamily="mono" color="textPrimary">
-              3907
+            <Text fontSize="12px" color="textSecondary">Дата смены</Text>
+            <Text fontSize="18px" fontWeight="700" fontFamily="mono" color="textPrimary" data-testid="main-shift-date">
+              {formatToday()}
             </Text>
           </Stack>
         </Flex>

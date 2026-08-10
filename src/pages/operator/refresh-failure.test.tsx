@@ -1,4 +1,5 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -14,8 +15,16 @@ import type {
   ServiceList,
 } from '../../__data__/types'
 
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+
+
 vi.mock('@brojs/cli', () => ({
   getConfigValue: vi.fn(),
+  getNavigation: vi.fn(() => ({})),
+  getNavigationValue: vi.fn((key: string) => {
+    if (key === 'clinic-scheduler.main') return '/clinic-scheduler'
+    return ''
+  }),
 }))
 
 const mockedGetConfigValue = vi.mocked(getConfigValue)
@@ -29,7 +38,8 @@ const doctorsPayload: DoctorList = {
 
 const servicesPayload: ServiceList = {
   items: [
-    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
+    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+    { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
   ],
 }
 
@@ -78,15 +88,16 @@ const buildSchedule = (date: string): Schedule => ({
 })
 
 const appointmentsPayload: AppointmentList = {
+  date: '2026-08-10',
   items: [
     {
       id: 'a-001',
       doctorId: 'd-001',
       patientId: 'p-001',
-      start: `${new Date().toISOString().slice(0, 10)}T08:15:00+03:00`,
+      start: `${'2026-08-10'}T08:15:00+03:00`,
       durationMin: 30,
       status: 'scheduled',
-      paymentType: 'cash',
+      paymentType: 'regular',
       serviceId: 's-001',
       doctorName: 'Иванова Е.С.',
       patientName: 'Алексеев Игорь Николаевич',
@@ -94,8 +105,12 @@ const appointmentsPayload: AppointmentList = {
   ],
 }
 
-const renderWithProviders = (ui: React.ReactNode) =>
-  render(<Provider>{ui}</Provider>)
+const renderWithProviders = (ui: React.ReactNode, date = '2026-08-10') =>
+  render(
+    <MemoryRouter initialEntries={[`/clinic-scheduler/operator?date=${date}`]}>
+      <Provider>{ui}</Provider>
+    </MemoryRouter>,
+  )
 
 const buildBaseFetch = (
   date: string,
@@ -117,7 +132,7 @@ const buildBaseFetch = (
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
-    if (url.endsWith('/appointments') && method === 'POST') {
+    if (isAppointmentsList(url) && method === 'POST') {
       postCallIndex += 1
       if (overrides.postResponse) {
         const r = overrides.postResponse(postCallIndex)
@@ -128,10 +143,10 @@ const buildBaseFetch = (
       return Promise.resolve(new Response(JSON.stringify({
         id: 'a-999', doctorId: 'd-001', patientId: 'p-002',
         start: `${date}T08:00:00+03:00`, durationMin: 30,
-        status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+        status: 'scheduled', paymentType: 'regular', serviceId: 's-001',
       }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
     }
-    if (url.endsWith('/appointments') && method !== 'PATCH') {
+    if (isAppointmentsList(url) && method !== 'PATCH') {
       appointmentsCallIndex += 1
       const items = overrides.appointmentsOnReload
         ? overrides.appointmentsOnReload(appointmentsCallIndex)
@@ -144,7 +159,7 @@ const buildBaseFetch = (
           status: 500, headers: { 'Content-Type': 'application/json' },
         }))
       }
-      return Promise.resolve(new Response(JSON.stringify({ items }), {
+      return Promise.resolve(new Response(JSON.stringify({ date, items }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
@@ -159,7 +174,7 @@ const buildBaseFetch = (
       return Promise.resolve(new Response(JSON.stringify({
         id: 'a-001', doctorId: 'd-002', patientId: 'p-001',
         start: `${date}T08:45:00+03:00`, durationMin: 30,
-        status: 'scheduled', paymentType: 'cash', serviceId: 's-001',
+        status: 'scheduled', paymentType: 'regular', serviceId: 's-001',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     }
     if (url.endsWith('/doctors')) {
@@ -172,6 +187,14 @@ const buildBaseFetch = (
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
+    if (url.includes('/waitlist')) {
+
+      return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+
+    }
+
     if (url.endsWith('/patients')) {
       return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -192,7 +215,7 @@ describe('OperatorPage — отказ перезагрузки после зап
   })
 
   it('после успешной записи, если GET /appointments упал, виден банер ошибки и сетка не подменена', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     const fetchMock = buildBaseFetch(date, {
       appointmentsOnReload: (callIndex) => {
         if (callIndex === 1) return appointmentsPayload.items
@@ -217,7 +240,7 @@ describe('OperatorPage — отказ перезагрузки после зап
     const calls = fetchMock.mock.calls.filter(([input, init]) => {
       const url = typeof input === 'string' ? input : (input as Request).url
       const method = init?.method ?? 'GET'
-      return url.endsWith('/appointments') && method === 'GET'
+      return isAppointmentsList(url) && method === 'GET'
     })
     expect(calls.length).toBeGreaterThanOrEqual(2)
 
@@ -226,7 +249,7 @@ describe('OperatorPage — отказ перезагрузки после зап
   })
 
   it('карточка слота после отказа перезагрузки остаётся открытой — оператор видит неуспех', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     buildBaseFetch(date, {
       appointmentsOnReload: (callIndex) => {
         if (callIndex === 1) return appointmentsPayload.items
@@ -247,7 +270,7 @@ describe('OperatorPage — отказ перезагрузки после зап
   })
 
   it('после успешной записи сетка обновляется без банера, если reload прошёл', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     buildBaseFetch(date, {
       appointmentsOnReload: () => appointmentsPayload.items,
     })
@@ -274,7 +297,7 @@ describe('OperatorPage — отказ перезагрузки после пер
   })
 
   it('после успешного PATCH, если GET /appointments упал, виден банер ошибки', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     buildBaseFetch(date, {
       appointmentsOnReload: (callIndex) => {
         if (callIndex === 1) return appointmentsPayload.items
@@ -297,7 +320,7 @@ describe('OperatorPage — отказ перезагрузки после пер
   })
 
   it('после успешного переноса сетка обновляется без банера', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     buildBaseFetch(date, {
       appointmentsOnReload: () => appointmentsPayload.items,
     })
@@ -327,7 +350,7 @@ describe('OperatorPage — банер скрывается при повторн
   })
 
   it('если предыдущий refresh упал, банер сохраняется до следующего успешного обновления', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     const shouldFail = true
     buildBaseFetch(date, {
       appointmentsOnReload: (callIndex) => {

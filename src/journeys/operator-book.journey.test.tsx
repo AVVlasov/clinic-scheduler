@@ -7,39 +7,57 @@
 //
 // Здесь мока API нет. Поднимаются настоящие стабы, рендерится настоящее приложение,
 // и путь проходится кликами — так же, как его пройдёт оператор.
-//
-// ЭТОТ ТЕСТ ОБЯЗАН ПАДАТЬ, ПОКА СЦЕНАРИЙ НЕ РАБОТАЕТ. На 2026-08-09 он падает на первом
-// же шаге: сетка пуста, потому что экран всегда просит сегодняшнюю дату и не даёт её
-// сменить, а на сегодняшнюю дату слотов нет. Это и есть то, что увидел заказчик.
 
 import React from 'react'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Provider } from '../theme'
 import { Dashboard } from '../dashboard'
-import { URLs } from '../__data__/urls'
+import { armPath } from '../__data__/urls'
+import { todayDate, shiftDate, weekStartOf } from '../__data__/dates'
 
 import { apiGet, startJourneyServer, type JourneyServer } from './journey-server'
 
 interface AppointmentsResponse {
+  date: string
   items: Array<{ id: string; doctorId: string; patientId: string; start: string; serviceId: string | null }>
+}
+
+interface ScheduleResponse {
+  date: string
+  slots: Array<{ time: string; doctors: Array<{ id: string; busy: boolean }> }>
 }
 
 let server: JourneyServer
 
+/** Первый рабочий день окна с непустой сеткой — не зависит от дня недели прогона. */
+const findBookableDate = async (): Promise<string> => {
+  const start = weekStartOf(todayDate())
+  for (let i = 0; i < 14; i += 1) {
+    const date = shiftDate(start, i)
+    const schedule = await apiGet<ScheduleResponse>(server, `/schedule/${date}`)
+    const free = schedule.slots.some((slot) => slot.doctors.some((d) => !d.busy))
+    if (free) return date
+  }
+  throw new Error('в окне демо-данных нет дня со свободным слотом')
+}
+
 beforeEach(async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  vi.setSystemTime(new Date('2026-08-10T10:00:00'))
   server = await startJourneyServer()
 })
 
 afterEach(async () => {
   await server.close()
+  vi.useRealTimers()
 })
 
-const renderOperator = () =>
+const renderOperator = (date: string) =>
   render(
-    <MemoryRouter initialEntries={[URLs.arms.operator]}>
+    <MemoryRouter initialEntries={[armPath('operator', date)]}>
       <Provider>
         <Dashboard />
       </Provider>
@@ -48,15 +66,12 @@ const renderOperator = () =>
 
 describe('journey operator-book — оператор находит свободный слот и записывает пациента', () => {
   it('operator-book: сетка смены открывается и в ней есть свободные слоты', async () => {
-    renderOperator()
+    const date = await findBookableDate()
+    renderOperator(date)
 
-    // Шаг 1. Оператор открыл рабочее место и видит сетку смены.
     const grid = await screen.findByTestId('schedule-grid', {}, { timeout: 5000 })
-
-    // Шаг 2. В сетке есть хотя бы один слот, в который можно записать.
-    // Пустая сетка — это не «сегодня нет записей», это неработающее рабочее место:
-    // оператор колл-центра не может ответить пациенту ничего.
     const freeSlots = within(grid).queryAllByTestId(/^slot-d-\d+-\d{2}:\d{2}$/)
+      .filter((el) => el.getAttribute('data-busy') === 'false' && el.getAttribute('data-working') === 'true')
     expect(
       freeSlots.length,
       'сетка смены пуста — оператору не из чего выбирать слот, сценарий записи недостижим',
@@ -64,33 +79,31 @@ describe('journey operator-book — оператор находит свобод
   })
 
   it('operator-book: выбранный слот открывает карточку, пациент выбирается, запись создаётся на сервере', async () => {
-    renderOperator()
+    const date = await findBookableDate()
+    renderOperator(date)
 
     const grid = await screen.findByTestId('schedule-grid', {}, { timeout: 5000 })
     const freeSlots = within(grid).queryAllByTestId(/^slot-d-\d+-\d{2}:\d{2}$/)
+      .filter((el) => el.getAttribute('data-busy') === 'false' && el.getAttribute('data-working') === 'true')
     expect(freeSlots.length, 'нет свободных слотов — записывать некуда').toBeGreaterThan(0)
 
-    const before = await apiGet<AppointmentsResponse>(server, '/appointments')
+    const before = await apiGet<AppointmentsResponse>(server, `/appointments?date=${date}`)
 
-    // Шаг 3. Клик по слоту открывает карточку записи.
     fireEvent.click(freeSlots[0])
     const card = await screen.findByTestId('slot-card', {}, { timeout: 5000 })
 
-    // Шаг 4. Оператор находит пациента.
     const picker = within(card).getByTestId('patient-picker')
     const options = within(picker).queryAllByTestId(/^patient-option-/)
     expect(options.length, 'в карточке нет ни одного пациента — записывать некого').toBeGreaterThan(0)
     fireEvent.click(options[0])
 
-    // Шаг 5. Запись создаётся.
     const book = within(card).getByTestId('card-book')
     expect(book, 'кнопка «Записать» недоступна на свободном слоте').toBeEnabled()
     fireEvent.click(book)
 
-    // Шаг 6. Эффект виден НА СЕРВЕРЕ, а не только в состоянии React.
     await waitFor(
       async () => {
-        const after = await apiGet<AppointmentsResponse>(server, '/appointments')
+        const after = await apiGet<AppointmentsResponse>(server, `/appointments?date=${date}`)
         expect(after.items.length).toBe(before.items.length + 1)
       },
       { timeout: 5000 },

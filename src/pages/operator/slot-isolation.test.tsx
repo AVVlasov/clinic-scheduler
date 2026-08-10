@@ -1,4 +1,5 @@
 import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -14,8 +15,16 @@ import type {
   ServiceList,
 } from '../../__data__/types'
 
+const isAppointmentsList = (url: string) => url.includes('/appointments') && !/\/appointments\//.test(url.split('?')[0])
+
+
 vi.mock('@brojs/cli', () => ({
   getConfigValue: vi.fn(),
+  getNavigation: vi.fn(() => ({})),
+  getNavigationValue: vi.fn((key: string) => {
+    if (key === 'clinic-scheduler.main') return '/clinic-scheduler'
+    return ''
+  }),
 }))
 
 const mockedGetConfigValue = vi.mocked(getConfigValue)
@@ -29,8 +38,9 @@ const doctorsPayload: DoctorList = {
 
 const servicesPayload: ServiceList = {
   items: [
-    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 },
-    { id: 's-002', name: 'Расширенная консультация', duration: 60, category: 'Приём', price: 4000 },
+    { id: 's-001', name: 'Первичная консультация', duration: 30, category: 'Приём', price: 2500 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+    { id: 's-002', name: 'Расширенная консультация', duration: 60, category: 'Приём', price: 4000 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
+    { id: 's-003', name: 'ЭКГ', duration: 15, category: 'Диагностика', price: 1200 , doctorIds: ['d-001', 'd-002', 'd-003', 'd-004', 'd-005', 'd-006']},
   ],
 }
 
@@ -94,7 +104,7 @@ const buildAppointment = (
   start: `${date}T${time}:00+03:00`,
   durationMin,
   status,
-  paymentType: 'cash',
+  paymentType: 'regular',
   serviceId: 's-001',
   doctorName: doctorId === 'd-001' ? 'Иванова Е.С.' : 'Петров А.В.',
   patientName: patientId === 'p-001'
@@ -109,12 +119,13 @@ const mockApi = (date: string, appointments: AppointmentList) => {
   fetchMock.mockImplementation((input) => {
     const url = typeof input === 'string' ? input : (input as Request).url
     if (url.includes('/schedule/')) {
-      return Promise.resolve(new Response(JSON.stringify(buildSchedule(date)), {
+      const schedDate = (url.match(/schedule\/(\d{4}-\d{2}-\d{2})/) || [null, date])[1] as string
+      return Promise.resolve(new Response(JSON.stringify(buildSchedule(schedDate)), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
-    if (url.endsWith('/appointments')) {
-      return Promise.resolve(new Response(JSON.stringify(appointments), {
+    if (isAppointmentsList(url)) {
+      return Promise.resolve(new Response(JSON.stringify({ ...appointments, date }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
@@ -128,6 +139,14 @@ const mockApi = (date: string, appointments: AppointmentList) => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       }))
     }
+    if (url.includes('/waitlist')) {
+
+      return Promise.resolve(new Response(JSON.stringify({ items: [], openCount: 0 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }))
+
+    }
+
     if (url.endsWith('/patients')) {
       return Promise.resolve(new Response(JSON.stringify(patientsPayload), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -138,8 +157,12 @@ const mockApi = (date: string, appointments: AppointmentList) => {
   return fetchMock
 }
 
-const renderWithProviders = (ui: React.ReactNode) =>
-  render(<Provider>{ui}</Provider>)
+const renderWithProviders = (ui: React.ReactNode, date = '2026-08-10') =>
+  render(
+    <MemoryRouter initialEntries={[`/clinic-scheduler/operator?date=${date}`]}>
+      <Provider>{ui}</Provider>
+    </MemoryRouter>,
+  )
 
 describe('SlotCard — выбор пациента изолирован между слотами', () => {
   beforeEach(() => {
@@ -151,10 +174,10 @@ describe('SlotCard — выбор пациента изолирован межд
   })
 
   it('при смене свободного слота выбранный пациент сбрасывается, кнопка «Записать» disabled', async () => {
-    const date = new Date().toISOString().slice(0, 10)
-    mockApi(date, { items: [] })
+    const date = '2026-08-10'
+    mockApi(date, { items: [], date: date })
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-08:00'))
     await screen.findByTestId('slot-card')
@@ -176,10 +199,10 @@ describe('SlotCard — выбор пациента изолирован межд
   })
 
   it('при смене врача на свободном слоте выбранный пациент сбрасывается', async () => {
-    const date = new Date().toISOString().slice(0, 10)
-    mockApi(date, { items: [] })
+    const date = '2026-08-10'
+    mockApi(date, { items: [], date: date })
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-08:00'))
     await screen.findByTestId('slot-card')
@@ -201,15 +224,16 @@ describe('SlotCard — выбор пациента изолирован межд
   })
 
   it('после выбора пациента на free-слоте и перехода на busy-слот выбранный пациент не виден в busy-карточке', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     const appts: AppointmentList = {
+      date: '2026-08-10',
       items: [
         buildAppointment('a-001', 'd-001', 'p-001', 30, 'scheduled', date, '08:15'),
       ],
     }
     mockApi(date, appts)
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-08:00'))
     await screen.findByTestId('slot-card')
@@ -234,10 +258,10 @@ describe('SlotCard — выбор пациента изолирован межд
   })
 
   it('повторный клик по тому же свободному слоту сохраняет выбранного пациента', async () => {
-    const date = new Date().toISOString().slice(0, 10)
-    mockApi(date, { items: [] })
+    const date = '2026-08-10'
+    mockApi(date, { items: [], date: date })
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
 
     fireEvent.click(await screen.findByTestId('slot-d-001-08:00'))
     await screen.findByTestId('slot-card')
@@ -267,15 +291,16 @@ describe('ShiftOverview — статистика считается по дан�
   })
 
   it('при 1 записи с durationMin=30 обзор показывает total=1 и avg=00:30', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     const appts: AppointmentList = {
+      date: '2026-08-10',
       items: [
         buildAppointment('a-001', 'd-001', 'p-001', 30, 'scheduled', date, '08:15'),
       ],
     }
     mockApi(date, appts)
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
     await screen.findByTestId('schedule-grid')
 
     const totalEl = await screen.findByTestId('shift-stat-total')
@@ -289,8 +314,9 @@ describe('ShiftOverview — статистика считается по дан�
   })
 
   it('при 3 записях с разной длительностью total=3, avg=00:45 и needs=2', async () => {
-    const date = new Date().toISOString().slice(0, 10)
+    const date = '2026-08-10'
     const appts: AppointmentList = {
+      date: '2026-08-10',
       items: [
         buildAppointment('a-001', 'd-001', 'p-001', 30, 'scheduled', date, '08:15'),
         buildAppointment('a-002', 'd-001', 'p-002', 60, 'arrived', date, '08:30'),
@@ -299,7 +325,7 @@ describe('ShiftOverview — статистика считается по дан�
     }
     mockApi(date, appts)
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
     await screen.findByTestId('schedule-grid')
 
     const totalEl = await screen.findByTestId('shift-stat-total')
@@ -313,10 +339,10 @@ describe('ShiftOverview — статистика считается по дан�
   })
 
   it('при 0 записей показывает total=0 и avg=—', async () => {
-    const date = new Date().toISOString().slice(0, 10)
-    mockApi(date, { items: [] })
+    const date = '2026-08-10'
+    mockApi(date, { items: [], date: date })
 
-    renderWithProviders(<OperatorPage />)
+    renderWithProviders(<OperatorPage />, date)
     await screen.findByTestId('schedule-grid')
 
     const totalEl = await screen.findByTestId('shift-stat-total')

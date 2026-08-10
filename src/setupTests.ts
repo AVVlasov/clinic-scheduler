@@ -1,6 +1,26 @@
 import '@testing-library/jest-dom/vitest'
+import { afterEach, beforeEach, expect, vi } from 'vitest'
 
 import broConfig from '../bro.config.js'
+
+/**
+ * Опциональная пиновка «сейчас» для доказательства DoD TASK-46:
+ * VITEST_SYSTEM_TIME=2026-08-09T12:00:00 (вс) и …-08-10… (пн) — два прогона.
+ * Фейкаем только Date (не setTimeout) — иначе ломаются latency стабов и poll регистратора.
+ * Тесты с vi.setSystemTime по-прежнему переопределяют часы сами.
+ */
+const pinnedNow = process.env.VITEST_SYSTEM_TIME
+if (pinnedNow) {
+  beforeEach(() => {
+    const testPath = expect.getState().testPath ?? ''
+    if (/[/\\]stubs[/\\]/.test(testPath)) return
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(pinnedNow))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+}
 
 const w = globalThis as unknown as { window?: Record<string, unknown> }
 
