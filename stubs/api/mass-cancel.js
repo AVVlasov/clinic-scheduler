@@ -123,6 +123,9 @@ router.post('/mass-cancel', (req, res) => {
       patientName: patient ? patient.name : a.patientName || null,
       patientPhone: patient ? patient.phone : a.patientPhone || null,
       originalStart: a.start,
+      // Длительность снесённой записи. Без неё экран перезаписи не знает, сколько времени
+      // резервировать, и подставляет константу: приём на 20 минут возвращался на 30.
+      durationMin: a.durationMin,
       originalDoctorId: a.doctorId,
       originalDoctorName: doctor.name,
       serviceId: a.serviceId || null,
@@ -244,7 +247,9 @@ router.post('/mass-cancel/:batchId/items/:itemId/reschedule', (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const doctorId = body.doctorId != null ? String(body.doctorId) : '';
   const start = body.start != null ? String(body.start) : '';
-  const durationMin = Number(body.durationMin);
+  // Умолчание — длительность снесённой записи, а не константа: перезапись возвращает
+  // пациенту его приём, а не приём стандартного размера.
+  const durationMin = body.durationMin != null ? Number(body.durationMin) : Number(item.durationMin);
   const serviceId = body.serviceId != null && body.serviceId !== ''
     ? String(body.serviceId)
     : item.serviceId;

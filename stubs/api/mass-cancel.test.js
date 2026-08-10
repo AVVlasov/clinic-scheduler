@@ -110,4 +110,44 @@ describe('stubs/api/mass-cancel — снос расписания', () => {
     expect(exported.body.csv).toMatch(/под_отмену|перезаписан/);
     expect(exported.body.csv).toMatch(item.patientName || item.patientId);
   });
+
+  // Регрессия: строка разбора не несла длительность, а экран подставлял 30 минут. Приём на
+  // 20 минут возвращался пациенту получасовым, часовой — вдвое короче. Перезапись обязана
+  // вернуть ту же запись, а не запись стандартного размера.
+  test('перезапись сохраняет длительность снесённой записи, а не подставляет 30 минут', async () => {
+    const source = [...data.state.appointments, ...(data.state.demoAppointments || [])]
+      .find((a) => a.status === 'scheduled' && a.durationMin !== 30);
+    expect(source, 'нужна запланированная запись с длительностью, отличной от 30').toBeTruthy();
+    const date = String(source.start).slice(0, 10);
+
+    const created = await request(app).post('/mass-cancel').send({
+      doctorId: source.doctorId,
+      dateFrom: date,
+      dateTo: date,
+      reason: 'Проверка длительности',
+    });
+    expect(created.status).toBe(201);
+
+    const item = created.body.items.find((i) => i.appointmentId === source.id);
+    expect(item, 'снесённая запись обязана попасть в разбор').toBeTruthy();
+    expect(item.durationMin).toBe(source.durationMin);
+
+    const matches = await request(app)
+      .get(`/mass-cancel/${created.body.id}/matches`)
+      .query({ itemId: item.id });
+    expect(matches.status).toBe(200);
+    const slot = matches.body.items[0];
+    expect(slot).toBeTruthy();
+
+    // Тело без durationMin: сервер обязан взять длительность из строки разбора.
+    const booked = await request(app)
+      .post(`/mass-cancel/${created.body.id}/items/${item.id}/reschedule`)
+      .send({ doctorId: slot.doctorId, start: `${slot.date}T${slot.time}:00+03:00` });
+    expect(booked.status).toBe(200);
+    expect(booked.body.appointment.durationMin).toBe(source.durationMin);
+
+    const stored = await request(app).get(`/appointments/${booked.body.appointment.id}`);
+    expect(stored.status).toBe(200);
+    expect(stored.body.durationMin).toBe(source.durationMin);
+  });
 });

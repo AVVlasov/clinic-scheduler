@@ -281,6 +281,8 @@ export interface MassCancelItem {
   patientName: string | null
   patientPhone: string | null
   originalStart: string
+  /** Длительность снесённой записи: перезапись резервирует её, а не стандартные 30 минут. */
+  durationMin: number
   originalDoctorId: string
   originalDoctorName: string | null
   serviceId: string | null

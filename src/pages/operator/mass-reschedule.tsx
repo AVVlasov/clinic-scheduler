@@ -113,11 +113,14 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
   const onBook = async (slot: { date: string; time: string; doctorId: string }) => {
     if (!batch || !selectedItemId) return
     setError(null)
+    // Длительность берётся у снесённой записи: константа возвращала приём на 20 минут
+    // получасовым, а часовой — вдвое короче.
+    const row = batch.items.find((i) => i.id === selectedItemId)
     try {
       const result = await rescheduleMassCancelItem(batch.id, selectedItemId, {
         doctorId: slot.doctorId,
         start: `${slot.date}T${slot.time}:00+03:00`,
-        durationMin: 30,
+        durationMin: row?.durationMin ?? 30,
       })
       setBatch(result.batch)
       setMatches([])
