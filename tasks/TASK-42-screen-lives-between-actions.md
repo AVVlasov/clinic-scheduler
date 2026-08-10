@@ -21,6 +21,7 @@
 - `src/pages/registrar/registrar-page.tsx`
 - `src/pages/doctor/doctor-page.tsx`
 - `src/pages/empty-states.test.tsx`
+- `src/journeys/cross-role-handoff.journey.test.tsx`
 
 ## Вход
 
