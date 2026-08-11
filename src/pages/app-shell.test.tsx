@@ -78,8 +78,76 @@ const apiBody = (path: string): unknown => {
     }
   }
   if (path.endsWith('/doctors')) return { items: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт', cabinet: '201' }] }
-  if (path.endsWith('/services')) return { items: [] }
+  if (path.endsWith('/services')) {
+    return {
+      items: [
+        {
+          id: 's-001',
+          name: 'Первичная консультация',
+          duration: 30,
+          category: 'Приём',
+          price: 2500,
+          doctorIds: ['d-001'],
+          limitedDoctorIds: [],
+          requiresEquipment: false,
+        },
+      ],
+    }
+  }
   if (path.endsWith('/doctor-cards')) return { items: [] }
+  if (path.includes('/equipment/schedule')) {
+    return {
+      date,
+      stepMinutes: 15,
+      startTime: '08:00',
+      endTime: '09:00',
+      items: [
+        {
+          id: 'eq-001',
+          name: 'Электрокардиограф',
+          code: 'EQ.ECG.01',
+          kind: 'apparatus',
+          type: 'Диагностика',
+          cabinet: '305',
+          hours: { start: '08:00', end: '20:00' },
+          maintenance: '—',
+          serviceIds: ['s-003'],
+          serviceNames: ['ЭКГ'],
+          sharedWith: [],
+          repair: null,
+          bookedCount: 0,
+          slots: [{ time: '08:00', state: 'free', label: null }],
+        },
+      ],
+    }
+  }
+  if (path.endsWith('/equipment')) return { items: [] }
+  if (path.endsWith('/competencies')) {
+    return {
+      doctors: [{ id: 'd-001', name: 'Иванова Е.С.', specialty: 'Терапевт' }],
+      services: [{ id: 's-001', name: 'Первичная консультация', category: 'Приём' }],
+      cells: [{ serviceId: 's-001', values: [{ doctorId: 'd-001', value: 'yes' }] }],
+    }
+  }
+  if (path.includes('/duration-rules')) {
+    return {
+      items: [
+        {
+          id: 'dr-base',
+          priority: 0,
+          condition: 'Базовая длительность',
+          factor: 'Норматив услуги',
+          effectLabel: 'база',
+          enabled: true,
+          locked: true,
+          match: {},
+          effect: { kind: 'base' },
+        },
+      ],
+    }
+  }
+  if (path.includes('/waitlist')) return { items: [], openCount: 0 }
+  if (path.includes('/patients')) return { items: [] }
   if (path.includes('/week-templates')) {
     return {
       weekStart: date,
@@ -209,7 +277,7 @@ describe('AppShell — каркас и навигация между АРМ', ()
     expect(screen.getByTestId('switcher-operator')).toHaveAttribute('aria-selected', 'false')
   })
 
-  it('на каждом АРМ есть внутренняя nav и явные недоступные разделы с причиной', async () => {
+  it('каждый пункт навигации открывает свой экран — недоступных пунктов нет', async () => {
     const { container } = render(<App />)
 
     await waitFor(() => {
@@ -217,9 +285,32 @@ describe('AppShell — каркас и навигация между АРМ', ()
     })
 
     const cases = [
-      { switcher: 'switcher-operator', unavailable: 'arm-nav-cart', reasonBits: ['границей', 'очеред'] },
-      { switcher: 'switcher-doctor', unavailable: 'arm-nav-sick-leave', reasonBits: ['границей'] },
-      { switcher: 'switcher-admin', unavailable: 'arm-nav-equipment', reasonBits: ['пробел'] },
+      {
+        switcher: 'switcher-operator',
+        items: [
+          { id: 'grid', screen: 'operator-page' },
+          { id: 'waitlist', screen: 'waitlist-panel' },
+          { id: 'mass-reschedule', screen: 'mass-reschedule-panel' },
+        ],
+      },
+      {
+        switcher: 'switcher-registrar',
+        items: [
+          { id: 'queue', screen: 'registrar-page' },
+          { id: 'search', screen: 'patient-search' },
+          { id: 'new-patient', screen: 'patient-card-form' },
+        ],
+      },
+      {
+        switcher: 'switcher-admin',
+        items: [
+          { id: 'templates', screen: 'week-templates' },
+          { id: 'doctors', screen: 'doctors-list' },
+          { id: 'equipment', screen: 'equipment-screen' },
+          { id: 'matrix', screen: 'matrix-screen' },
+          { id: 'duration-rules', screen: 'duration-screen' },
+        ],
+      },
     ] as const
 
     for (const c of cases) {
@@ -231,27 +322,41 @@ describe('AppShell — каркас и навигация между АРМ', ()
         expect(screen.getByTestId('arm-nav')).toBeInTheDocument()
       })
 
-      expect(container.querySelectorAll('nav').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getByTestId(c.unavailable)).toHaveAttribute('data-status', 'unavailable')
+      for (const item of c.items) {
+        await act(async () => {
+          fireEvent.click(screen.getByTestId(`arm-nav-${item.id}`))
+        })
 
-      await act(async () => {
-        fireEvent.click(screen.getByTestId(c.unavailable))
-      })
-
-      await waitFor(() => {
-        expect(screen.getByTestId('arm-nav-unavailable-reason')).toBeInTheDocument()
-      })
-      const reason = screen.getByTestId('arm-nav-unavailable-reason').textContent ?? ''
-      for (const bit of c.reasonBits) {
-        expect(reason).toContain(bit)
+        await waitFor(() => {
+          expect(screen.getByTestId(`arm-nav-${item.id}`)).toHaveAttribute('data-active', 'true')
+        })
+        await waitFor(() => {
+          expect(screen.getByTestId(item.screen)).toBeInTheDocument()
+        })
       }
     }
 
-    await act(async () => {
-      fireEvent.click(container.querySelector('[data-testid="switcher-registrar"]') as HTMLElement)
-    })
+    // Пунктов «недоступно» в интерфейсе больше нет — ни в одном АРМ.
+    expect(container.querySelectorAll('[data-status="unavailable"]').length).toBe(0)
+    expect(screen.queryByTestId('arm-nav-unavailable-reason')).toBeNull()
+  })
+
+  it('раздел живёт в адресе: ссылка открывает тот же экран', async () => {
+    window.history.replaceState({}, '', '/clinic-scheduler/admin?section=matrix')
+    render(<App />)
+
     await waitFor(() => {
-      expect(screen.getByTestId('arm-nav-new-patient')).toHaveAttribute('data-status', 'available')
+      expect(screen.getByTestId('matrix-screen')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('arm-nav-matrix')).toHaveAttribute('data-active', 'true')
+  })
+
+  it('неизвестный раздел в адресе открывает первый раздел, а не пустой экран', async () => {
+    window.history.replaceState({}, '', '/clinic-scheduler/admin?section=нет-такого')
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('arm-nav-templates')).toHaveAttribute('data-active', 'true')
     })
   })
 

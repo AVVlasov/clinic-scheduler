@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { resolveSection } from '../../__data__/arm-nav'
 import { confirmAppointment, getAppointments, getDoctors, getServices, payAppointment, rescheduleAppointment } from '../../__data__/api'
-import { formatShortDate, parseArmDate } from '../../__data__/dates'
+import { formatShortDate, parseArmDate, withArmSection } from '../../__data__/dates'
 import type { Appointment, AppointmentStatus, Doctor, Patient, Service } from '../../__data__/types'
 
 import { PatientCardForm } from './patient-card-form'
@@ -53,7 +54,9 @@ const formatUpdatedAt = (iso: string): string => {
 
 export const RegistrarPage = () => {
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const selectedDate = parseArmDate(location.search)
+  const section = resolveSection('registrar', searchParams.get('section'))
 
   const [items, setItems] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -68,10 +71,15 @@ export const RegistrarPage = () => {
   const [ticketVisitId, setTicketVisitId] = useState<string | null>(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
-  const [panel, setPanel] = useState<'queue' | 'new' | 'card'>('queue')
   const [openedPatient, setOpenedPatient] = useState<Patient | null>(null)
   const selectedIdRef = useRef<string | null>(null)
   selectedIdRef.current = selectedId
+
+  const navigate = useNavigate()
+  /** Переход между разделами регистратора — через адрес, как и в шапке АРМ. */
+  const goSection = useCallback((next: string) => {
+    navigate(withArmSection(location.search, next))
+  }, [navigate, location.search])
 
   const applyAppointments = useCallback((next: Appointment[]) => {
     setItems(next)
@@ -137,16 +145,16 @@ export const RegistrarPage = () => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       setTicketVisitId(null)
-      if (panel !== 'queue') {
-        setPanel('queue')
+      if (section !== 'queue') {
         setOpenedPatient(null)
+        goSection('queue')
         return
       }
       setSelectedId(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [panel])
+  }, [section, goSection])
 
   const updateStatus = useCallback(async (id: string, status: AppointmentStatus) => {
     setBusy(true)
@@ -254,7 +262,7 @@ export const RegistrarPage = () => {
           h="32px"
           px="12px"
           borderRadius="4px"
-          bg="brandGreen"
+          bg="brandGreenDark"
           color="white"
           fontSize="13px"
           cursor="pointer"
@@ -291,7 +299,7 @@ export const RegistrarPage = () => {
         <Stack gap="0">
           <Box fontSize="12px" color="textSecondary">АРМ регистратора</Box>
           <Box fontSize="18px" fontWeight="700" color="brandGreen700" data-testid="registrar-shift-date">
-            Смена · {formatShortDate(selectedDate)}
+            Смена {formatShortDate(selectedDate)}
           </Box>
           {lastUpdatedAt ? (
             <Text fontSize="12px" color="textSecondary" data-testid="registrar-last-updated">
@@ -319,10 +327,24 @@ export const RegistrarPage = () => {
               {formatRub(shiftCash)}
             </Text>
           </Stack>
+          {/* Три разных счётчика — три колонки, а не строка «а · б · в»:
+              под заголовком «Завершено» стояли и «на приёме», и «неявка». */}
+          <Stack gap="0" align="flex-end">
+            <Text fontSize="12px" color="textSecondary">На приёме</Text>
+            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-in-progress">
+              {inProgressCount}
+            </Text>
+          </Stack>
           <Stack gap="0" align="flex-end">
             <Text fontSize="12px" color="textSecondary">Завершено</Text>
-            <Text fontSize="14px" fontFamily="mono">
-              на приёме {inProgressCount} · готово {completedCount} · неявка {noShowCount}
+            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-completed">
+              {completedCount}
+            </Text>
+          </Stack>
+          <Stack gap="0" align="flex-end">
+            <Text fontSize="12px" color="textSecondary">Неявок</Text>
+            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-no-show">
+              {noShowCount}
             </Text>
           </Stack>
         </Stack>
@@ -342,18 +364,28 @@ export const RegistrarPage = () => {
         </Box>
       ) : null}
 
-      <PatientSearch
-        onSelect={(patient) => {
-          setOpenedPatient(patient)
-          setPanel('card')
-        }}
-        onCreateNew={() => {
-          setOpenedPatient(null)
-          setPanel('new')
-        }}
-      />
+      {section === 'search' ? (
+        openedPatient ? (
+          <PatientCardView
+            patient={openedPatient}
+            onBack={() => setOpenedPatient(null)}
+            onCreateNew={() => {
+              setOpenedPatient(null)
+              goSection('new-patient')
+            }}
+          />
+        ) : (
+          <PatientSearch
+            onSelect={(patient) => setOpenedPatient(patient)}
+            onCreateNew={() => {
+              setOpenedPatient(null)
+              goSection('new-patient')
+            }}
+          />
+        )
+      ) : null}
 
-      {panel === 'new' ? (
+      {section === 'new-patient' ? (
         <PatientCardForm
           doctors={doctors}
           services={services}
@@ -364,27 +396,13 @@ export const RegistrarPage = () => {
           }}
           onOpenExisting={(patient) => {
             setOpenedPatient(patient)
-            setPanel('card')
+            goSection('search')
           }}
-          onCancel={() => setPanel('queue')}
+          onCancel={() => goSection('queue')}
         />
       ) : null}
 
-      {panel === 'card' && openedPatient ? (
-        <PatientCardView
-          patient={openedPatient}
-          onBack={() => {
-            setPanel('queue')
-            setOpenedPatient(null)
-          }}
-          onCreateNew={() => {
-            setOpenedPatient(null)
-            setPanel('new')
-          }}
-        />
-      ) : null}
-
-      {panel === 'queue' && isEmpty ? (
+      {section === 'queue' && isEmpty ? (
         <Box
           bg="white"
           borderWidth="1px"
@@ -399,7 +417,7 @@ export const RegistrarPage = () => {
         </Box>
       ) : null}
 
-      {panel === 'queue' ? (
+      {section === 'queue' ? (
         <Flex flex="1" gap="12px" minH="0">
           <QueueTable
             items={visibleItems}

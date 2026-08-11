@@ -38,7 +38,7 @@ const formatBirth = (iso: string | null): string => {
 const formatAuthor = (name?: string | null, unit?: string | null): string => {
   const n = (name ?? '').trim()
   const u = (unit ?? '').trim()
-  if (n && u) return `${n} · ${u}`
+  if (n && u) return `${n}, ${u}`
   if (n) return n
   if (u) return u
   return '—'
@@ -212,7 +212,7 @@ export const VisitCard = (props: VisitCardProps) => {
           <>
             <Button
               colorPalette="green"
-              bg="brandGreen"
+              bg="brandGreenDark"
               color="white"
               _hover={{ bg: 'brandGreenDark' }}
               size="lg"

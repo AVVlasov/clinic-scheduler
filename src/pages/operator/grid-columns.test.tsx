@@ -194,4 +194,48 @@ describe('ScheduleGrid — соответствие ячеек колонкам 
     expect(screen.getByTestId('slot-d-001-08:30')).toHaveAttribute('data-working', 'false')
     expect(screen.getByTestId('slot-d-003-08:30')).toHaveAttribute('data-working', 'false')
   })
+
+  /**
+   * Дефект приёмки 2026-08-11: рядом стояли две полосы прокрутки — сетка
+   * прокручивалась сама и вместе с колонкой-обёрткой. Полоса обязана быть одна,
+   * поэтому режим прокрутки — часть контракта сетки, а не оформление.
+   */
+  it('прокрутку держит кто-то один: в режиме «сама» сетка виртуализирована, в режиме «страница» — рисует все строки', () => {
+    const { rerender } = render(
+      <Provider>
+        <ScheduleGrid
+          schedule={schedule}
+          doctors={doctors}
+          appointments={appointments}
+          selectedTime={null}
+          selectedDoctorId={null}
+          onSlotClick={noop}
+        />
+      </Provider>,
+    )
+
+    const self = screen.getByTestId('schedule-grid')
+    expect(self).toHaveAttribute('data-scroll', 'self')
+    const windowMax = Number(self.getAttribute('data-window-max'))
+    expect(Number(self.getAttribute('data-window-rows'))).toBeLessThanOrEqual(windowMax)
+
+    rerender(
+      <Provider>
+        <ScheduleGrid
+          schedule={schedule}
+          doctors={doctors}
+          appointments={appointments}
+          selectedTime={null}
+          selectedDoctorId={null}
+          scroll="page"
+          onSlotClick={noop}
+        />
+      </Provider>,
+    )
+
+    const page = screen.getByTestId('schedule-grid')
+    expect(page).toHaveAttribute('data-scroll', 'page')
+    // Все строки дня на месте: окно строк без своей прокрутки не работало бы.
+    expect(Number(page.getAttribute('data-window-rows'))).toBe(schedule.slots.length)
+  })
 })

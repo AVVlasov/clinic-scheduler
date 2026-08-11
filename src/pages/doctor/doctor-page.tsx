@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Box, Button, Flex, Text } from '@chakra-ui/react'
+import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { getAppointments, getAppointmentHistory, getDoctors, getServices, createWaitlist, rescheduleAppointment } from '../../__data__/api'
@@ -26,7 +26,7 @@ export const computeAgeYears = (birthDate: string | null): string | null => {
   const m = now.getMonth() - b.getMonth()
   if (m < 0 || (m === 0 && now.getDate() < b.getDate())) years -= 1
   // Прежнее правило (`years < 5 ? 'года' : 'лет'`) верно только до 5: 34 давало «34 лет».
-  return `${b.getFullYear()} г. р. · ${years} ${plural(years, 'год', 'года', 'лет')}`
+  return `${b.getFullYear()} г. р., ${years} ${plural(years, 'год', 'года', 'лет')}`
 }
 
 const formatRange = (start: string, durationMin: number): string => {
@@ -38,6 +38,29 @@ const formatRange = (start: string, durationMin: number): string => {
   const fmt = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   return `${dd} ${months[s.getMonth()]}, ${fmt(s)}–${fmt(e)}`
 }
+
+/** Факт карточки визита: подпись сверху, значение снизу. */
+const VisitFact = ({
+  label, testId, mono = false, children,
+}: {
+  label: string
+  testId: string
+  mono?: boolean
+  children: React.ReactNode
+}) => (
+  <Stack gap="2px" minW="0">
+    <Text fontSize="11px" lineHeight="14px" color="textSecondary">{label}</Text>
+    <Text
+      fontSize="13px"
+      lineHeight="18px"
+      color="textPrimary"
+      fontFamily={mono ? 'mono' : undefined}
+      data-testid={testId}
+    >
+      {children}
+    </Text>
+  </Stack>
+)
 
 const payerLabel = (paymentType: Appointment['paymentType']): string => {
   switch (paymentType) {
@@ -232,11 +255,6 @@ export const DoctorPage = () => {
     [sortedAppointments, selectedId],
   )
 
-  const currentDoctor = useMemo(
-    () => doctors.find((d) => d.id === doctorId) ?? null,
-    [doctors, doctorId],
-  )
-
   const currentFormState: VisitFormState = selected
     ? visitForm[selected.id] ?? fromAppointment(selected)
     : emptyVisitFormState
@@ -351,7 +369,7 @@ export const DoctorPage = () => {
           h="32px"
           px="12px"
           borderRadius="4px"
-          bg="brandGreen"
+          bg="brandGreenDark"
           color="white"
           fontSize="13px"
           cursor="pointer"
@@ -383,6 +401,7 @@ export const DoctorPage = () => {
           <Text fontSize="16px" fontWeight="700" color="textPrimary">АРМ врача</Text>
           <select
             data-testid="doctor-subject"
+            aria-label="Врач, чей день приёма открыт"
             value={doctorId}
             onChange={(e) => onDoctorChange(e.target.value)}
             style={{
@@ -409,7 +428,6 @@ export const DoctorPage = () => {
       <DayList
         appointments={sortedAppointments}
         selectedId={selectedId}
-        doctorName={currentDoctor?.name ?? null}
         onSelect={(id) => {
           setSubmitError(null)
           setSelectedId(id)
@@ -417,6 +435,7 @@ export const DoctorPage = () => {
         doctorSwitcher={(
           <select
             data-testid="doctor-subject"
+            aria-label="Врач, чей день приёма открыт"
             value={doctorId}
             onChange={(e) => onDoctorChange(e.target.value)}
             style={{
@@ -493,56 +512,46 @@ export const DoctorPage = () => {
                   {selected.patientUid ?? '—'}
                 </Text>
               </Flex>
-              <Flex align="center" gap="14px" flexWrap="wrap" fontSize="13px" color="textSecondary">
-                <Text data-testid="visit-birth">{computeAgeYears(selected.patientBirthDate) ?? '—'}</Text>
-                <Text>·</Text>
-                <Text data-testid="visit-payer">Плательщик: {payerLabel(selected.paymentType)}</Text>
-                <Text>·</Text>
-                <Text data-testid="visit-phone">{selected.patientPhone ?? '—'}</Text>
-              </Flex>
-              <Flex align="center" gap="8px" flexWrap="wrap">
-                <Box
-                  fontSize="12px"
-                  lineHeight="20px"
-                  px="8px"
-                  borderRadius="compact"
-                  bg="surfaceLight"
-                  color="brandGreen700"
-                >
+              {/* Факты карточки — подпись над значением. Строка «значение ·
+                  значение · значение» экономит место, но заставляет читателя
+                  угадывать, что есть что, и выглядит как машинная склейка. */}
+              <Flex gap="24px" flexWrap="wrap">
+                <VisitFact label="Пациент" testId="visit-birth">
+                  {computeAgeYears(selected.patientBirthDate) ?? '—'}
+                </VisitFact>
+                <VisitFact label="Плательщик" testId="visit-payer">
+                  {payerLabel(selected.paymentType)}
+                </VisitFact>
+                <VisitFact label="Телефон" testId="visit-phone" mono>
+                  {selected.patientPhone ?? '—'}
+                </VisitFact>
+                <VisitFact label="Приём" testId="visit-slot" mono>
                   {formatRange(selected.start, selected.durationMin)}
-                </Box>
+                </VisitFact>
               </Flex>
+              {/* Кнопка говорит, что делать сейчас. Подсказка рядом повторяла
+                  её же словами и дублировала строку у «Завершить приём» —
+                  оставлена только там, где действия нет. */}
               <Flex align="center" gap="2" flexWrap="wrap" data-testid="visit-status-actions">
-                {(() => {
-                  const action = nextStatusAction(selected.status)
-                  if (action) {
-                    return (
-                      <Button
-                        data-testid="visit-advance-status"
-                        onClick={() => { void onAdvanceStatus() }}
-                        disabled={statusBusy}
-                        size="sm"
-                        bg="brandGreen"
-                        color="white"
-                        borderRadius="4px"
-                        fontSize="13px"
-                        _hover={{ bg: 'brandGreenDark' }}
-                      >
-                        {statusBusy ? 'Обновляем…' : action.label}
-                      </Button>
-                    )
-                  }
-                  return (
-                    <Text fontSize="12px" color="textSecondary" data-testid="visit-status-guidance">
-                      {guidanceFor(selected.status)}
-                    </Text>
-                  )
-                })()}
                 {nextStatusAction(selected.status) ? (
+                  <Button
+                    data-testid="visit-advance-status"
+                    onClick={() => { void onAdvanceStatus() }}
+                    disabled={statusBusy}
+                    size="sm"
+                    bg="brandGreenDark"
+                    color="white"
+                    borderRadius="4px"
+                    fontSize="13px"
+                    _hover={{ bg: 'brandGreenDark' }}
+                  >
+                    {statusBusy ? 'Обновляем…' : nextStatusAction(selected.status)?.label}
+                  </Button>
+                ) : (
                   <Text fontSize="12px" color="textSecondary" data-testid="visit-status-guidance">
                     {guidanceFor(selected.status)}
                   </Text>
-                ) : null}
+                )}
               </Flex>
               {history.length > 0 && (
                 <Box data-testid="appointment-history">
@@ -554,7 +563,7 @@ export const DoctorPage = () => {
                       color="textPrimary"
                       data-testid={`history-entry-${idx}`}
                     >
-                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)} · {entry.actor}
+                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {entry.actor}
                     </Text>
                   ))}
                 </Box>

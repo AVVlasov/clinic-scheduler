@@ -57,6 +57,7 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
       borderColor="borderLight"
       p="4"
       borderRadius="compact"
+      flex="none"
       data-testid="shift-overview"
       data-arm-section="shift"
     >

@@ -185,8 +185,102 @@ export interface Service {
   duration: number
   category: string
   price: number
-  /** Врачи, которым разрешена услуга (матрица компетенций, упрощённо). */
+  /** Врачи с допуском к услуге — матрица компетенций (ФТ 1.5). */
   doctorIds: string[]
+  /** Подмножество doctorIds с допуском «с ограничением»: запись возможна с предупреждением. */
+  limitedDoctorIds?: string[]
+  /** Услуга выполняется на аппарате или в кабинете из справочника оборудования. */
+  requiresEquipment?: boolean
+}
+
+/** Значение клетки матрицы компетенций «врач × услуга». */
+export type CompetencyValue = 'yes' | 'limited' | 'no'
+
+export interface CompetencyMatrix {
+  doctors: Array<{ id: string; name: string; specialty: string }>
+  services: Array<{ id: string; name: string; category: string }>
+  cells: Array<{
+    serviceId: string
+    values: Array<{ doctorId: string; value: CompetencyValue }>
+  }>
+}
+
+export interface CompetencyPatchResult {
+  serviceId: string
+  doctorId: string
+  value: CompetencyValue
+  matrix: CompetencyMatrix
+}
+
+/** Ресурс расписания помимо врача: аппарат или кабинет (ФТ 3.1.1, 3.1.2). */
+export interface Equipment {
+  id: string
+  name: string
+  code: string
+  kind: 'apparatus' | 'room'
+  type: string
+  cabinet: string
+  hours: { start: string; end: string }
+  maintenance: string
+  serviceIds: string[]
+  serviceNames: string[]
+}
+
+export interface EquipmentList {
+  items: Equipment[]
+}
+
+export type EquipmentSlotState = 'free' | 'booked' | 'repair' | 'closed'
+
+export interface EquipmentSlot {
+  time: string
+  state: EquipmentSlotState
+  label: string | null
+  appointmentId?: string
+  doctorName?: string | null
+  serviceName?: string | null
+  isStart?: boolean
+}
+
+export interface EquipmentDayItem extends Equipment {
+  sharedWith: string[]
+  repair: { from: string; to: string; reason: string } | null
+  bookedCount: number
+  slots: EquipmentSlot[]
+}
+
+export interface EquipmentDay {
+  date: string
+  stepMinutes: number
+  startTime: string
+  endTime: string
+  items: EquipmentDayItem[]
+}
+
+/** Правило длительности приёма (ФТ 1.6, 2.1). */
+export interface DurationRule {
+  id: string
+  priority: number
+  condition: string
+  factor: string
+  effectLabel: string
+  enabled: boolean
+  locked: boolean
+  match: {
+    serviceCategory?: string
+    visitType?: 'first' | 'repeat'
+    doctorId?: string
+    requiresEquipment?: boolean
+    patientAgeFrom?: number
+  }
+  effect:
+    | { kind: 'base' }
+    | { kind: 'set'; minutes: number }
+    | { kind: 'add'; minutes: number }
+}
+
+export interface DurationRuleList {
+  items: DurationRule[]
 }
 
 export type SlotOccupancyKind =

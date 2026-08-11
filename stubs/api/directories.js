@@ -133,7 +133,15 @@ router.patch('/doctor-cards/:id', (req, res) => {
 });
 
 router.get('/services', (req, res) => {
-  res.json({ items: state.services });
+  // requiresEquipment — производное от справочника оборудования: услуга, у
+  // которой есть ресурс, считается по правилу длительности «Оборудование» и
+  // проверяется на занятость аппарата при записи.
+  const items = state.services.map((s) => ({
+    ...s,
+    limitedDoctorIds: Array.isArray(s.limitedDoctorIds) ? s.limitedDoctorIds.slice() : [],
+    requiresEquipment: (state.equipment || []).some((e) => e.serviceIds.includes(s.id)),
+  }));
+  res.json({ items });
 });
 
 router.get('/patients', (req, res) => {

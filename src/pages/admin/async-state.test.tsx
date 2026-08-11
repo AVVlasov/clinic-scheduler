@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { Provider } from '../../theme'
+import { ArmRouter, SectionNav } from '../arm-test-harness'
 import { AdminPage } from './admin-page'
 import type {
   DoctorCard,
@@ -185,7 +186,14 @@ const installFetchMock = (options: MockOptions = {}) => {
   }
 }
 
-const renderPage = () => render(<Provider><AdminPage /></Provider>)
+const renderPage = () => render(
+  <ArmRouter>
+    <Provider>
+      <SectionNav sections={['templates', 'doctors']} />
+      <AdminPage />
+    </Provider>
+  </ArmRouter>,
+)
 
 const postPublishCalls = (log: FetchLogEntry[]) =>
   log.filter((e) => e.method === 'POST' && e.url.includes('/week-templates/publish'))

@@ -11,6 +11,13 @@ interface PatientCardViewProps {
   onCreateNew: () => void
 }
 
+/** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ. */
+const formatBirth = (iso: string): string => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
 const formatStart = (iso: string): string => {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
@@ -70,7 +77,7 @@ export const PatientCardView = ({ patient, onBack, onCreateNew }: PatientCardVie
         </Button>
       </Flex>
       <Text fontSize="13px" color="textSecondary" data-testid="patient-card-meta">
-        {patient.birthDate} · {patient.phone}
+        {formatBirth(patient.birthDate)}, {patient.phone}
       </Text>
 
       <Text fontSize="14px" fontWeight="700">Другие записи пациента</Text>
@@ -95,7 +102,7 @@ export const PatientCardView = ({ patient, onBack, onCreateNew }: PatientCardVie
             >
               <Text fontSize="13px" fontFamily="mono">{formatStart(a.start)}</Text>
               <Text fontSize="12px" color="textSecondary">
-                {a.doctorName ?? '—'} · {appointmentStatusLabel(a.status)}
+                {a.doctorName ?? '—'}, {appointmentStatusLabel(a.status)}
               </Text>
             </Box>
           ))

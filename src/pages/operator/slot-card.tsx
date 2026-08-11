@@ -14,12 +14,16 @@ import {
   PAYMENT_TYPE_OPTIONS,
   paymentTypeLabel,
   resolveBookingDuration,
+  serviceLimitedForDoctor,
   serviceOfferedByDoctor,
 } from '../../__data__/booking'
+import { formatArmDateLabel } from '../../__data__/dates'
+import { ageYearsOn } from '../../__data__/duration'
 import type {
   Appointment,
   AppointmentHistoryEntry,
   Doctor,
+  DurationRule,
   Patient,
   PaymentType,
   Schedule,
@@ -50,6 +54,8 @@ interface SlotCardProps {
   onFitDurationChange?: (durationMin: number | null) => void
   /** Услуга, выбранная в режиме «запись от услуги» — фиксируется в карточке. */
   preferredServiceId?: string | null
+  /** Правила длительности администратора: считают длину записи. */
+  durationRules?: DurationRule[]
 }
 
 const slotFitsDuration = (
@@ -108,6 +114,7 @@ export const SlotCard = ({
   onClearRescheduleTarget,
   onFitDurationChange,
   preferredServiceId = null,
+  durationRules = [],
 }: SlotCardProps) => {
   const offeredServices = useMemo(
     () => services.filter((s) => serviceOfferedByDoctor(s, doctor.id)),
@@ -191,8 +198,18 @@ export const SlotCard = ({
   )
 
   const durationMin = selectedService
-    ? resolveBookingDuration(selectedService, visitType)
+    ? resolveBookingDuration(selectedService, visitType, {
+      rules: durationRules,
+      doctorId: doctor.id,
+      patientAgeYears: ageYearsOn(selectedPatient?.birthDate, scheduleDate),
+      requiresEquipment: selectedService.requiresEquipment,
+    })
     : 0
+
+  /** Допуск врача к услуге выдан с ограничением — предупреждаем до записи. */
+  const limitedService = Boolean(
+    selectedService && serviceLimitedForDoctor(selectedService, doctor.id),
+  )
 
   const fit = useMemo(
     () => (isBusy ? { ok: true, reason: null as string | null } : slotFitsDuration(schedule, doctor.id, time, durationMin)),
@@ -414,8 +431,9 @@ export const SlotCard = ({
           >
             {time}
           </Text>
+          {/* Дата — по-русски, как в шапке: машинное «2026-08-11» на экране смены не читают. */}
           <Text fontSize="12px" color="textSecondary" data-testid="card-date">
-            {scheduleDate}
+            {formatArmDateLabel(scheduleDate)}
           </Text>
           <Box flex="1" />
           <Box
@@ -478,9 +496,21 @@ export const SlotCard = ({
                 style={{ fontSize: '13px', height: '32px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '0 8px' }}
               >
                 {offeredServices.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} · {s.duration} мин</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name}{serviceLimitedForDoctor(s, doctor.id) ? ' (с ограничением)' : ''}
+                  </option>
                 ))}
               </select>
+              {durationMin > 0 ? (
+                <Text fontSize="12px" color="textSecondary" data-testid="card-duration-note">
+                  Длительность по правилам администратора: {durationMin} мин
+                </Text>
+              ) : null}
+              {limitedService ? (
+                <Text fontSize="12px" color="brandOrange700" data-testid="card-service-limited">
+                  Допуск врача к услуге — с ограничением. Проверьте условия приёма в карточке врача.
+                </Text>
+              ) : null}
             </Stack>
             <Stack gap="1">
               <Text fontSize="12px" color="textSecondary">Тип приёма</Text>
@@ -538,7 +568,7 @@ export const SlotCard = ({
                   fontWeight="700"
                   data-testid="patient-selected"
                 >
-                  Выбран: {selectedPatient.name} · {selectedPatient.phone}
+                  Выбран: {selectedPatient.name}, {selectedPatient.phone}
                 </Text>
               )}
               <Stack
@@ -610,7 +640,7 @@ export const SlotCard = ({
                 value={
                   [appointment.createdByName, appointment.createdByUnit]
                     .filter((x): x is string => Boolean(x && String(x).trim()))
-                    .join(' · ') || '—'
+                    .join(', ') || '—'
                 }
               />
             </Box>
@@ -622,7 +652,7 @@ export const SlotCard = ({
             </Box>
             <Field
               label="Длительность"
-              value={`${appointment.durationMin} мин · ${formatTimeRange(time, appointment.durationMin)}`}
+              value={`${appointment.durationMin} мин, ${formatTimeRange(time, appointment.durationMin)}`}
             />
             <Field
               label="Оплата"
@@ -660,7 +690,7 @@ export const SlotCard = ({
                       color="textPrimary"
                       data-testid={`history-entry-${idx}`}
                     >
-                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)} · {entry.actor} · {entry.at.slice(11, 16)}
+                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {entry.actor}, {entry.at.slice(11, 16)}
                     </Text>
                   ))}
                 </Stack>
@@ -813,7 +843,7 @@ export const SlotCard = ({
               onClick={handleBook}
               disabled={busy || !patientId || !selectedService || !fit.ok}
               size="sm"
-              bg="brandGreen"
+              bg="brandGreenDark"
               color="white"
               borderRadius="pill"
               fontWeight="700"

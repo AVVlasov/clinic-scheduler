@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 
 import { ApiError, createAppointment, createPatient, getSchedule } from '../../__data__/api'
+import { fieldStyle } from '../field-style'
 import type {
   CreatePatientInput,
   Doctor,
@@ -22,6 +23,32 @@ const DOCUMENT_OPTIONS: Array<{ id: PatientDocumentType; label: string }> = [
   { id: 'foreign', label: 'Иностранный документ' },
 ]
 
+/** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ. */
+const formatBirthDate = (iso: string): string => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
+/** Поле формы: одна ячейка сетки, ширина от колонки, а не от содержимого. */
+const formFieldStyle: React.CSSProperties = { ...fieldStyle, maxWidth: '100%' }
+
+const FormField = ({
+  label, required = false, children,
+}: {
+  label: string
+  required?: boolean
+  children: React.ReactNode
+}) => (
+  <Stack gap="4px" minW="0">
+    <Text fontSize="11px" color="textSecondary">
+      {label}
+      {required ? <Text as="span" color="danger"> *</Text> : null}
+    </Text>
+    {children}
+  </Stack>
+)
+
 interface PatientCardFormProps {
   doctors: Doctor[]
   services: Service[]
@@ -29,15 +56,6 @@ interface PatientCardFormProps {
   onCreated: (patient: Patient) => void
   onOpenExisting: (patient: Patient) => void
   onCancel: () => void
-}
-
-const fieldStyle: React.CSSProperties = {
-  height: '32px',
-  padding: '0 10px',
-  border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
-  borderRadius: '4px',
-  fontSize: '13px',
-  width: '100%',
 }
 
 export const PatientCardForm = ({
@@ -237,7 +255,7 @@ export const PatientCardForm = ({
         >
           <Text fontSize="13px" fontWeight="700">Похожая карта уже есть</Text>
           <Text fontSize="12px">
-            {duplicate.name}, {duplicate.birthDate}, {duplicate.phone}
+            {duplicate.name}, {formatBirthDate(duplicate.birthDate)}, {duplicate.phone}
           </Text>
           <Button
             mt="2"
@@ -255,45 +273,45 @@ export const PatientCardForm = ({
         <Box bg="brandGreenTint" borderRadius="compact" px="3" py="2" data-testid="patient-card-created">
           <Text fontSize="13px" fontWeight="700" color="brandGreen700">Карта заведена</Text>
           <Text fontSize="12px" color="brandGreen700">
-            {created.name} · {created.cardNumber}
+            {created.name}, карта {created.cardNumber}
           </Text>
         </Box>
       ) : (
-        <Stack gap="3">
-          <Flex gap="2" wrap="wrap">
-            <Stack gap="1" flex="1" minW="140px">
-              <Text fontSize="12px">Фамилия <Text as="span" color="danger">*</Text></Text>
-              <input data-testid="patient-last-name" style={fieldStyle} value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </Stack>
-            <Stack gap="1" flex="1" minW="140px">
-              <Text fontSize="12px">Имя <Text as="span" color="danger">*</Text></Text>
-              <input data-testid="patient-first-name" style={fieldStyle} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-            </Stack>
-            <Stack gap="1" flex="1" minW="140px">
-              <Text fontSize="12px">Отчество <Text as="span" color="danger">*</Text></Text>
-              <input data-testid="patient-middle-name" style={fieldStyle} value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
-            </Stack>
-          </Flex>
-          <Flex gap="2" wrap="wrap">
-            <Stack gap="1" w="190px">
-              <Text fontSize="12px">Дата рождения <Text as="span" color="danger">*</Text></Text>
-              <input data-testid="patient-birth-date" type="date" style={fieldStyle} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-            </Stack>
-            <Stack gap="1" w="220px">
-              <Text fontSize="12px">Телефон <Text as="span" color="danger">*</Text></Text>
-              <input data-testid="patient-phone" style={fieldStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </Stack>
-            <Stack gap="1" flex="1" minW="180px">
-              <Text fontSize="12px">Электронная почта</Text>
-              <input data-testid="patient-email" style={fieldStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Необязательно" />
-            </Stack>
-          </Flex>
-          <Flex gap="2" wrap="wrap">
-            <Stack gap="1" flex="1" minW="200px">
-              <Text fontSize="12px">Документ</Text>
+        /* Форма — сетка в три колонки фиксированной ширины и с ограничением по
+           ширине целиком. Прежняя раскладка тянула поля резиновыми `flex="1"`:
+           на широком мониторе «Серия и номер» уезжала к правому краю, а поля
+           одной строки получали разную ширину — карточка выглядела рассыпанной. */
+        <Stack gap="4" maxW="820px">
+          <Box
+            display="grid"
+            gridTemplateColumns="repeat(auto-fit, minmax(220px, 260px))"
+            gap="12px"
+          >
+            <FormField label="Фамилия" required>
+              <input data-testid="patient-last-name" aria-label="Фамилия" style={formFieldStyle} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </FormField>
+            <FormField label="Имя" required>
+              <input data-testid="patient-first-name" aria-label="Имя" style={formFieldStyle} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </FormField>
+            <FormField label="Отчество" required>
+              <input data-testid="patient-middle-name" aria-label="Отчество" style={formFieldStyle} value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
+            </FormField>
+
+            <FormField label="Дата рождения" required>
+              <input data-testid="patient-birth-date" aria-label="Дата рождения" type="date" style={formFieldStyle} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+            </FormField>
+            <FormField label="Телефон" required>
+              <input data-testid="patient-phone" aria-label="Телефон" style={formFieldStyle} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 900 000-00-00" />
+            </FormField>
+            <FormField label="Электронная почта">
+              <input data-testid="patient-email" aria-label="Электронная почта" style={formFieldStyle} value={email} onChange={(e) => setEmail(e.target.value)} />
+            </FormField>
+
+            <FormField label="Документ">
               <select
                 data-testid="patient-document-type"
-                style={fieldStyle}
+                aria-label="Документ"
+                style={formFieldStyle}
                 value={documentType}
                 onChange={(e) => setDocumentType(e.target.value as PatientDocumentType | '')}
               >
@@ -302,14 +320,14 @@ export const PatientCardForm = ({
                   <option key={o.id} value={o.id}>{o.label}</option>
                 ))}
               </select>
-            </Stack>
-            <Stack gap="1" w="220px">
-              <Text fontSize="12px">Серия и номер</Text>
-              <input data-testid="patient-document-number" style={fieldStyle} value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
-            </Stack>
-          </Flex>
-          <Stack gap="1">
-            <Text fontSize="12px">Согласия</Text>
+            </FormField>
+            <FormField label="Серия и номер">
+              <input data-testid="patient-document-number" aria-label="Серия и номер документа" style={formFieldStyle} value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} />
+            </FormField>
+          </Box>
+
+          <Stack gap="6px">
+            <Text fontSize="11px" color="textSecondary">Согласия пациента</Text>
             {CONSENT_OPTIONS.map((label) => (
               <label key={label} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
                 <input
@@ -322,9 +340,11 @@ export const PatientCardForm = ({
               </label>
             ))}
           </Stack>
-          <Flex gap="2">
+
+          <Flex gap="3" align="center" wrap="wrap" pt="2" borderTopWidth="1px" borderColor="borderLight">
             <Button
-              bg="brandGreen"
+              mt="3"
+              bg="brandGreenDark"
               color="white"
               _hover={{ bg: 'brandGreenDark' }}
               onClick={() => { void submit() }}
@@ -333,52 +353,68 @@ export const PatientCardForm = ({
             >
               {busy ? 'Сохранение…' : 'Завести карту'}
             </Button>
+            {fieldErrors.length > 0 ? (
+              <Text mt="3" fontSize="12px" color="danger" data-testid="patient-required-hint">
+                Не заполнено: {fieldErrors.join(', ')}
+              </Text>
+            ) : (
+              <Text mt="3" fontSize="12px" color="textSecondary">
+                Звёздочкой отмечены обязательные поля
+              </Text>
+            )}
           </Flex>
-          {fieldErrors.length > 0 ? (
-            <Text fontSize="12px" color="danger" data-testid="patient-required-hint">
-              Не заполнено: {fieldErrors.join(', ')}
-            </Text>
-          ) : null}
         </Stack>
       )}
 
       {created ? (
         <Stack gap="2" data-testid="patient-book-panel" borderTopWidth="1px" borderColor="borderLight" pt="3">
           <Text fontSize="14px" fontWeight="700">Записать сразу на смену</Text>
-          <Flex gap="2" wrap="wrap">
-            <select
-              data-testid="patient-book-doctor"
-              style={{ ...fieldStyle, width: 220 }}
-              value={bookDoctorId}
-              onChange={(e) => onDoctorChange(e.target.value)}
-            >
-              {doctors.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            <select
-              data-testid="patient-book-service"
-              style={{ ...fieldStyle, width: 220 }}
-              value={bookServiceId}
-              onChange={(e) => setBookServiceId(e.target.value)}
-            >
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-            <select
-              data-testid="patient-book-time"
-              style={{ ...fieldStyle, width: 120 }}
-              value={bookTime}
-              onChange={(e) => setBookTime(e.target.value)}
-            >
-              {freeTimes.length === 0 ? <option value="">Нет слотов</option> : null}
-              {freeTimes.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+          <Flex gap="3" wrap="wrap" align="flex-end">
+            <Stack gap="1">
+              <Text as="span" fontSize="11px" color="textSecondary" id="patient-book-doctor-label">Врач</Text>
+              <select
+                data-testid="patient-book-doctor"
+                aria-labelledby="patient-book-doctor-label"
+                style={{ ...fieldStyle, width: 220 }}
+                value={bookDoctorId}
+                onChange={(e) => onDoctorChange(e.target.value)}
+              >
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </Stack>
+            <Stack gap="1">
+              <Text as="span" fontSize="11px" color="textSecondary" id="patient-book-service-label">Услуга</Text>
+              <select
+                data-testid="patient-book-service"
+                aria-labelledby="patient-book-service-label"
+                style={{ ...fieldStyle, width: 220 }}
+                value={bookServiceId}
+                onChange={(e) => setBookServiceId(e.target.value)}
+              >
+                {services.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </Stack>
+            <Stack gap="1">
+              <Text as="span" fontSize="11px" color="textSecondary" id="patient-book-time-label">Время</Text>
+              <select
+                data-testid="patient-book-time"
+                aria-labelledby="patient-book-time-label"
+                style={{ ...fieldStyle, width: 120 }}
+                value={bookTime}
+                onChange={(e) => setBookTime(e.target.value)}
+              >
+                {freeTimes.length === 0 ? <option value="">Нет слотов</option> : null}
+                {freeTimes.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </Stack>
             <Button
-              bg="brandGreen"
+              bg="brandGreenDark"
               color="white"
               _hover={{ bg: 'brandGreenDark' }}
               disabled={bookBusy || !bookTime}

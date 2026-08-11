@@ -119,6 +119,7 @@ describe('OperatorPage — фильтр сетки по услуге', () => {
       </MemoryRouter>,
     )
 
+    fireEvent.click(await screen.findByTestId('service-picker-toggle'))
     const picker = await screen.findByTestId('service-picker')
     fireEvent.change(within(picker).getByTestId('service-picker-search'), {
       target: { value: 'Диагностика' },

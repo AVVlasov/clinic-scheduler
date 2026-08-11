@@ -4,6 +4,13 @@ import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 import { getPatients } from '../../__data__/api'
 import type { Patient } from '../../__data__/types'
 
+/** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ: в картотеке дата читается по-русски. */
+const formatBirthDate = (iso: string): string => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
 interface PatientSearchProps {
   onSelect: (patient: Patient) => void
   onCreateNew: () => void
@@ -56,33 +63,20 @@ export const PatientSearch = ({ onSelect, onCreateNew }: PatientSearchProps) => 
       borderRadius="compact"
       p="3"
     >
+      {/* Вход в заведение карты один — раздел «Новая карта» в шапке. Здесь
+          кнопка появляется только тогда, когда поиск ничего не нашёл: это
+          продолжение пути, а не второй такой же вход. */}
       <Flex align="center" gap="2" wrap="wrap">
         <Text fontSize="14px" fontWeight="700">Поиск пациента</Text>
-        <Box flex="1" />
-        <Box
-          as="button"
-          data-testid="section-new-patient"
-          onClick={onCreateNew}
-          h="28px"
-          px="10px"
-          borderRadius="4px"
-          bg="brandGreen"
-          color="white"
-          fontSize="12px"
-          fontWeight="700"
-          cursor="pointer"
-        >
-          Новая карта
-        </Box>
+        <Text fontSize="12px" color="textSecondary">по всей картотеке</Text>
       </Flex>
-      <Text fontSize="12px" color="textSecondary">
-        Фамилия, телефон или номер карты — по всей картотеке
-      </Text>
+      {/* Подпись поля — одна: подсказка в placeholder, дубля строкой выше нет. */}
       <input
         data-testid="patient-search-input"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Фамилия, телефон или номер карты"
+        aria-label="Поиск пациента по фамилии, телефону или номеру карты"
         style={{
           height: '32px',
           padding: '0 10px',
@@ -90,6 +84,7 @@ export const PatientSearch = ({ onSelect, onCreateNew }: PatientSearchProps) => 
           borderRadius: '4px',
           fontSize: '13px',
           width: '100%',
+          maxWidth: '420px',
         }}
       />
       {busy ? (
@@ -101,9 +96,26 @@ export const PatientSearch = ({ onSelect, onCreateNew }: PatientSearchProps) => 
       {query.trim().length >= 2 && !busy ? (
         <Stack gap="1" data-testid="patient-search-results" maxH="160px" overflowY="auto">
           {items.length === 0 ? (
-            <Text fontSize="12px" color="textSecondary" data-testid="patient-search-empty">
-              Никого не нашли — заведите новую карту
-            </Text>
+            <Flex align="center" gap="10px" wrap="wrap">
+              <Text fontSize="12px" color="textSecondary" data-testid="patient-search-empty">
+                Никого не нашли
+              </Text>
+              <Box
+                as="button"
+                data-testid="section-new-patient"
+                onClick={onCreateNew}
+                h="28px"
+                px="10px"
+                borderRadius="4px"
+                bg="brandGreenDark"
+                color="white"
+                fontSize="12px"
+                fontWeight="700"
+                cursor="pointer"
+              >
+                Завести карту
+              </Box>
+            </Flex>
           ) : (
             items.map((p) => (
               <Box
@@ -121,9 +133,11 @@ export const PatientSearch = ({ onSelect, onCreateNew }: PatientSearchProps) => 
                 cursor="pointer"
               >
                 <Text fontSize="13px" fontWeight="700">{p.name}</Text>
-                <Text fontSize="12px" color="textSecondary" fontFamily="mono">
-                  {p.cardNumber} · {p.phone} · {p.birthDate}
-                </Text>
+                <Flex gap="16px" wrap="wrap" fontSize="12px" color="textSecondary" fontFamily="mono">
+                  <Box>{p.cardNumber}</Box>
+                  <Box>{p.phone}</Box>
+                  <Box>{formatBirthDate(p.birthDate)}</Box>
+                </Flex>
               </Box>
             ))
           )}

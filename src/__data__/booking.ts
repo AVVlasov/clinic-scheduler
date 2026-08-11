@@ -1,4 +1,5 @@
-import type { PaymentType, Service, VisitType } from './types'
+import { evaluateDuration, FALLBACK_DURATION_RULES } from './duration'
+import type { DurationRule, PaymentType, Service, VisitType } from './types'
 
 export const PAYMENT_TYPE_OPTIONS: ReadonlyArray<{ id: PaymentType; label: string }> = [
   { id: 'regular', label: 'Обычный (платный)' },
@@ -12,14 +13,29 @@ export const paymentTypeLabel = (value: PaymentType | null | undefined): string 
   PAYMENT_TYPE_OPTIONS.find((o) => o.id === value)?.label ?? (value ? String(value) : '—')
 
 /**
- * Длительность записи: для категории «Приём» тип визита задаёт норматив
- * (первичный 60 / повторный 30); иначе берётся длительность услуги из справочника.
+ * Длительность записи считают правила администратора (экран «Правила
+ * длительности»), а не константа в коде оператора: выключенное правило обязано
+ * менять длительность реальной записи, иначе экран администратора врёт.
+ * Без справочника правил действует резервный норматив приёма.
  */
-export const resolveBookingDuration = (service: Service, visitType: VisitType): number => {
-  if (service.category === 'Приём') {
-    return visitType === 'first' ? 60 : 30
-  }
-  return service.duration
+export const resolveBookingDuration = (
+  service: Service,
+  visitType: VisitType,
+  options?: {
+    rules?: DurationRule[]
+    doctorId?: string | null
+    patientAgeYears?: number | null
+    requiresEquipment?: boolean
+  },
+): number => {
+  const rules = options?.rules?.length ? options.rules : FALLBACK_DURATION_RULES
+  return evaluateDuration(rules, {
+    service,
+    visitType,
+    doctorId: options?.doctorId ?? null,
+    patientAgeYears: options?.patientAgeYears ?? null,
+    requiresEquipment: options?.requiresEquipment ?? false,
+  }).totalMin
 }
 
 /** Услуга доступна врачу по матрице компетенций (doctorIds). */
@@ -27,6 +43,10 @@ export const serviceOfferedByDoctor = (service: Service, doctorId: string): bool
   if (!Array.isArray(service.doctorIds) || service.doctorIds.length === 0) return true
   return service.doctorIds.includes(doctorId)
 }
+
+/** Допуск врача к услуге выдан «с ограничением» — оператор обязан это увидеть. */
+export const serviceLimitedForDoctor = (service: Service, doctorId: string): boolean =>
+  Array.isArray(service.limitedDoctorIds) && service.limitedDoctorIds.includes(doctorId)
 
 export const filterServicesByQuery = (services: Service[], query: string): Service[] => {
   const q = query.trim().toLowerCase()

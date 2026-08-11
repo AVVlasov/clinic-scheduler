@@ -127,7 +127,7 @@ describe('TASK-47 — гигиена стаба: reset, nextVisit, контра�
     const clientPath = path.join(__dirname, '..', '..', 'src', '__data__', 'api.ts');
     const clientSrc = fs.readFileSync(clientPath, 'utf8');
 
-    const routeFiles = ['schedule.js', 'appointments.js', 'directories.js', 'waitlist.js', 'mass-cancel.js', 'index.js']
+    const routeFiles = ['schedule.js', 'appointments.js', 'directories.js', 'catalog.js', 'waitlist.js', 'mass-cancel.js', 'index.js']
       .map((f) => fs.readFileSync(path.join(stubsDir, f), 'utf8'))
       .join('\n');
 

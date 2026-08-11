@@ -48,6 +48,16 @@ export const withArmDate = (pathname: string, date: string, doctorId?: string): 
   return `${url.pathname}?${url.searchParams.toString()}`
 }
 
+/**
+ * Тот же адрес с другим разделом рабочего места. Раздел живёт в адресе, чтобы
+ * ссылка открывала тот же экран и работала кнопка «назад».
+ */
+export const withArmSection = (search: string, section: string): string => {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  params.set('section', section)
+  return `?${params.toString()}`
+}
+
 export const parseArmDoctorId = (search: string): string | null => {
   const raw = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('doctorId')
   return raw && raw.trim() ? raw : null
@@ -64,7 +74,8 @@ export const formatArmDateLabel = (isoDate: string): string => {
   return `${weekdays[date.getDay()]}, ${d} ${months[m - 1]}`
 }
 
+/** Короткая дата ДД.ММ — с ведущими нулями, как в остальных экранах («11.08», не «11.8»). */
 export const formatShortDate = (isoDate: string): string => {
   const [, mm, dd] = isoDate.split('-')
-  return `${Number(dd)}.${Number(mm)}`
+  return `${dd}.${mm}`
 }

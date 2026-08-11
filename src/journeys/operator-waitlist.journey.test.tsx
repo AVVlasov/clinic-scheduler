@@ -56,7 +56,7 @@ describe('journey operator-waitlist — заявка, подбор, страхо
     )
 
     await screen.findByTestId('operator-page', {}, { timeout: 15000 })
-    fireEvent.click(screen.getByTestId('section-waitlist'))
+    fireEvent.click(screen.getByTestId('arm-nav-waitlist'))
     await screen.findByTestId('waitlist-panel')
 
     fireEvent.click(screen.getByTestId('waitlist-new'))
@@ -154,7 +154,7 @@ describe('journey operator-waitlist — заявка, подбор, страхо
       </MemoryRouter>,
     )
     await screen.findByTestId('operator-page', {}, { timeout: 15000 })
-    fireEvent.click(screen.getByTestId('section-waitlist'))
+    fireEvent.click(screen.getByTestId('arm-nav-waitlist'))
     await screen.findByTestId('waitlist-panel')
     fireEvent.click(screen.getByTestId('waitlist-filter-from_doctor'))
     await waitFor(() => {

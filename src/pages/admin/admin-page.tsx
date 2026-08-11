@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
+import { useSearchParams } from 'react-router-dom'
 
+import { resolveSection } from '../../__data__/arm-nav'
 import { getDoctorCards, getDoctors, getWeekTemplates, publishWeek, saveDoctorCard, saveWeekTemplateInterval, unpublishWeek } from '../../__data__/api'
 import type {
   Doctor,
@@ -11,6 +13,9 @@ import type {
 } from '../../__data__/types'
 
 import { AbsenceDialog } from './absence-dialog'
+import { CompetencyMatrixScreen } from './competency-matrix'
+import { DurationRulesScreen } from './duration-rules'
+import { EquipmentSchedule } from './equipment-schedule'
 import {
   countIncompleteCards,
   draftDiff,
@@ -52,7 +57,13 @@ const MAX_WEEKS_BACK = 1
 
 type PublishState = 'idle' | 'confirming' | 'publishing'
 
-type Section = 'templates' | 'doctors'
+/** Сегодняшняя дата в формате ГГГГ-ММ-ДД (лента оборудования — про день). */
+const todayDate = (): string => {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
 
 export const AdminPage = () => {
   const currentWeekStart = weekStartOf(new Date())
@@ -69,7 +80,8 @@ export const AdminPage = () => {
   const handleWeekNext = useCallback(() => {
     setWeekStart((prev) => (prev < maxWeekStart ? shiftDate(prev, 7) : prev))
   }, [maxWeekStart])
-  const [section, setSection] = useState<Section>('templates')
+  const [searchParams] = useSearchParams()
+  const section = resolveSection('admin', searchParams.get('section'))
   const [templates, setTemplates] = useState<WeekTemplatesData | null>(null)
   const [templatesError, setTemplatesError] = useState<string | null>(null)
   const [isTemplatesLoading, setIsTemplatesLoading] = useState(true)
@@ -291,7 +303,7 @@ export const AdminPage = () => {
             АРМ администратора
           </Text>
           <Text fontSize="18px" fontWeight="700" color="brandGreen700">
-            Площадка · расписание и справочники
+            Расписание и справочники площадки
           </Text>
         </Stack>
         <Box flex="1" />
@@ -301,35 +313,7 @@ export const AdminPage = () => {
             {countIncompleteCards(cards)}
           </Text>
         </Flex>
-        <Flex gap="6px">
-          <Button
-            type="button"
-            size="sm"
-            borderRadius="compact"
-            variant={section === 'templates' ? 'solid' : 'outline'}
-            bg={section === 'templates' ? 'brandGreen' : 'transparent'}
-            color={section === 'templates' ? 'white' : 'textPrimary'}
-            borderColor="borderLight"
-            _hover={{ bg: section === 'templates' ? 'brandGreenDark' : 'surfaceLight' }}
-            onClick={() => setSection('templates')}
-            data-testid="section-templates"
-          >
-            Шаблоны приёма
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            borderRadius="compact"
-            variant={section === 'doctors' ? 'solid' : 'outline'}
-            bg={section === 'doctors' ? 'brandGreen' : 'transparent'}
-            color={section === 'doctors' ? 'white' : 'textPrimary'}
-            borderColor="borderLight"
-            _hover={{ bg: section === 'doctors' ? 'brandGreenDark' : 'surfaceLight' }}
-            onClick={() => setSection('doctors')}
-            data-testid="section-doctors"
-          >
-            Справочник врачей
-          </Button>
+        {section === 'templates' ? (
           <Button
             type="button"
             size="sm"
@@ -346,7 +330,7 @@ export const AdminPage = () => {
           >
             Блокировка расписания
           </Button>
-        </Flex>
+        ) : null}
       </Flex>
 
       {absenceNotice ? (
@@ -374,7 +358,10 @@ export const AdminPage = () => {
         }}
       />
 
-      <Flex flex="1" gap="12px" minH="0">
+      <Flex flex="1" gap="12px" minH="0" data-section={section}>
+        {section === 'equipment' ? <EquipmentSchedule date={todayDate()} /> : null}
+        {section === 'matrix' ? <CompetencyMatrixScreen /> : null}
+        {section === 'duration-rules' ? <DurationRulesScreen /> : null}
         {section === 'templates' ? (
           <WeekTemplates
             data={templates}
@@ -397,7 +384,8 @@ export const AdminPage = () => {
             saveIntervalBusy={saveIntervalBusy}
             saveIntervalError={saveIntervalError}
           />
-        ) : (
+        ) : null}
+        {section === 'doctors' ? (
           <DoctorsDirectory
             cards={cards}
             cardsError={cardsError}
@@ -410,7 +398,7 @@ export const AdminPage = () => {
             onDraftChange={setDraft}
             onSave={handleSaveDoctor}
           />
-        )}
+        ) : null}
       </Flex>
     </Stack>
   )

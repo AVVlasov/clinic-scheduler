@@ -48,21 +48,22 @@ export const MainPage: React.FC = () => {
         <Flex align="center" gap="4" flexWrap="wrap">
           <Stack gap="0">
             <Text fontSize="12px" color="textSecondary">Стартовый экран</Text>
-            <Text fontSize="24px" fontWeight="700" lineHeight="32px" color="brandGreen700">
-              Начало смены · {WEEKDAY[today.getDay()]} {formatToday()}
+            <Text
+              fontSize="24px"
+              fontWeight="700"
+              lineHeight="32px"
+              color="brandGreen700"
+              data-testid="main-shift-date"
+            >
+              Начало смены: {WEEKDAY[today.getDay()].toLowerCase()}, {formatToday()}
             </Text>
           </Stack>
           <Box flex="1" />
+          {/* Дата смены названа в заголовке — второй такой же плашки рядом быть не должно. */}
           <Stack gap="0" align="flex-end">
             <Text fontSize="12px" color="textSecondary">Площадка</Text>
             <Text fontSize="18px" fontWeight="700" color="textPrimary" data-testid="main-site">
               Динамо
-            </Text>
-          </Stack>
-          <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">Дата смены</Text>
-            <Text fontSize="18px" fontWeight="700" fontFamily="mono" color="textPrimary" data-testid="main-shift-date">
-              {formatToday()}
             </Text>
           </Stack>
         </Flex>
@@ -99,9 +100,12 @@ export const MainPage: React.FC = () => {
             gap="3"
             data-testid={`main-card-${route.slug}`}
           >
-            <Stack gap="2">
-              <Text fontSize="12px" color="textSecondary">{route.title}</Text>
-              <Text fontSize="14px" color="textPrimary" lineHeight="20px">
+            {/* Название рабочего места — главное в карточке, подсказка вторична. */}
+            <Stack gap="1">
+              <Text fontSize="15px" fontWeight="700" color="textPrimary" lineHeight="20px">
+                {route.title}
+              </Text>
+              <Text fontSize="13px" color="textSecondary" lineHeight="18px">
                 {route.hint}
               </Text>
             </Stack>
@@ -110,7 +114,7 @@ export const MainPage: React.FC = () => {
               type="button"
               size="md"
               borderRadius="pill"
-              bg="brandGreen"
+              bg="brandGreenDark"
               color="white"
               fontWeight="700"
               _hover={{ bg: 'brandGreenDark' }}

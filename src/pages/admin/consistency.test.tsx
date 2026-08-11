@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { Provider } from '../../theme'
+import { ArmRouter, SectionNav } from '../arm-test-harness'
 import { AdminPage } from './admin-page'
 import type {
   DoctorCard,
@@ -187,7 +188,14 @@ describe('AdminPage — консистентность (consistency)', () => {
     )
     router.install()
 
-    render(<Provider><AdminPage /></Provider>)
+    render(
+      <ArmRouter>
+        <Provider>
+          <SectionNav sections={['templates', 'doctors']} />
+          <AdminPage />
+        </Provider>
+      </ArmRouter>,
+    )
 
     // шаблоны в ошибке, ошибка видна ровно один раз
     const errorBanner = await screen.findByTestId('week-templates-error')
@@ -211,7 +219,14 @@ describe('AdminPage — консистентность (consistency)', () => {
     )
     router.install()
 
-    render(<Provider><AdminPage /></Provider>)
+    render(
+      <ArmRouter>
+        <Provider>
+          <SectionNav sections={['templates', 'doctors']} />
+          <AdminPage />
+        </Provider>
+      </ArmRouter>,
+    )
 
     // шаблоны отрисовались — это успех, который раньше затирался общим loadError
     await screen.findByTestId('tpl-row-d-001')
@@ -233,7 +248,14 @@ describe('AdminPage — консистентность (consistency)', () => {
     router.onGet((url) => url.includes('/doctor-cards'), () => json(cardsPayload))
     router.install()
 
-    render(<Provider><AdminPage /></Provider>)
+    render(
+      <ArmRouter>
+        <Provider>
+          <SectionNav sections={['templates', 'doctors']} />
+          <AdminPage />
+        </Provider>
+      </ArmRouter>,
+    )
 
     const publishBtn = await screen.findByTestId('publish-week')
     expect(publishBtn).toBeDisabled()
@@ -257,7 +279,14 @@ describe('AdminPage — консистентность (consistency)', () => {
     )
     const fetchMock = router.install()
 
-    render(<Provider><AdminPage /></Provider>)
+    render(
+      <ArmRouter>
+        <Provider>
+          <SectionNav sections={['templates', 'doctors']} />
+          <AdminPage />
+        </Provider>
+      </ArmRouter>,
+    )
 
     const publishBtn = await screen.findByTestId('publish-week')
     fireEvent.click(publishBtn)
@@ -294,7 +323,14 @@ describe('AdminPage — консистентность (consistency)', () => {
     )
     router.install()
 
-    render(<Provider><AdminPage /></Provider>)
+    render(
+      <ArmRouter>
+        <Provider>
+          <SectionNav sections={['templates', 'doctors']} />
+          <AdminPage />
+        </Provider>
+      </ArmRouter>,
+    )
     fireEvent.click(await screen.findByTestId('section-doctors'))
     fireEvent.click(await screen.findByTestId('doctor-item-d-001'))
 

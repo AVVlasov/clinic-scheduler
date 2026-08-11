@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { Provider } from '../../theme'
+import { ArmRouter, SectionNav } from '../arm-test-harness'
 import { AdminPage } from './admin-page'
 import type {
   DoctorCardList,
@@ -140,7 +141,14 @@ const installFetchMock = (): { fetchMock: ReturnType<typeof vi.spyOn>; log: Fetc
   return { fetchMock, log }
 }
 
-const renderPage = () => render(<Provider><AdminPage /></Provider>)
+const renderPage = () => render(
+  <ArmRouter>
+    <Provider>
+      <SectionNav sections={['templates', 'doctors']} />
+      <AdminPage />
+    </Provider>
+  </ArmRouter>,
+)
 
 const weekTemplateGet = (log: FetchLog[], weekStart: string) =>
   log.filter(

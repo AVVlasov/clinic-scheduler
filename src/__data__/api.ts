@@ -34,6 +34,12 @@ import type {
   MassCancelMatches,
   MassCancelPreview,
   MassCancelRescheduleInput,
+  CompetencyMatrix,
+  CompetencyPatchResult,
+  CompetencyValue,
+  DurationRuleList,
+  EquipmentDay,
+  EquipmentList,
 } from './types'
 
 export class ApiError extends Error {
@@ -308,6 +314,32 @@ export const confirmAppointment = (id: string) =>
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: '{}',
+  })
+
+export const getEquipment = () => request<EquipmentList>('/equipment')
+
+export const getEquipmentDay = (date: string) =>
+  request<EquipmentDay>(`/equipment/schedule?date=${encodeURIComponent(date)}`)
+
+export const getCompetencies = () => request<CompetencyMatrix>('/competencies')
+
+export const setCompetency = (input: {
+  serviceId: string
+  doctorId: string
+  value: CompetencyValue
+}) => request<CompetencyPatchResult>('/competencies', {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(input),
+})
+
+export const getDurationRules = () => request<DurationRuleList>('/duration-rules')
+
+export const setDurationRuleEnabled = (id: string, enabled: boolean) =>
+  request<DurationRuleList>(`/duration-rules/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
   })
 
 /** Сброс демо-стенда к исходному состоянию (без перезапуска процесса). */

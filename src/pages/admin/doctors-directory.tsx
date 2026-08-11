@@ -127,15 +127,21 @@ const ListField = ({ label, hint, testId, values, emptyText, onChange }: ListFie
   }
 
   return (
-    <Stack gap="6px" data-testid={testId}>
-      <Text fontSize="11px" color="textSecondary">
-        {label}
-      </Text>
-      {values.length === 0 ? (
-        <Text fontSize="12px" color="textSecondary" data-testid={`${testId}-empty`}>
-          {emptyText}
+    <Stack gap="6px" data-testid={testId} maxW="620px">
+      {/* Подпись у поля одна. Раньше строкой ниже стояла фраза «X не заданы», а
+          в самом поле — placeholder «Добавить: x»: три текста об одном, и экран
+          читался как каша из подсказок. */}
+      <Flex align="baseline" gap="8px">
+        <Text fontSize="11px" color="textSecondary">
+          {label}
         </Text>
-      ) : (
+        {values.length === 0 ? (
+          <Text fontSize="11px" color="textSecondary" data-testid={`${testId}-empty`}>
+            {emptyText}
+          </Text>
+        ) : null}
+      </Flex>
+      {values.length === 0 ? null : (
         <Flex flexWrap="wrap" gap="6px">
           {values.map((value) => (
             <Flex
@@ -170,13 +176,12 @@ const ListField = ({ label, hint, testId, values, emptyText, onChange }: ListFie
           ))}
         </Flex>
       )}
-      <Flex gap="6px">
+      <Flex gap="6px" maxW="420px">
         <Input
           size="sm"
           borderColor="borderDark"
           borderRadius="compact"
           value={entry}
-          placeholder={`Добавить: ${label.toLowerCase()}`}
           aria-label={`Добавить значение в поле «${label}»`}
           onChange={(e) => setEntry(e.target.value)}
           onKeyDown={(e) => {
@@ -192,6 +197,7 @@ const ListField = ({ label, hint, testId, values, emptyText, onChange }: ListFie
           variant="outline"
           borderColor="borderDark"
           borderRadius="compact"
+          flex="none"
           onClick={add}
           data-testid={`${testId}-add`}
         >
@@ -227,16 +233,19 @@ const ServiceWindowsField = ({ values, onChange }: ServiceWindowsFieldProps) => 
   }
 
   return (
-    <Stack gap="6px" data-testid="field-service-windows">
-      <Text fontSize="11px" color="textSecondary">
-        Доступность услуг во времени
-      </Text>
-      {values.length === 0 ? (
-        <Text fontSize="12px" color="textSecondary" data-testid="field-service-windows-empty">
-          Ограничений по услугам нет
+    <Stack gap="6px" data-testid="field-service-windows" maxW="620px">
+      <Flex align="baseline" gap="8px">
+        <Text fontSize="11px" color="textSecondary">
+          Доступность услуг во времени
         </Text>
-      ) : (
-        <Stack gap="4px">
+        {values.length === 0 ? (
+          <Text fontSize="11px" color="textSecondary" data-testid="field-service-windows-empty">
+            ограничений нет
+          </Text>
+        ) : null}
+      </Flex>
+      {values.length === 0 ? null : (
+        <Stack gap="4px" maxW="480px">
           {values.map((row) => (
             <Flex
               key={`${row.what}-${row.when}`}
@@ -269,7 +278,7 @@ const ServiceWindowsField = ({ values, onChange }: ServiceWindowsFieldProps) => 
           ))}
         </Stack>
       )}
-      <Flex gap="6px" flexWrap="wrap">
+      <Flex gap="6px" flexWrap="wrap" maxW="480px">
         <Input
           size="sm"
           flex="1"
@@ -477,7 +486,7 @@ export const DoctorsDirectory = ({
               <Button
                 type="button"
                 size="sm"
-                bg="brandGreen"
+                bg="brandGreenDark"
                 color="white"
                 borderRadius="compact"
                 _hover={{ bg: 'brandGreenDark' }}
@@ -509,7 +518,7 @@ export const DoctorsDirectory = ({
                 hint="Первая в списке — основная: она уходит в общий справочник врачей и видна в сетке и списках."
                 testId="field-specialties"
                 values={draft.specialties}
-                emptyText="Специальности не указаны"
+                emptyText="не указаны"
                 onChange={(next) => update('specialties', next)}
               />
 
@@ -551,7 +560,7 @@ export const DoctorsDirectory = ({
                 hint="Период действия учитывается при подборе слота."
                 testId="field-temporary-sites"
                 values={draft.temporarySites}
-                emptyText="Временных площадок нет"
+                emptyText="нет"
                 onChange={(next) => update('temporarySites', next)}
               />
 
@@ -592,7 +601,7 @@ export const DoctorsDirectory = ({
                 label="Правила приёма"
                 testId="field-admission-rules"
                 values={draft.admissionRules}
-                emptyText="Правила приёма не заданы"
+                emptyText="не заданы"
                 onChange={(next) => update('admissionRules', next)}
               />
 
@@ -600,7 +609,7 @@ export const DoctorsDirectory = ({
                 label="Допуски к оборудованию"
                 testId="field-equipment-access"
                 values={draft.equipmentAccess}
-                emptyText="Допусков к оборудованию нет"
+                emptyText="нет"
                 onChange={(next) => update('equipmentAccess', next)}
               />
 
@@ -629,7 +638,7 @@ export const DoctorsDirectory = ({
                 label="Теги специализации"
                 testId="field-specialization-tags"
                 values={draft.specializationTags}
-                emptyText="Теги не заданы"
+                emptyText="не заданы"
                 onChange={(next) => update('specializationTags', next)}
               />
             </Stack>

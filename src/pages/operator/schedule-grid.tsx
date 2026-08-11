@@ -27,6 +27,16 @@ interface ScheduleGridProps {
   rescheduleTargetDoctorId?: string | null
   fitDurationMin?: number | null
   fitDoctorId?: string | null
+  /**
+   * Кто прокручивает сетку.
+   *
+   * `self` — сетка сама: она занимает высоту панели и держит окно строк.
+   * `page` — прокручивает страница (режим «Неделя», где сеток семь): тогда
+   * сетка рисует все строки сразу и своей полосы прокрутки не заводит.
+   * Две вложенные полосы рядом — дефект приёмки 2026-08-11: пользователь
+   * тянет внешнюю и не понимает, почему таблица стоит на месте.
+   */
+  scroll?: 'self' | 'page'
   onSlotClick: (slot: ScheduleSlot, doctor: SlotResource) => void
 }
 
@@ -275,6 +285,7 @@ export const ScheduleGrid = ({
   rescheduleTargetDoctorId,
   fitDurationMin = null,
   fitDoctorId = null,
+  scroll = 'self',
   onSlotClick,
 }: ScheduleGridProps) => {
   const slots = schedule.slots
@@ -360,10 +371,13 @@ export const ScheduleGrid = ({
     setWindowStart(Math.min(start, maxStart))
   }, [slots.length])
 
-  const windowEnd = Math.min(slots.length, windowStart + WINDOW_ROWS)
-  const topPad = windowStart * SLOT_HEIGHT_PX
-  const bottomPad = Math.max(0, (slots.length - windowEnd) * SLOT_HEIGHT_PX)
-  const visibleSlots = slots.slice(windowStart, windowEnd)
+  // Когда прокручивает страница, окно строк не работает: onScroll сетки не
+  // сработает, и нижние строки дня просто не отрисовались бы.
+  const virtualized = scroll === 'self'
+  const windowEnd = virtualized ? Math.min(slots.length, windowStart + WINDOW_ROWS) : slots.length
+  const topPad = virtualized ? windowStart * SLOT_HEIGHT_PX : 0
+  const bottomPad = virtualized ? Math.max(0, (slots.length - windowEnd) * SLOT_HEIGHT_PX) : 0
+  const visibleSlots = virtualized ? slots.slice(windowStart, windowEnd) : slots
 
   const gridStyle: React.CSSProperties = {
     display: 'grid',
@@ -410,12 +424,16 @@ export const ScheduleGrid = ({
       data-doctor-count={doctors.length}
       data-window-rows={visibleSlots.length}
       data-window-max={WINDOW_ROWS}
+      data-scroll={scroll}
       bg="white"
       borderWidth="1px"
       borderColor="borderLight"
       borderRadius="none"
-      overflow="auto"
-      maxH={`${VIEWPORT_ROWS * SLOT_HEIGHT_PX}px`}
+      // Полоса прокрутки одна: либо у сетки (день), либо у страницы (неделя).
+      overflow={virtualized ? 'auto' : 'visible'}
+      flex={virtualized ? '1' : undefined}
+      minH={virtualized ? '0' : undefined}
+      maxH={virtualized ? `${WINDOW_ROWS * SLOT_HEIGHT_PX}px` : 'none'}
       ref={scrollRef}
       onScroll={onScroll}
     >

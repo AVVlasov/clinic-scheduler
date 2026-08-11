@@ -67,6 +67,8 @@ describe('journey registrar-new-patient-card', () => {
     const { date, doctorId, time } = await findBookableDate()
     renderRegistrar(date)
 
+    // Картотека — отдельный раздел рабочего места: путь начинается с навигации.
+    fireEvent.click(await screen.findByTestId('arm-nav-search', {}, { timeout: 8000 }))
     const search = await screen.findByTestId('patient-search', {}, { timeout: 8000 })
     fireEvent.change(within(search).getByTestId('patient-search-input'), {
       target: { value: 'Алексеев' },
@@ -75,7 +77,8 @@ describe('journey registrar-new-patient-card', () => {
       expect(within(search).getByTestId('patient-search-hit-p-001')).toBeInTheDocument()
     }, { timeout: 5000 })
 
-    fireEvent.click(within(search).getByTestId('section-new-patient'))
+    // Вход в заведение карты — раздел рабочего места, а не вторая кнопка в поиске.
+    fireEvent.click(screen.getByTestId('arm-nav-new-patient'))
     const form = await screen.findByTestId('patient-card-form', {}, { timeout: 5000 })
 
     fireEvent.change(within(form).getByTestId('patient-last-name'), { target: { value: 'Козлова' } })

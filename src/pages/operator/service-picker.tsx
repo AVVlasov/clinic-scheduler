@@ -9,9 +9,10 @@ interface ServicePickerProps {
   services: Service[]
   selectedId: string | null
   onSelect: (serviceId: string | null) => void
+  onClose?: () => void
 }
 
-export const ServicePicker = ({ services, selectedId, onSelect }: ServicePickerProps) => {
+export const ServicePicker = ({ services, selectedId, onSelect, onClose }: ServicePickerProps) => {
   const [query, setQuery] = useState('')
   const filtered = useMemo(() => filterServicesByQuery(services, query), [services, query])
   const selected = selectedId ? services.find((s) => s.id === selectedId) : undefined
@@ -29,15 +30,14 @@ export const ServicePicker = ({ services, selectedId, onSelect }: ServicePickerP
     >
       <Flex align="center" gap="2" wrap="wrap">
         <Text fontSize="14px" fontWeight="700" color="textPrimary">
-          Запись от услуги
+          Подбор по услуге
         </Text>
         <Box flex="1" />
-        {selected ? (
+        {selected || onClose ? (
           <Box
             as="button"
-            tabIndex={-1}
             data-testid="service-picker-clear"
-            onClick={() => onSelect(null)}
+            onClick={() => (onClose ? onClose() : onSelect(null))}
             fontSize="12px"
             color="brandGreen700"
             cursor="pointer"
@@ -49,14 +49,14 @@ export const ServicePicker = ({ services, selectedId, onSelect }: ServicePickerP
         ) : null}
       </Flex>
       <Text fontSize="12px" color="textSecondary">
-        Поиск по названию и категории. После выбора в сетке останутся только подходящие врачи.
+        После выбора услуги в сетке останутся только врачи с допуском к ней.
       </Text>
       <input
         data-testid="service-picker-search"
-        tabIndex={-1}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Название или категория…"
+        placeholder="Название или категория услуги"
+        aria-label="Поиск услуги по названию или категории"
         style={{
           height: '32px',
           padding: '0 10px',
@@ -64,9 +64,10 @@ export const ServicePicker = ({ services, selectedId, onSelect }: ServicePickerP
           borderRadius: '4px',
           fontSize: '13px',
           width: '100%',
+          maxWidth: '420px',
         }}
       />
-      <Stack gap="1" maxH="180px" overflowY="auto" data-testid="service-picker-list">
+      <Stack gap="1" maxH="180px" maxW="560px" overflowY="auto" data-testid="service-picker-list">
         {filtered.length === 0 ? (
           <Text fontSize="12px" color="textSecondary" data-testid="service-picker-empty">
             Ничего не найдено
@@ -78,7 +79,6 @@ export const ServicePicker = ({ services, selectedId, onSelect }: ServicePickerP
               <Box
                 as="button"
                 key={s.id}
-                tabIndex={-1}
                 data-testid={`service-option-${s.id}`}
                 data-selected={active ? 'true' : 'false'}
                 onClick={() => onSelect(active ? null : s.id)}
@@ -94,9 +94,11 @@ export const ServicePicker = ({ services, selectedId, onSelect }: ServicePickerP
                 <Text fontSize="13px" fontWeight={active ? '700' : '500'} color={active ? 'brandGreen700' : 'textPrimary'}>
                   {s.name}
                 </Text>
-                <Text fontSize="12px" color="textSecondary">
-                  {s.category} · {s.duration} мин · {s.doctorIds.length} {doctorsWord(s.doctorIds.length)}
-                </Text>
+                <Flex gap="12px" wrap="wrap" fontSize="12px" color="textSecondary">
+                  <Box>{s.category}</Box>
+                  <Box fontFamily="mono">{s.duration} мин</Box>
+                  <Box>{s.doctorIds.length} {doctorsWord(s.doctorIds.length)}</Box>
+                </Flex>
               </Box>
             )
           })

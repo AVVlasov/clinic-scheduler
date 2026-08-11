@@ -21,6 +21,7 @@ router.post('/demo/reset', (req, res) => {
 router.use(require('./schedule'));
 router.use(require('./appointments'));
 router.use(require('./directories'));
+router.use(require('./catalog'));
 router.use(require('./waitlist'));
 router.use(require('./mass-cancel'));
 

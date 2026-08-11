@@ -39,8 +39,9 @@ const formatDayDate = (date: string): string => {
   return `${dd}.${mm}`
 }
 
-const intervalText = (interval: WeekTemplateInterval): string => {
-  if (interval.start === interval.end) return KIND_LABEL[interval.kind]
+/** Границы интервала. Пустой интервал (00:00–00:00) времени не показывает. */
+const intervalText = (interval: WeekTemplateInterval): string | null => {
+  if (interval.start === interval.end) return null
   return `${interval.start}–${interval.end}`
 }
 
@@ -226,7 +227,7 @@ export const WeekTemplates = ({
                 Шаблоны приёма на неделю
               </Text>
               <Text fontSize="12px" color="textSecondary" data-testid="week-range">
-                {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)} · применяется к сетке
+                {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)}, применяется к сетке
                 при публикации
               </Text>
             </Stack>
@@ -256,7 +257,7 @@ export const WeekTemplates = ({
             ) : null}
             <Button
               size="sm"
-              bg="brandGreen"
+              bg="brandGreenDark"
               color="white"
               borderRadius="compact"
               _hover={{ bg: 'brandGreenDark' }}
@@ -290,7 +291,7 @@ export const WeekTemplates = ({
               <Flex gap="2">
                 <Button
                   size="sm"
-                  bg="brandGreen"
+                  bg="brandGreenDark"
                   color="white"
                   borderRadius="compact"
                   _hover={{ bg: 'brandGreenDark' }}
@@ -376,7 +377,7 @@ export const WeekTemplates = ({
               data-testid="interval-editor"
             >
               <Text fontSize="14px" fontWeight="700" color="textPrimary" mb="1">
-                {edit.doctorName} · {edit.weekday} {formatDayDate(edit.date)}
+                {edit.doctorName}: {edit.weekday}, {formatDayDate(edit.date)}
               </Text>
               <Flex gap="3" flexWrap="wrap" align="flex-end" mb="3">
                 <Stack gap="1">
@@ -420,7 +421,7 @@ export const WeekTemplates = ({
               <Flex gap="2">
                 <Button
                   size="sm"
-                  bg="brandGreen"
+                  bg="brandGreenDark"
                   color="white"
                   borderRadius="compact"
                   _hover={{ bg: 'brandGreenDark' }}
@@ -537,10 +538,18 @@ export const WeekTemplates = ({
                       >
                         {primary ? (
                           <Stack gap="0">
-                            <Text fontSize="12px" lineHeight="15px" color={style.ink}>
-                              {intervalText(primary)}
-                            </Text>
-                            <Text fontSize="11px" lineHeight="14px" color="textSecondary">
+                            {/* Время и режим — разные строки; у режима без времени
+                                печатается только название, а не дважды одно и то же. */}
+                            {intervalText(primary) ? (
+                              <Text fontSize="12px" lineHeight="15px" color={style.ink}>
+                                {intervalText(primary)}
+                              </Text>
+                            ) : null}
+                            <Text
+                              fontSize={intervalText(primary) ? '11px' : '12px'}
+                              lineHeight={intervalText(primary) ? '14px' : '15px'}
+                              color={intervalText(primary) ? 'textSecondary' : style.ink}
+                            >
                               {KIND_LABEL[primary.kind]}
                             </Text>
                             {day.intervals.slice(1).map((extra) => (
@@ -550,7 +559,7 @@ export const WeekTemplates = ({
                                 lineHeight="14px"
                                 color="textSecondary"
                               >
-                                {intervalText(extra)}
+                                {intervalText(extra) ?? KIND_LABEL[extra.kind]}
                               </Text>
                             ))}
                           </Stack>

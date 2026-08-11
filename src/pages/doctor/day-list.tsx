@@ -8,7 +8,10 @@ interface DayListProps {
   appointments: Appointment[]
   selectedId: string | null
   onSelect: (id: string) => void
-  doctorName?: string | null
+  /**
+   * Переключатель врача. Имя врача показывает он сам — отдельной строкой рядом
+   * его дублировать нельзя: два одинаковых текста подряд читаются как ошибка.
+   */
   doctorSwitcher?: React.ReactNode
 }
 
@@ -59,7 +62,7 @@ const toneColor = (tone: 'neutral' | 'attention' | 'booked' | 'danger'): string 
 }
 
 export const DayList = ({
-  appointments, selectedId, onSelect, doctorName, doctorSwitcher,
+  appointments, selectedId, onSelect, doctorSwitcher,
 }: DayListProps) => {
   const counted = appointments.filter((a) => a.status !== 'cancelled' && a.status !== 'no_show')
   const doneCount = counted.filter((a) => a.status === 'completed').length
@@ -94,12 +97,8 @@ export const DayList = ({
         <Text fontSize="12px" color="textSecondary" data-testid="doctor-progress">
           {doneCount} из {totalCount} завершено
         </Text>
+        <Box flex="1" />
         {doctorSwitcher}
-        {doctorName ? (
-          <Text fontSize="12px" color="textSecondary" data-testid="doctor-day-subject">
-            {doctorName}
-          </Text>
-        ) : null}
       </Flex>
       <Box flex="1" overflowY="auto" p="2">
         {appointments.length === 0 && (
@@ -163,7 +162,7 @@ export const DayList = ({
                   overflow="hidden"
                   textOverflow="ellipsis"
                 >
-                  {formatDate(a.start)} · {a.durationMin} мин
+                  {formatDate(a.start)}, {a.durationMin} мин
                 </Text>
               </Flex>
               <Box

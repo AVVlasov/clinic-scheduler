@@ -70,7 +70,7 @@ describe('journey admin-doctor-card — заполнение карточки у
       )
 
       await screen.findByTestId('admin-page', {}, { timeout: 15000 })
-      fireEvent.click(await screen.findByTestId('section-doctors'))
+      fireEvent.click(await screen.findByTestId('arm-nav-doctors'))
       await screen.findByTestId('doctors-list', {}, { timeout: 15000 })
       await screen.findByTestId(`doctor-item-${target!.id}`, {}, { timeout: 15000 })
 

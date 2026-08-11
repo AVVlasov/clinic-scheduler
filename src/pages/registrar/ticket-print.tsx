@@ -42,7 +42,7 @@ export const TicketPrint = ({ visit, doctor, service, onClose }: TicketPrintProp
       <Button
         data-testid="ticket-print-close"
         onClick={onClose}
-        bg="brandGreen"
+        bg="brandGreenDark"
         color="white"
         borderRadius="pill"
         _hover={{ bg: 'brandGreenDark' }}

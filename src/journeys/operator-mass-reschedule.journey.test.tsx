@@ -70,7 +70,7 @@ describe('journey operator-mass-reschedule — снос и разбор пост
     )
 
     await screen.findByTestId('operator-page', {}, { timeout: 15000 })
-    fireEvent.click(screen.getByTestId('section-mass-reschedule'))
+    fireEvent.click(screen.getByTestId('arm-nav-mass-reschedule'))
     const panel = await screen.findByTestId('mass-reschedule-panel')
 
     fireEvent.change(within(panel).getByTestId('mass-doctor'), { target: { value: doctorId } })

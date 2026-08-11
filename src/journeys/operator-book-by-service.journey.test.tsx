@@ -83,6 +83,8 @@ describe('journey operator-book-by-service — запись от услуги', 
     const date = await findBookableDateForDoctors(ecg!.doctorIds)
     renderOperator(date)
 
+    // Подбор по услуге — фильтр «Расписания»: отдельного экрана с той же сеткой больше нет.
+    fireEvent.click(await screen.findByTestId('service-picker-toggle', {}, { timeout: 8000 }))
     const picker = await screen.findByTestId('service-picker', {}, { timeout: 8000 })
     const search = within(picker).getByTestId('service-picker-search')
     fireEvent.change(search, { target: { value: 'ЭКГ' } })

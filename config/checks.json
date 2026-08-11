@@ -191,9 +191,10 @@
     "npx --no-install vitest run src/pages/admin",
     "npx --no-install vitest run stubs/api/specialties-sync.test.js"
   ],
+  "_TASK-46_note": "Проверка №2 запускает гейт харнесса, а он живёт ВНЕ проекта: путь берётся из BCF_HARNESS_ROOT (его выставляет verify.ps1), параметр гейта называется -Repo, а не -ProjectRoot. Прежняя редакция ссылалась на harness/lint-gate.ps1 внутри проекта и вкладывала кавычки в кавычки: pwsh печатал usage-баннер и отдавал exit 1 за секунду — проверка не могла пройти ни при каком состоянии кода. Форма с -ProjectRoot тоже негодна: такого параметра у гейта нет, он линтует свой собственный каталог и отвечает PASS даже при нарушении в проекте.",
   "TASK-46": [
     "npx --no-install vitest run",
-    "pwsh -NoProfile -Command \"$env:BCF_TIME_DEPENDENT_TESTS='1'; & pwsh -NoProfile -File harness/lint-gate.ps1\""
+    "$env:BCF_TIME_DEPENDENT_TESTS='1'; & (Join-Path $env:BCF_HARNESS_ROOT 'lint-gate.ps1') -Repo (Get-Location).Path"
   ],
   "TASK-47": [
     "npx --no-install vitest run stubs/api",

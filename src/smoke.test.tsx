@@ -96,7 +96,9 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByTestId('arm-nav')).toBeInTheDocument()
     })
-    expect(screen.getByTestId('arm-nav-grid')).toHaveAttribute('data-status', 'available')
-    expect(screen.getByTestId('arm-nav-cart')).toHaveAttribute('data-status', 'unavailable')
+    // Каждый пункт навигации ведёт на рабочий экран: «недоступных» пунктов нет.
+    expect(screen.getByTestId('arm-nav-grid')).toHaveAttribute('data-active', 'true')
+    expect(screen.getByTestId('arm-nav-waitlist')).toHaveAttribute('data-active', 'false')
+    expect(screen.queryByTestId('arm-nav-cart')).toBeNull()
   })
 })

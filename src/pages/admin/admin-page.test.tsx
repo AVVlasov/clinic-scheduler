@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { Provider } from '../../theme'
+import { ArmRouter, SectionNav } from '../arm-test-harness'
 import { AdminPage } from './admin-page'
 import type {
   DoctorCard,
@@ -182,7 +183,14 @@ const mockApi = ({ cards = cardsPayload, patchResponse }: ApiOptions = {}) => {
   return fetchMock
 }
 
-const renderPage = () => render(<Provider><AdminPage /></Provider>)
+const renderPage = () => render(
+  <ArmRouter>
+    <Provider>
+      <SectionNav sections={['templates', 'doctors']} />
+      <AdminPage />
+    </Provider>
+  </ArmRouter>,
+)
 
 const openDoctors = async () => {
   fireEvent.click(await screen.findByTestId('section-doctors'))

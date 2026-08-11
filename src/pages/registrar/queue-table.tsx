@@ -252,19 +252,23 @@ export const QueueTable = (props: QueueTableProps) => {
                         {paymentTypeLabel(a.paymentType)}
                       </Badge>
                     </Table.Cell>
-                    <Table.Cell>
-                      <Badge bg={sp.bg} color={sp.fg} px="8px" borderRadius="compact">
-                        {appointmentStatusLabel(a.status)}
-                      </Badge>
-                      {a.confirmed ? (
-                        <Badge ml="1" bg="brandGreenTint" color="brandGreen700" px="8px" borderRadius="compact" data-testid={`confirmed-${a.id}`}>
-                          Подтверждена
+                    {/* Статус приёма — плашка, подтверждение — подпись под ней.
+                        Две плашки в строку разной ширины при переносе вставали
+                        лесенкой: колонка читалась как сломанная. */}
+                    <Table.Cell verticalAlign="top">
+                      <Flex direction="column" align="flex-start" gap="2px">
+                        <Badge bg={sp.bg} color={sp.fg} px="8px" borderRadius="compact">
+                          {appointmentStatusLabel(a.status)}
                         </Badge>
-                      ) : (
-                        <Badge ml="1" bg="gray.100" color="textSecondary" px="8px" borderRadius="compact" data-testid={`unconfirmed-${a.id}`}>
-                          Не подтверждена
-                        </Badge>
-                      )}
+                        <Box
+                          fontSize="11px"
+                          lineHeight="14px"
+                          color={a.confirmed ? 'brandGreen700' : 'textSecondary'}
+                          data-testid={a.confirmed ? `confirmed-${a.id}` : `unconfirmed-${a.id}`}
+                        >
+                          {a.confirmed ? 'Подтверждена пациентом' : 'Не подтверждена'}
+                        </Box>
+                      </Flex>
                     </Table.Cell>
                     <Table.Cell minW="280px" whiteSpace="nowrap">
                       <Flex gap="6px" justify="flex-end" align="center" wrap="nowrap">

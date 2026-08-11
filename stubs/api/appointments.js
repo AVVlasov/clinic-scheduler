@@ -9,6 +9,7 @@ const {
   ensureWeekTemplates,
   normalizeStartIso,
   dateOnly,
+  findEquipmentConflict,
 } = require('./data');
 const {
   APPOINTMENT_STATUSES,
@@ -272,6 +273,23 @@ router.post('/appointments', (req, res) => {
     });
   }
 
+  // Оборудование и кабинет — второй ресурс записи (ФТ 3.1.1, 3.1.2): врач
+  // свободен, а аппарат уже занят другим приёмом или стоит в ремонте.
+  const equipmentConflict = findEquipmentConflict({
+    serviceId: resolvedServiceId,
+    startIso,
+    durationMin: numericDuration,
+  });
+  if (equipmentConflict) {
+    return res.status(409).json({
+      error: 'equipment_busy',
+      message: equipmentConflict.reason === 'repair'
+        ? `«${equipmentConflict.equipment.name}» недоступен: ремонт до ${equipmentConflict.absence.dateTo}`
+        : `«${equipmentConflict.equipment.name}» занят в это время (запись ${equipmentConflict.appointment.id})`,
+      equipmentId: equipmentConflict.equipment.id,
+    });
+  }
+
   const initialStatus = status || 'scheduled';
   const record = {
     id: newId(),
@@ -372,6 +390,24 @@ router.patch('/appointments/:id', (req, res) => {
       error: 'slot_taken',
       message: `Слот ${nextStart} у врача ${nextDoctorId} уже занят (запись ${collision.id})`,
     });
+  }
+
+  if (timeChanged) {
+    const equipmentConflict = findEquipmentConflict({
+      serviceId: body.serviceId !== undefined ? body.serviceId : a.serviceId,
+      startIso: nextStart,
+      durationMin: nextDuration,
+      excludeId: id,
+    });
+    if (equipmentConflict) {
+      return res.status(409).json({
+        error: 'equipment_busy',
+        message: equipmentConflict.reason === 'repair'
+          ? `«${equipmentConflict.equipment.name}» недоступен: ремонт до ${equipmentConflict.absence.dateTo}`
+          : `«${equipmentConflict.equipment.name}» занят в это время (запись ${equipmentConflict.appointment.id})`,
+        equipmentId: equipmentConflict.equipment.id,
+      });
+    }
   }
 
   if (body.status !== undefined && body.status !== null) {

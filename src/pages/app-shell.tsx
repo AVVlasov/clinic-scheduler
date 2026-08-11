@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
-import { ARM_NAV, type ArmNavItem } from '../__data__/arm-nav'
+import { ARM_NAV, resolveSection } from '../__data__/arm-nav'
 import { formatArmDateLabel, parseArmDate, parseArmDoctorId, shiftDate, todayDate, withArmDate } from '../__data__/dates'
 import { getDoctors } from '../__data__/api'
 import type { Doctor } from '../__data__/types'
@@ -35,38 +35,29 @@ const SITE_LABEL = 'Динамо'
 const matchArm = (pathname: string): ArmDescriptor | null =>
   ARMS.find((arm) => pathname.startsWith(arm.path)) ?? null
 
-const focusArmSection = (slug: ArmDescriptor['slug'], item: ArmNavItem) => {
-  if (item.status !== 'available' || !item.section) return
-  const sectionBtn = document.querySelector(`[data-testid="section-${item.section}"]`) as HTMLElement | null
-  if (sectionBtn) {
-    sectionBtn.click()
-    return
-  }
-  const target = document.querySelector(`[data-arm-section="${item.section}"]`) as HTMLElement | null
-  target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-}
-
-const ArmWorkspaceNav: React.FC<{ slug: ArmDescriptor['slug'] }> = ({ slug }) => {
+/**
+ * Разделы рабочего места. Каждый пункт открывает свой экран через адрес
+ * (`?section=`): нажатие всегда что-то делает, а раздел можно дать ссылкой.
+ */
+const ArmWorkspaceNav: React.FC<{
+  slug: ArmDescriptor['slug']
+  section: string
+  onSelect: (section: string) => void
+}> = ({ slug, section, onSelect }) => {
   const items = ARM_NAV[slug]
-  const [notice, setNotice] = useState<string | null>(null)
-  const [focusIdx, setFocusIdx] = useState(0)
+  if (items.length < 2) return null
 
-  useEffect(() => {
-    setNotice(null)
-    setFocusIdx(0)
-  }, [slug])
-
-  const availableIdxs = items
-    .map((item, idx) => (item.status === 'available' ? idx : -1))
-    .filter((idx) => idx >= 0)
+  const activeIdx = Math.max(0, items.findIndex((item) => item.id === section))
 
   return (
     <Box flex="none" borderBottomWidth="1px" borderBottomStyle="solid" borderBottomColor="borderLight" bg="white">
       <Flex
         as="nav"
+        role="tablist"
         aria-label="Разделы рабочего места"
         data-testid="arm-nav"
         data-arm={slug}
+        data-section={section}
         align="center"
         gap="2px"
         px="3"
@@ -74,14 +65,12 @@ const ArmWorkspaceNav: React.FC<{ slug: ArmDescriptor['slug'] }> = ({ slug }) =>
         overflowX="auto"
         onKeyDown={(e) => {
           if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
-          if (availableIdxs.length === 0) return
-          const pos = availableIdxs.indexOf(focusIdx)
-          const base = pos >= 0 ? pos : 0
-          const nextPos = e.key === 'ArrowRight'
-            ? Math.min(availableIdxs.length - 1, base + 1)
-            : Math.max(0, base - 1)
-          const nextIdx = availableIdxs[nextPos]
-          setFocusIdx(nextIdx)
+          e.preventDefault()
+          const nextIdx = e.key === 'ArrowRight'
+            ? Math.min(items.length - 1, activeIdx + 1)
+            : Math.max(0, activeIdx - 1)
+          if (nextIdx === activeIdx) return
+          onSelect(items[nextIdx].id)
           requestAnimationFrame(() => {
             const el = document.querySelector(
               `[data-testid="arm-nav-${items[nextIdx].id}"]`,
@@ -91,61 +80,37 @@ const ArmWorkspaceNav: React.FC<{ slug: ArmDescriptor['slug'] }> = ({ slug }) =>
         }}
       >
         {items.map((item, idx) => {
-          const unavailable = item.status === 'unavailable'
-          const label = unavailable && item.task ? `${item.label} · ${item.task}` : item.label
-          const tabStop = !unavailable && idx === focusIdx
+          const active = idx === activeIdx
           return (
             <Box
               as="button"
               key={item.id}
+              role="tab"
+              aria-selected={active}
+              aria-controls="arm-section"
+              tabIndex={active ? 0 : -1}
               data-testid={`arm-nav-${item.id}`}
-              data-status={item.status}
-              aria-disabled={unavailable}
-              tabIndex={unavailable ? -1 : (tabStop ? 0 : -1)}
-              title={unavailable ? (item.reason ?? item.label) : item.label}
-              onFocus={() => {
-                if (!unavailable) setFocusIdx(idx)
-              }}
-              onClick={() => {
-                if (unavailable) {
-                  const taskBit = item.task ? ` (${item.task})` : ''
-                  setNotice(`${item.reason ?? 'Раздел недоступен'}${taskBit}`)
-                  return
-                }
-                setNotice(null)
-                setFocusIdx(idx)
-                focusArmSection(slug, item)
-              }}
+              data-active={active}
+              onClick={() => onSelect(item.id)}
               h="28px"
               px="10px"
               flex="none"
               borderRadius="4px"
               borderWidth="1px"
-              borderColor={unavailable ? 'borderLight' : 'brandGreen'}
-              bg={unavailable ? 'surfaceLight' : 'white'}
-              color={unavailable ? 'textSecondary' : 'brandGreen700'}
+              borderColor={active ? 'brandGreenDark' : 'borderLight'}
+              bg={active ? 'brandGreenDark' : 'white'}
+              color={active ? 'white' : 'textPrimary'}
               fontSize="12px"
-              fontWeight={unavailable ? '400' : '700'}
-              cursor={unavailable ? 'not-allowed' : 'pointer'}
-              opacity={unavailable ? 0.85 : 1}
+              fontWeight={active ? '700' : '400'}
+              cursor="pointer"
               whiteSpace="nowrap"
+              _hover={{ bg: active ? 'brandGreenDark' : 'surfaceLight' }}
             >
-              {label}
+              {item.label}
             </Box>
           )
         })}
       </Flex>
-      {notice ? (
-        <Text
-          px="3"
-          pb="6px"
-          fontSize="12px"
-          color="textSecondary"
-          data-testid="arm-nav-unavailable-reason"
-        >
-          {notice}
-        </Text>
-      ) : null}
     </Box>
   )
 }
@@ -172,7 +137,8 @@ const SwitcherItem: React.FC<ArmDescriptor & { active: boolean; to: string; tabI
       fontWeight: 400,
       textDecoration: 'none',
       color: active ? 'white' : 'var(--chakra-colors-textPrimary, #1F1F1F)',
-      background: active ? 'var(--chakra-colors-brandGreen, #0D9B6C)' : 'transparent',
+      // Белый текст мельче 18px — только на ступени ≥600 (_ds --text-on-green).
+      background: active ? 'var(--chakra-colors-brandGreenDark, #0B815A)' : 'transparent',
       transition: 'background-color 120ms ease, color 120ms ease',
     }}
   >
@@ -293,17 +259,38 @@ export const AppShell: React.FC = () => {
     [searchParams, location.search],
   )
 
+  const activeSection = activeArm
+    ? resolveSection(activeArm.slug, searchParams.get('section'))
+    : ''
+
+  /** Адрес АРМ с сохранением даты, врача и раздела. */
+  const buildArmUrl = useCallback((arm: ArmDescriptor, params: {
+    date?: string
+    section?: string
+  }) => {
+    const doctorId = arm.slug === 'doctor' ? parseArmDoctorId(location.search) ?? undefined : undefined
+    const base = arm.dateBound
+      ? withArmDate(arm.path, params.date ?? selectedDate, doctorId)
+      : arm.path
+    const section = params.section ?? (arm.slug === activeArm?.slug ? activeSection : undefined)
+    if (!section || section === ARM_NAV[arm.slug][0].id) return base
+    return `${base}${base.includes('?') ? '&' : '?'}section=${encodeURIComponent(section)}`
+  }, [activeArm?.slug, activeSection, location.search, selectedDate])
+
   const setDate = useCallback((next: string) => {
     if (!activeArm || !activeArm.dateBound) return
-    const doctorId = activeArm.slug === 'doctor' ? parseArmDoctorId(location.search) ?? undefined : undefined
-    navigate(withArmDate(activeArm.path, next, doctorId), { replace: true })
-  }, [activeArm, navigate, location.search])
+    navigate(buildArmUrl(activeArm, { date: next }), { replace: true })
+  }, [activeArm, buildArmUrl, navigate])
 
-  const armLink = useCallback((arm: ArmDescriptor) => {
-    if (!arm.dateBound) return arm.path
-    const doctorId = arm.slug === 'doctor' ? parseArmDoctorId(location.search) ?? undefined : undefined
-    return withArmDate(arm.path, selectedDate, doctorId)
-  }, [selectedDate, location.search])
+  const setSection = useCallback((next: string) => {
+    if (!activeArm) return
+    navigate(buildArmUrl(activeArm, { section: next }))
+  }, [activeArm, buildArmUrl, navigate])
+
+  const armLink = useCallback(
+    (arm: ArmDescriptor) => buildArmUrl(arm, { section: ARM_NAV[arm.slug][0].id }),
+    [buildArmUrl],
+  )
 
   const [doctors, setDoctors] = useState<Doctor[]>([])
   useEffect(() => {
@@ -468,9 +455,11 @@ export const AppShell: React.FC = () => {
         </Flex>
       </Flex>
 
-      {activeArm ? <ArmWorkspaceNav slug={activeArm.slug} /> : null}
+      {activeArm ? (
+        <ArmWorkspaceNav slug={activeArm.slug} section={activeSection} onSelect={setSection} />
+      ) : null}
 
-      <Box flex="1" minH="0" overflow="hidden" data-testid="app-shell-content">
+      <Box id="arm-section" flex="1" minH="0" overflow="hidden" data-testid="app-shell-content">
         <Outlet />
       </Box>
     </Flex>

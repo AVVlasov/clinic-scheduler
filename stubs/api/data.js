@@ -60,6 +60,8 @@ const services = [
   {
     id: 's-004', name: 'УЗИ брюшной полости', duration: 30, category: 'Диагностика', price: 2800,
     doctorIds: ['d-002', 'd-006'],
+    // Матрица компетенций: допуск есть, но с ограничением — оператор увидит предупреждение.
+    limitedDoctorIds: ['d-006'],
   },
   {
     id: 's-005', name: 'Анализ крови общий', duration: 10, category: 'Лаборатория', price: 650,
@@ -76,6 +78,136 @@ const services = [
   {
     id: 's-008', name: 'Расширенный приём', duration: 60, category: 'Приём', price: 4500,
     doctorIds: ['d-001', 'd-002', 'd-004'],
+    limitedDoctorIds: ['d-004'],
+  },
+];
+
+/**
+ * Оборудование и кабинеты — второй ресурс записи (ФТ 3.1.1, 3.1.2).
+ * `serviceIds` — услуги, которые без этого ресурса не выполняются: занятость
+ * ресурса считается по реальным записям на эти услуги, а не отдельным списком.
+ * `kind`: apparatus — аппарат, room — кабинет (в одном кабинете могут стоять
+ * разные аппараты, и тогда кабинет становится общим ограничением).
+ */
+const equipment = [
+  {
+    id: 'eq-001',
+    name: 'Электрокардиограф Schiller AT-102',
+    code: 'EQ.ECG.01',
+    kind: 'apparatus',
+    type: 'Функциональная диагностика',
+    cabinet: '305',
+    hours: { start: '08:00', end: '20:00' },
+    maintenance: '10 мин после каждого исследования',
+    serviceIds: ['s-003'],
+  },
+  {
+    id: 'eq-002',
+    name: 'УЗИ-сканер Mindray Resona 7',
+    code: 'EQ.USG.04',
+    kind: 'apparatus',
+    type: 'Ультразвуковая диагностика',
+    cabinet: '118',
+    hours: { start: '08:00', end: '20:00' },
+    maintenance: 'обработка датчиков 5 мин',
+    serviceIds: ['s-004'],
+  },
+  {
+    id: 'eq-003',
+    name: 'Гематологический анализатор Sysmex XN-550',
+    code: 'EQ.LAB.02',
+    kind: 'apparatus',
+    type: 'Лаборатория',
+    cabinet: '104',
+    hours: { start: '08:00', end: '16:00' },
+    maintenance: 'калибровка 08:00–08:15',
+    serviceIds: ['s-005'],
+  },
+  {
+    id: 'eq-004',
+    name: 'Биохимический анализатор Mindray BS-240',
+    code: 'EQ.LAB.07',
+    kind: 'apparatus',
+    type: 'Лаборатория',
+    cabinet: '104',
+    hours: { start: '08:00', end: '16:00' },
+    maintenance: 'промывка 30 мин после 20 проб',
+    serviceIds: ['s-006'],
+  },
+  {
+    id: 'eq-005',
+    name: 'Процедурный кабинет 104 (забор крови)',
+    code: 'ROOM.104',
+    kind: 'room',
+    type: 'Кабинет',
+    cabinet: '104',
+    hours: { start: '08:00', end: '16:00' },
+    maintenance: 'кварцевание 12:00–12:15',
+    serviceIds: ['s-005', 's-006'],
+  },
+];
+
+/**
+ * Правила длительности (ФТ 1.6, 2.1). Применяются по приоритету сверху вниз:
+ * `base` берёт длительность услуги из справочника, `set` задаёт норматив,
+ * `add` двигает результат. Выключение правила меняет длительность реальной
+ * записи — правила читает и АРМ оператора, а не только экран администратора.
+ */
+const durationRules = [
+  {
+    id: 'dr-base',
+    priority: 0,
+    condition: 'Базовая длительность',
+    factor: 'Норматив услуги из справочника',
+    effectLabel: 'база',
+    enabled: true,
+    locked: true,
+    match: {},
+    effect: { kind: 'base' },
+  },
+  {
+    id: 'dr-visit-first',
+    priority: 1,
+    condition: 'Тип приёма',
+    factor: 'Первичный, категория «Приём»',
+    effectLabel: '60 мин',
+    enabled: true,
+    locked: false,
+    match: { serviceCategory: 'Приём', visitType: 'first' },
+    effect: { kind: 'set', minutes: 60 },
+  },
+  {
+    id: 'dr-visit-repeat',
+    priority: 2,
+    condition: 'Тип приёма',
+    factor: 'Повторный, категория «Приём»',
+    effectLabel: '30 мин',
+    enabled: true,
+    locked: false,
+    match: { serviceCategory: 'Приём', visitType: 'repeat' },
+    effect: { kind: 'set', minutes: 30 },
+  },
+  {
+    id: 'dr-equipment',
+    priority: 3,
+    condition: 'Оборудование',
+    factor: 'Услуга выполняется на аппарате',
+    effectLabel: '+10 мин',
+    enabled: false,
+    locked: false,
+    match: { requiresEquipment: true },
+    effect: { kind: 'add', minutes: 10 },
+  },
+  {
+    id: 'dr-age-senior',
+    priority: 4,
+    condition: 'Возраст пациента',
+    factor: 'Старше 70 лет',
+    effectLabel: '+15 мин',
+    enabled: true,
+    locked: false,
+    match: { patientAgeFrom: 70 },
+    effect: { kind: 'add', minutes: 15 },
   },
 ];
 
@@ -120,7 +252,24 @@ const patients = [
     birthDate: '2001-01-30',
     cardNumber: 'UID 0004 1004',
   },
+  {
+    id: 'p-005',
+    name: 'Кузьмин Пётр Ильич',
+    lastName: 'Кузьмин',
+    firstName: 'Пётр',
+    middleName: 'Ильич',
+    phone: '+7 900 100-00-05',
+    birthDate: '1949-06-18',
+    cardNumber: 'UID 0005 1005',
+  },
 ];
+
+/**
+ * Посев записей берёт первую четвёрку: состав демо-дня зафиксирован сценариями,
+ * и пятый пациент не должен его двигать. В картотеке он нужен целиком — на нём
+ * проверяется правило длительности «старше 70 лет».
+ */
+const seedPatients = patients.slice(0, 4);
 
 const stepMinutes = 15;
 const dayStart = '08:00';
@@ -187,7 +336,27 @@ const SEED_PLAN = [
   { doctorId: 'd-005', patientId: 'p-004', status: 'scheduled',   paymentType: 'dms', serviceId: 's-001', durationMin: 30 },
   { doctorId: 'd-006', patientId: 'p-001', status: 'scheduled',   paymentType: 'regular',      serviceId: 's-004', durationMin: 30 },
   { doctorId: 'd-006', patientId: 'p-002', status: 'completed',   paymentType: 'promo',      serviceId: 's-007', durationMin: 20 },
+  // Приёмы на аппаратах: занятость оборудования считается по записям, и без
+  // них лента ресурсов пуста — проверить её на стенде было бы нечем.
+  { doctorId: 'd-004', patientId: 'p-004', status: 'scheduled',   paymentType: 'regular',    serviceId: 's-003', durationMin: 15 },
+  { doctorId: 'd-005', patientId: 'p-001', status: 'scheduled',   paymentType: 'regular',    serviceId: 's-005', durationMin: 10 },
 ];
+
+/**
+ * Услуги на аппаратах, которыми добираются записи-заполнители. Заполнитель
+ * приходит без услуги, и лента оборудования на демо-стенде оставалась пустой:
+ * занятость аппарата считается по записям, а записей на аппаратные услуги
+ * почти не было. Время и длительность заполнителя при этом не меняются —
+ * услуга подбирается ровно под уже выбранную длительность и допуск врача.
+ */
+const EQUIPMENT_SERVICES = ['s-003', 's-004', 's-005', 's-006'];
+
+const equipmentServiceFor = (doctorId, durationMin) => {
+  const svc = services.find((s) => EQUIPMENT_SERVICES.includes(s.id)
+    && s.duration === durationMin
+    && s.doctorIds.includes(doctorId));
+  return svc ? svc.id : null;
+};
 
 // Статусы, которые могут появиться на конкретном дне относительно sysDate.
 // Прошедший день — только терминальные статусы; сегодня — смесь; будущий — scheduled.
@@ -208,7 +377,7 @@ const clampStatusForDay = (date, sysDate, status) => {
   return status;
 };
 
-const patientIds = patients.map((p) => p.id);
+const patientIds = seedPatients.map((p) => p.id);
 
 const seedAppointments = (date, sysDate, seedMap) => {
   const dIdx = dayIndex(date);
@@ -217,17 +386,33 @@ const seedAppointments = (date, sysDate, seedMap) => {
   const usedMinutes = [];
   const placed = [];
 
+  /**
+   * Пациент, свободный в этом интервале. Раньше посев считал занятость только
+   * по врачу, и один пациент оказывался в двух кабинетах в одно время: на
+   * стенде это видно глазами, а сервер (ФТ 3.3.1) такую запись не принял бы.
+   */
+  const pickPatient = (preferredId, startMin, durationMin) => {
+    const busy = (id) => placed.some((a) => a.patientId === id
+      && a.startMin < startMin + durationMin
+      && a.startMin + a.durationMin > startMin);
+    if (!busy(preferredId)) return preferredId;
+    return patientIds.find((id) => !busy(id)) ?? null;
+  };
+
   for (let i = 0; i < SEED_PLAN.length; i += 1) {
     const p = SEED_PLAN[i];
     const startMin = findSeedSlot(p.doctorId, dIdx, p.durationMin, usedMinutes, seedMap);
     if (startMin == null) continue;
+    const patientId = pickPatient(p.patientId, startMin, p.durationMin);
+    if (patientId == null) continue;
     usedMinutes.push({ doctorId: p.doctorId, startMin, endMin: startMin + p.durationMin });
     const hh = String(Math.floor(startMin / 60)).padStart(2, '0');
     const mm = String(startMin % 60).padStart(2, '0');
     const status = clampStatusForDay(date, sysDate, p.status);
     placed.push({
       doctorId: p.doctorId,
-      patientId: p.patientId,
+      patientId,
+      startMin,
       start: isoAt(date, hh, mm),
       durationMin: p.durationMin,
       status,
@@ -251,15 +436,18 @@ const seedAppointments = (date, sysDate, seedMap) => {
         const hh = String(Math.floor(startMin / 60)).padStart(2, '0');
         const mm = String(startMin % 60).padStart(2, '0');
         const status = clampStatusForDay(date, sysDate, statusPool[placed.length % statusPool.length]);
-        const patientId = patientIds[(placed.length + safety) % patientIds.length];
+        const preferred = patientIds[(placed.length + safety) % patientIds.length];
+        const patientId = pickPatient(preferred, startMin, durationMin);
+        if (patientId == null) continue;
         placed.push({
           doctorId: doc.id,
           patientId,
+          startMin,
           start: isoAt(date, hh, mm),
           durationMin,
           status,
           paymentType: 'regular',
-          serviceId: null,
+          serviceId: equipmentServiceFor(doc.id, durationMin),
         });
         grown = true;
         break;
@@ -273,7 +461,7 @@ const seedAppointments = (date, sysDate, seedMap) => {
     { createdByName: 'Смирнова А.И.', createdByUnit: 'Колл-центр' },
     { createdByName: 'Орлова Н.В.', createdByUnit: 'Регистратура Динамо' },
   ];
-  const out = placed.map((a, idx) => ({
+  const out = placed.map(({ startMin: _startMin, ...a }, idx) => ({
     ...a,
     complaints: null,
     diagnosis: null,
@@ -576,6 +764,19 @@ const buildState = () => {
     services: services.map((s) => ({
       ...s,
       doctorIds: Array.isArray(s.doctorIds) ? s.doctorIds.slice() : [],
+      // Матрица компетенций: «выполняет с ограничением» — врач в doctorIds,
+      // но оператор обязан увидеть предупреждение при записи.
+      limitedDoctorIds: Array.isArray(s.limitedDoctorIds) ? s.limitedDoctorIds.slice() : [],
+    })),
+    equipment: equipment.map((e) => ({
+      ...e,
+      hours: { ...e.hours },
+      serviceIds: e.serviceIds.slice(),
+    })),
+    durationRules: durationRules.map((r) => ({
+      ...r,
+      match: { ...r.match },
+      effect: { ...r.effect },
     })),
     patients: patients.map((p) => ({
       ...p,
@@ -863,6 +1064,204 @@ const buildSlots = (date) => {
   return slots;
 };
 
+/** Ресурсы, без которых услуга не выполняется (аппарат и/или кабинет). */
+const equipmentForService = (serviceId) => {
+  if (!serviceId) return [];
+  return (state.equipment || []).filter((e) => e.serviceIds.includes(serviceId));
+};
+
+/** Ремонт/простой ресурса на дату — из тех же отсутствий, что и у врачей. */
+const equipmentAbsentOn = (equipmentId, date) =>
+  (state.absences || []).find(
+    (a) => a.equipmentId === equipmentId && dateInRange(date, a.dateFrom, a.dateTo),
+  ) || null;
+
+/**
+ * Записи, которые занимают ресурс в интервале. Оборудование — второй ресурс:
+ * занятость считается по записям на услуги ресурса, а не отдельным журналом.
+ */
+const appointmentsOnEquipment = (equipmentId, date) => {
+  const eq = (state.equipment || []).find((e) => e.id === equipmentId);
+  if (!eq) return [];
+  const pool = [...state.appointments, ...(state.demoAppointments || [])];
+  return pool
+    .filter((a) => ACTIVE_APPOINTMENT_STATUSES.has(a.status)
+      && dateOnly(a.start) === date
+      && a.serviceId
+      && eq.serviceIds.includes(a.serviceId))
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)));
+};
+
+/**
+ * Свободен ли ресурс под запись. Возвращает первый конфликт: занятость другой
+ * записью или ремонт ресурса на эту дату.
+ */
+const findEquipmentConflict = ({ serviceId, startIso, durationMin, excludeId }) => {
+  const needed = equipmentForService(serviceId);
+  if (needed.length === 0) return null;
+  const date = dateOnly(startIso);
+  const newStart = new Date(startIso).getTime();
+  const newEnd = newStart + durationMin * 60000;
+  const pool = [...state.appointments, ...(state.demoAppointments || [])];
+
+  for (const eq of needed) {
+    const repair = equipmentAbsentOn(eq.id, date);
+    if (repair) {
+      return { equipment: eq, reason: 'repair', absence: repair };
+    }
+    const busy = pool.find((a) => {
+      if (a.id === excludeId) return false;
+      if (!ACTIVE_APPOINTMENT_STATUSES.has(a.status)) return false;
+      if (!a.serviceId || !eq.serviceIds.includes(a.serviceId)) return false;
+      const aStart = new Date(a.start).getTime();
+      const aEnd = aStart + a.durationMin * 60000;
+      return aStart < newEnd && aEnd > newStart;
+    });
+    if (busy) {
+      return { equipment: eq, reason: 'busy', appointment: busy };
+    }
+  }
+  return null;
+};
+
+/** Дневная лента ресурса: шаг сетки, реальные записи, ремонт и нерабочие часы. */
+const buildEquipmentDay = (date) => {
+  const items = (state.equipment || []).map((eq) => {
+    const repair = equipmentAbsentOn(eq.id, date);
+    const booked = appointmentsOnEquipment(eq.id, date);
+    const dayStartMin = toMinutes(dayStart);
+    const dayEndMin = toMinutes(dayEnd);
+    const openStart = toMinutes(eq.hours.start);
+    const openEnd = toMinutes(eq.hours.end);
+    const slots = [];
+    for (let m = dayStartMin; m < dayEndMin; m += stepMinutes) {
+      const time = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      const slotStart = clinicDateTimeMs(date, time);
+      const slotEnd = slotStart + stepMinutes * 60000;
+      if (repair) {
+        slots.push({ time, state: 'repair', label: ABSENCE_REASON_LABEL[repair.reason] || repair.reason });
+        continue;
+      }
+      if (m < openStart || m >= openEnd) {
+        slots.push({ time, state: 'closed', label: null });
+        continue;
+      }
+      const taken = booked.find((a) => {
+        const aStart = new Date(a.start).getTime();
+        const aEnd = aStart + a.durationMin * 60000;
+        return aStart < slotEnd && aEnd > slotStart;
+      });
+      if (taken) {
+        const patient = state.patients.find((p) => p.id === taken.patientId);
+        const doctor = state.doctors.find((d) => d.id === taken.doctorId);
+        const service = state.services.find((s) => s.id === taken.serviceId);
+        slots.push({
+          time,
+          state: 'booked',
+          label: patient ? patient.name : 'Запись',
+          appointmentId: taken.id,
+          doctorName: doctor ? doctor.name : null,
+          serviceName: service ? service.name : null,
+          isStart: new Date(taken.start).getTime() === slotStart,
+        });
+        continue;
+      }
+      slots.push({ time, state: 'free', label: null });
+    }
+    return {
+      ...eq,
+      hours: { ...eq.hours },
+      serviceIds: eq.serviceIds.slice(),
+      serviceNames: eq.serviceIds
+        .map((id) => (state.services.find((s) => s.id === id) || {}).name)
+        .filter(Boolean),
+      sharedWith: (state.equipment || [])
+        .filter((other) => other.id !== eq.id
+          && other.cabinet === eq.cabinet
+          && other.serviceIds.some((sid) => eq.serviceIds.includes(sid)))
+        .map((other) => other.name),
+      repair: repair
+        ? { from: repair.dateFrom, to: repair.dateTo, reason: ABSENCE_REASON_LABEL[repair.reason] || repair.reason }
+        : null,
+      bookedCount: booked.length,
+      slots,
+    };
+  });
+  return { date, stepMinutes, startTime: dayStart, endTime: dayEnd, items };
+};
+
+const COMPETENCY_VALUES = new Set(['yes', 'limited', 'no']);
+
+/** Значение матрицы компетенций для пары «услуга × врач». */
+const competencyValue = (service, doctorId) => {
+  const allowed = Array.isArray(service.doctorIds) ? service.doctorIds : [];
+  if (!allowed.includes(doctorId)) return 'no';
+  const limited = Array.isArray(service.limitedDoctorIds) ? service.limitedDoctorIds : [];
+  return limited.includes(doctorId) ? 'limited' : 'yes';
+};
+
+/** Матрица компетенций целиком: врачи × услуги (ФТ 1.5). */
+const buildCompetencies = () => ({
+  doctors: state.doctors.map((d) => ({ id: d.id, name: d.name, specialty: d.specialty })),
+  services: state.services.map((s) => ({ id: s.id, name: s.name, category: s.category })),
+  cells: state.services.map((s) => ({
+    serviceId: s.id,
+    values: state.doctors.map((d) => ({ doctorId: d.id, value: competencyValue(s, d.id) })),
+  })),
+});
+
+/**
+ * Правка одной клетки матрицы. Пишет в тот же `doctorIds`, по которому сервер
+ * отказывает в записи: снятый допуск сразу закрывает запись к этому врачу.
+ */
+const setCompetency = (serviceId, doctorId, value) => {
+  const service = state.services.find((s) => s.id === serviceId);
+  if (!service) {
+    return { ok: false, status: 404, error: 'service_not_found', message: 'Услуга не найдена' };
+  }
+  if (!state.doctors.some((d) => d.id === doctorId)) {
+    return { ok: false, status: 404, error: 'doctor_not_found', message: 'Врач не найден' };
+  }
+  if (!COMPETENCY_VALUES.has(value)) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'invalid_value',
+      message: 'Допуск принимает значения «yes», «limited» или «no»',
+    };
+  }
+  if (!Array.isArray(service.limitedDoctorIds)) service.limitedDoctorIds = [];
+  const withoutDoctor = (list) => list.filter((id) => id !== doctorId);
+
+  if (value === 'no') {
+    service.doctorIds = withoutDoctor(service.doctorIds);
+    service.limitedDoctorIds = withoutDoctor(service.limitedDoctorIds);
+  } else {
+    if (!service.doctorIds.includes(doctorId)) service.doctorIds.push(doctorId);
+    service.limitedDoctorIds = withoutDoctor(service.limitedDoctorIds);
+    if (value === 'limited') service.limitedDoctorIds.push(doctorId);
+  }
+  return { ok: true, serviceId, doctorId, value: competencyValue(service, doctorId) };
+};
+
+/** Включение/выключение правила длительности. Базовое правило не выключается. */
+const setDurationRuleEnabled = (id, enabled) => {
+  const rule = (state.durationRules || []).find((r) => r.id === id);
+  if (!rule) {
+    return { ok: false, status: 404, error: 'rule_not_found', message: 'Правило не найдено' };
+  }
+  if (rule.locked) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'rule_locked',
+      message: 'Базовое правило длительности выключить нельзя',
+    };
+  }
+  rule.enabled = Boolean(enabled);
+  return { ok: true, rule };
+};
+
 const overlaps = (a, doctorId, startTime, durationMin, excludeId) => {
   if (a.id === excludeId) return false;
   if (a.doctorId !== doctorId) return false;
@@ -992,4 +1391,13 @@ module.exports = {
   findAffectedAppointments,
   applyAbsence,
   ABSENCE_REASON_LABEL,
+  equipmentForService,
+  equipmentAbsentOn,
+  appointmentsOnEquipment,
+  findEquipmentConflict,
+  buildEquipmentDay,
+  buildCompetencies,
+  competencyValue,
+  setCompetency,
+  setDurationRuleEnabled,
 };

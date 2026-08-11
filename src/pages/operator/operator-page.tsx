@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Box, Flex, Stack, Text } from '@chakra-ui/react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { resolveSection } from '../../__data__/arm-nav'
 import {
   getAppointments,
   getDoctors,
+  getDurationRules,
   getPatients,
   getSchedule,
   getServices,
@@ -22,6 +24,7 @@ import { resolveBookingDuration, serviceOfferedByDoctor } from '../../__data__/b
 import type {
   Appointment,
   Doctor,
+  DurationRule,
   Patient,
   Schedule,
   ScheduleSlot,
@@ -60,7 +63,9 @@ const weekdayOf = (isoDate: string): number => {
 export const OperatorPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const selectedDate = parseArmDate(location.search)
+  const section = resolveSection('operator', searchParams.get('section'))
 
   const [range, setRange] = useState<OperatorRange>('today')
   const [schedules, setSchedules] = useState<Schedule[]>([])
@@ -75,7 +80,8 @@ export const OperatorPage = () => {
   const [isLoaded, setIsLoaded] = useState(false)
   const [fitDurationMin, setFitDurationMin] = useState<number | null>(null)
   const [filterServiceId, setFilterServiceId] = useState<string | null>(null)
-  const [section, setSection] = useState<'grid' | 'waitlist' | 'mass-reschedule'>('grid')
+  const [durationRules, setDurationRules] = useState<DurationRule[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [waitlistOpenCount, setWaitlistOpenCount] = useState(0)
   const [actionNotice, setActionNotice] = useState<string | null>(null)
 
@@ -119,6 +125,26 @@ export const OperatorPage = () => {
     })
   }, [load])
 
+  /**
+   * Правила длительности грузятся отдельно от смены: справочник администратора
+   * не должен закрывать оператору сетку. Без него действует резервный норматив
+   * приёма из `resolveBookingDuration` — тот же, что был до появления правил.
+   */
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve()
+      .then(() => getDurationRules())
+      .then((res) => {
+        if (!cancelled) setDurationRules(res.items)
+      })
+      .catch(() => {
+        if (!cancelled) setDurationRules([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const handleRangeChange = (next: OperatorRange) => {
     setRange(next)
     setSelected(null)
@@ -147,8 +173,11 @@ export const OperatorPage = () => {
 
   const serviceFitDuration = useMemo(() => {
     if (!filterService) return null
-    return resolveBookingDuration(filterService, 'repeat')
-  }, [filterService])
+    return resolveBookingDuration(filterService, 'repeat', {
+      rules: durationRules,
+      requiresEquipment: filterService.requiresEquipment,
+    })
+  }, [filterService, durationRules])
 
   const handleServiceFilter = useCallback((serviceId: string | null) => {
     setFilterServiceId(serviceId)
@@ -156,6 +185,19 @@ export const OperatorPage = () => {
     setRescheduleTarget(null)
     setFitDurationMin(null)
   }, [])
+
+  /**
+   * Подбор по услуге — фильтр «Расписания», а не отдельный экран: раньше на это
+   * же место вёл второй пункт меню с точно такой же сеткой. Уходя со сетки,
+   * фильтр снимаем: иначе он молча сужал бы список врачей.
+   */
+  useEffect(() => {
+    if (section === 'grid') return
+    setFilterServiceId(null)
+    setPickerOpen(false)
+  }, [section])
+
+  const isGridScreen = section === 'grid'
 
   const selectedDoctor = useMemo<Doctor | undefined>(
     () => (selected ? doctors.find((d) => d.id === selected.doctorId) : undefined),
@@ -241,7 +283,7 @@ export const OperatorPage = () => {
           h="32px"
           px="12px"
           borderRadius="4px"
-          bg="brandGreen"
+          bg="brandGreenDark"
           color="white"
           fontSize="13px"
           cursor="pointer"
@@ -290,50 +332,11 @@ export const OperatorPage = () => {
       gap="3"
       p="3"
     >
-      <Flex gap="6px" align="center" wrap="wrap">
-        <Button
-          type="button"
-          size="sm"
-          tabIndex={-1}
-          borderRadius="compact"
-          variant={section === 'grid' ? 'solid' : 'outline'}
-          bg={section === 'grid' ? 'brandGreen' : 'transparent'}
-          color={section === 'grid' ? 'white' : 'textPrimary'}
-          borderColor="borderLight"
-          onClick={() => setSection('grid')}
-          data-testid="section-grid"
-        >
-          Сетка
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          tabIndex={-1}
-          borderRadius="compact"
-          variant={section === 'waitlist' ? 'solid' : 'outline'}
-          bg={section === 'waitlist' ? 'brandGreen' : 'transparent'}
-          color={section === 'waitlist' ? 'white' : 'textPrimary'}
-          borderColor="borderLight"
-          onClick={() => setSection('waitlist')}
-          data-testid="section-waitlist"
-        >
-          Лист ожидания{waitlistOpenCount > 0 ? ` (${waitlistOpenCount})` : ''}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          tabIndex={-1}
-          borderRadius="compact"
-          variant={section === 'mass-reschedule' ? 'solid' : 'outline'}
-          bg={section === 'mass-reschedule' ? 'brandGreen' : 'transparent'}
-          color={section === 'mass-reschedule' ? 'white' : 'textPrimary'}
-          borderColor="borderLight"
-          onClick={() => setSection('mass-reschedule')}
-          data-testid="section-mass-reschedule"
-        >
-          Снос расписания
-        </Button>
-      </Flex>
+      {waitlistOpenCount > 0 && section !== 'waitlist' ? (
+        <Text fontSize="12px" color="textSecondary" data-testid="operator-waitlist-hint">
+          В листе ожидания открытых заявок: {waitlistOpenCount}
+        </Text>
+      ) : null}
 
       {actionNotice ? (
         <Box
@@ -363,7 +366,7 @@ export const OperatorPage = () => {
         <MassReschedulePanel doctors={doctors} />
       ) : null}
 
-      {section === 'grid' && refreshError ? (
+      {isGridScreen && refreshError ? (
         <Box
           bg="danger"
           color="white"
@@ -383,13 +386,14 @@ export const OperatorPage = () => {
           </Text>
         </Box>
       ) : null}
-      {section === 'grid' ? (
+      {isGridScreen ? (
         <Flex direction="column" gap="3" flex="1" minH="0">
           <Flex gap="3" align="stretch" flex="1" minH="0" order={2}>
             <Stack
               gap="3"
               flex="1"
               minW="0"
+              minH="0"
               bg="white"
               borderWidth="1px"
               borderColor="borderLight"
@@ -411,8 +415,27 @@ export const OperatorPage = () => {
                     {range === 'week'
                       ? `${formatShortDate(viewDates[0])}–${formatShortDate(viewDates[6])}`
                       : formatShortDate(primaryDate)}
-                    {daySchedules[0] ? ` · шаг ${daySchedules[0].stepMinutes} мин` : null}
+                    {daySchedules[0] ? `, шаг ${daySchedules[0].stepMinutes} мин` : null}
                   </Text>
+                </Box>
+                {/* Подбор по услуге — здесь же, на сетке: отдельный экран с той
+                    же сеткой был вторым входом в ту же работу. */}
+                <Box
+                  as="button"
+                  data-testid="service-picker-toggle"
+                  aria-expanded={pickerOpen || Boolean(filterServiceId)}
+                  onClick={() => setPickerOpen((v) => !v)}
+                  h="32px"
+                  px="12px"
+                  borderRadius="compact"
+                  borderWidth="1px"
+                  borderColor={filterServiceId ? 'brandGreen' : 'borderLight'}
+                  bg={filterServiceId ? 'brandGreenFaint' : 'white'}
+                  color={filterServiceId ? 'brandGreen700' : 'textPrimary'}
+                  fontSize="13px"
+                  cursor="pointer"
+                >
+                  {filterService ? `Услуга: ${filterService.name}` : 'Подбор по услуге'}
                 </Box>
                 <Flex
                   role="tablist"
@@ -486,10 +509,29 @@ export const OperatorPage = () => {
                   </Text>
                 </Box>
               ) : (
-                <Stack gap="4" data-testid={range === 'week' ? 'schedule-week' : undefined} overflowY="auto">
+                <Stack
+                  gap="4"
+                  data-testid={range === 'week' ? 'schedule-week' : undefined}
+                  flex="1"
+                  minH="0"
+                  /* Полоса прокрутки одна. День: её держит сама сетка. Неделя:
+                     сеток семь, поэтому прокручивается колонка, а сетки внутри
+                     рисуются целиком. Раньше прокручивались обе — рядом стояли
+                     две полосы, и внешняя не двигала таблицу. */
+                  overflowY={range === 'week' ? 'auto' : 'hidden'}
+                  display="flex"
+                  flexDirection="column"
+                >
                   {daySchedules.map((schedule) => (
                     schedule.slots.length === 0 && !schedule.holiday ? null : (
-                      <Box key={schedule.date} data-testid={`schedule-day-${schedule.date}`}>
+                      <Box
+                        key={schedule.date}
+                        data-testid={`schedule-day-${schedule.date}`}
+                        flex={range === 'week' ? undefined : '1'}
+                        minH={range === 'week' ? undefined : '0'}
+                        display="flex"
+                        flexDirection="column"
+                      >
                         {range === 'week' ? (
                           <Text fontSize="13px" fontWeight="700" mb="2" color="textPrimary">
                             {formatShortDate(schedule.date)}
@@ -515,6 +557,7 @@ export const OperatorPage = () => {
                             (selected?.date === schedule.date ? fitDurationMin : null)
                         ?? (filterService ? serviceFitDuration : null)
                           }
+                          scroll={range === 'week' ? 'page' : 'self'}
                           fitDoctorId={
                             filterService
                               ? null
@@ -560,6 +603,7 @@ export const OperatorPage = () => {
                   onClearRescheduleTarget={() => setRescheduleTarget(null)}
                   onFitDurationChange={setFitDurationMin}
                   preferredServiceId={filterServiceId}
+                  durationRules={durationRules}
                   onBookingDone={handleBookingDone}
                 />
               ) : (
@@ -582,13 +626,22 @@ export const OperatorPage = () => {
               )}
             </Box>
           </Flex>
-          <Box order={1}>
-            <ServicePicker
-              services={services}
-              selectedId={filterServiceId}
-              onSelect={handleServiceFilter}
-            />
-          </Box>
+          {pickerOpen || filterServiceId ? (
+            <Box order={1}>
+              <ServicePicker
+                services={services}
+                selectedId={filterServiceId}
+                onSelect={(id) => {
+                  handleServiceFilter(id)
+                  if (id === null) setPickerOpen(false)
+                }}
+                onClose={() => {
+                  handleServiceFilter(null)
+                  setPickerOpen(false)
+                }}
+              />
+            </Box>
+          ) : null}
         </Flex>
       ) : null}
     </Flex>

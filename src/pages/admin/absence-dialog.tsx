@@ -3,6 +3,10 @@ import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 
 import { createAbsence, previewAbsence } from '../../__data__/api'
 import type { AbsenceReason, Doctor } from '../../__data__/types'
+import { fieldStyle } from '../field-style'
+
+/** В модалке шириной 480px поле занимает всю строку: ограничение ширины здесь лишнее. */
+const dialogFieldStyle: React.CSSProperties = { ...fieldStyle, maxWidth: '100%' }
 
 const REASONS: Array<{ id: AbsenceReason; label: string }> = [
   { id: 'vacation', label: 'Отпуск' },
@@ -12,15 +16,6 @@ const REASONS: Array<{ id: AbsenceReason; label: string }> = [
   { id: 'training', label: 'Учебный день' },
   { id: 'tech_break', label: 'Техперерыв' },
 ]
-
-const fieldStyle: React.CSSProperties = {
-  height: '32px',
-  padding: '0 10px',
-  border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
-  borderRadius: '4px',
-  fontSize: '13px',
-  width: '100%',
-}
 
 interface AbsenceDialogProps {
   doctors: Doctor[]
@@ -139,7 +134,7 @@ export const AbsenceDialog = ({ doctors, open, onClose, onApplied }: AbsenceDial
           <Text fontSize="12px">Врач</Text>
           <select
             data-testid="absence-doctor"
-            style={fieldStyle}
+            style={dialogFieldStyle}
             value={doctorId}
             onChange={(e) => { setDoctorId(e.target.value); setConfirming(false) }}
           >
@@ -155,7 +150,7 @@ export const AbsenceDialog = ({ doctors, open, onClose, onApplied }: AbsenceDial
             <input
               type="date"
               data-testid="absence-date-from"
-              style={fieldStyle}
+              style={dialogFieldStyle}
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setConfirming(false) }}
             />
@@ -165,7 +160,7 @@ export const AbsenceDialog = ({ doctors, open, onClose, onApplied }: AbsenceDial
             <input
               type="date"
               data-testid="absence-date-to"
-              style={fieldStyle}
+              style={dialogFieldStyle}
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setConfirming(false) }}
             />
@@ -176,7 +171,7 @@ export const AbsenceDialog = ({ doctors, open, onClose, onApplied }: AbsenceDial
           <Text fontSize="12px">Причина</Text>
           <select
             data-testid="absence-reason"
-            style={fieldStyle}
+            style={dialogFieldStyle}
             value={reason}
             onChange={(e) => { setReason(e.target.value as AbsenceReason); setConfirming(false) }}
           >
@@ -213,7 +208,7 @@ export const AbsenceDialog = ({ doctors, open, onClose, onApplied }: AbsenceDial
         <Flex gap="2" justify="flex-end">
           <Button variant="outline" onClick={onClose} data-testid="absence-cancel">Отмена</Button>
           <Button
-            bg="brandGreen"
+            bg="brandGreenDark"
             color="white"
             _hover={{ bg: 'brandGreenDark' }}
             disabled={busy}

@@ -10,15 +10,7 @@ import {
   rescheduleMassCancelItem,
 } from '../../__data__/api'
 import type { Doctor, MassCancelBatch, MassCancelItem } from '../../__data__/types'
-
-const fieldStyle: React.CSSProperties = {
-  height: '32px',
-  padding: '0 10px',
-  border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
-  borderRadius: '4px',
-  fontSize: '13px',
-  width: '100%',
-}
+import { fieldStyle, wideFieldStyle } from '../field-style'
 
 const handlingLabel = (s: MassCancelItem['handlingStatus']) =>
   (s === 'pending' ? 'Под отмену' : 'Перезаписан')
@@ -189,43 +181,63 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
           <Text fontSize="13px" color="textSecondary">
             Массовая отмена по врачу и периоду. Действие необратимо.
           </Text>
-          <Flex gap="2" wrap="wrap">
-            <select
-              data-testid="mass-doctor"
-              style={{ ...fieldStyle, maxWidth: 260 }}
-              value={doctorId}
-              onChange={(e) => { setDoctorId(e.target.value); setConfirming(false) }}
-            >
-              {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-            <input
-              type="date"
-              data-testid="mass-date-from"
-              style={fieldStyle}
-              value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setConfirming(false) }}
-            />
-            <input
-              type="date"
-              data-testid="mass-date-to"
-              style={fieldStyle}
-              value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setConfirming(false) }}
-            />
+          {/* У каждого поля своя подпись: без неё оператор не отличает «с» от «по». */}
+          <Flex gap="3" wrap="wrap" align="flex-end">
+            <Stack gap="1" flex="0 1 260px" minW="200px">
+              <Text as="span" fontSize="11px" color="textSecondary" id="mass-doctor-label">Врач</Text>
+              <select
+                data-testid="mass-doctor"
+                aria-labelledby="mass-doctor-label"
+                style={{ ...fieldStyle, maxWidth: 260 }}
+                value={doctorId}
+                onChange={(e) => { setDoctorId(e.target.value); setConfirming(false) }}
+              >
+                {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </Stack>
+            <Stack gap="1" flex="0 1 170px" minW="150px">
+              <Text as="span" fontSize="11px" color="textSecondary" id="mass-date-from-label">Снести с даты</Text>
+              <input
+                type="date"
+                data-testid="mass-date-from"
+                aria-labelledby="mass-date-from-label"
+                style={{ ...fieldStyle, maxWidth: 170 }}
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setConfirming(false) }}
+              />
+            </Stack>
+            <Stack gap="1" flex="0 1 170px" minW="150px">
+              <Text as="span" fontSize="11px" color="textSecondary" id="mass-date-to-label">По дату включительно</Text>
+              <input
+                type="date"
+                data-testid="mass-date-to"
+                aria-labelledby="mass-date-to-label"
+                style={{ ...fieldStyle, maxWidth: 170 }}
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setConfirming(false) }}
+              />
+            </Stack>
           </Flex>
-          <input
-            data-testid="mass-reason"
-            style={fieldStyle}
-            value={reason}
-            onChange={(e) => { setReason(e.target.value); setConfirming(false) }}
-          />
+          <Stack gap="1">
+            <Text as="span" fontSize="11px" color="textSecondary" id="mass-reason-label">
+              Причина сноса — попадёт в отчёт и в карточку каждой отменённой записи
+            </Text>
+            <input
+              data-testid="mass-reason"
+              aria-labelledby="mass-reason-label"
+              placeholder="Например, врач на больничном"
+              style={wideFieldStyle}
+              value={reason}
+              onChange={(e) => { setReason(e.target.value); setConfirming(false) }}
+            />
+          </Stack>
           {previewCount != null ? (
             <Box bg="brandOrange" color="textPrimary" borderRadius="compact" px="3" py="2" data-testid="mass-preview">
               <Text fontSize="13px" fontWeight="700">Записей под отмену: {previewCount}</Text>
               <Stack gap="0" mt="1" data-testid="mass-preview-patients">
                 {previewPatients.slice(0, 8).map((p) => (
                   <Text key={`${p.start}-${p.patientName}`} fontSize="12px">
-                    {p.patientName ?? 'Пациент'} · {p.start}
+                    {p.patientName ?? 'Пациент'}, {p.start}
                   </Text>
                 ))}
               </Stack>
@@ -236,7 +248,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
           ) : null}
           <Flex justify="flex-end">
             <Button
-              bg="brandGreen"
+              bg="brandGreenDark"
               color="white"
               disabled={busy}
               onClick={() => { void applyCancel() }}
@@ -249,7 +261,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
       ) : (
         <Stack gap="3">
           <Flex gap="6px" wrap="wrap" align="center">
-            <Text fontSize="13px">Пакет {batch.id} · {batch.doctorName}</Text>
+            <Text fontSize="13px">Пакет {batch.id}, врач {batch.doctorName}</Text>
             <Box flex="1" />
             <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="Все" testId="mass-filter-all" />
             <FilterChip active={filter === 'pending'} onClick={() => setFilter('pending')} label="Под отмену" testId="mass-filter-pending" />
@@ -290,7 +302,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
                     </Text>
                   </Flex>
                   <Text fontSize="12px" color="textSecondary">
-                    Было: {item.originalStart} · {item.originalDoctorName}
+                    Было: {item.originalStart}, {item.originalDoctorName}
                   </Text>
                   {item.newStart ? (
                     <Text fontSize="12px" color="brandGreen700" data-testid={`mass-new-start-${item.id}`}>
@@ -315,7 +327,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
                       borderColor="borderLight"
                       borderRadius="compact"
                     >
-                      <Text fontSize="12px" flex="1">{m.date} {m.time} · {m.doctorName}</Text>
+                      <Text fontSize="12px" flex="1">{m.date} {m.time}, {m.doctorName}</Text>
                       <Button
                         size="xs"
                         onClick={() => { void onBook(m) }}
