@@ -350,10 +350,20 @@ describe('journey keyboard-and-response — клавиатура, подтвер
     renderArm(armPath('registrar', date))
     fireEvent.click(await screen.findByTestId(`queue-row-${item.id}`, {}, { timeout: 5000 }))
     const card = await screen.findByTestId('visit-card')
-    expect(card).toHaveAttribute('data-scrollable', 'true')
-    const style = window.getComputedStyle(card)
-    expect(['auto', 'scroll', 'overlay'].some((v) => style.overflowY.includes(v) || style.overflow.includes(v)
-      || card.getAttribute('style')?.includes('overflow')
-      || true)).toBe(true)
+    /**
+     * Проверяется вычисленный стиль, а не атрибут. Прежняя версия заканчивалась
+     * на `|| true` — то есть проходила всегда, даже если прокрутки нет вовсе:
+     * ровно так карточка оператора и приехала к показу с обрезанными кнопками.
+     */
+    const scrollable = (el: HTMLElement | null): boolean => {
+      let node = el
+      while (node && node !== document.body) {
+        const { overflowY, overflow } = window.getComputedStyle(node)
+        if (['auto', 'scroll', 'overlay'].some((v) => overflowY === v || overflow === v)) return true
+        node = node.parentElement
+      }
+      return false
+    }
+    expect(scrollable(card), 'низ карточки визита недостижим: нет прокрутки').toBe(true)
   })
 })

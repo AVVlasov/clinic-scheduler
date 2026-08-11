@@ -428,6 +428,19 @@ export const SlotCard = ({
       : 'Свободен')
   const statusTone = isBusy ? 'brandGreenTint' : 'brandGreenFaint'
 
+  /**
+   * Время закрыто администратором: блокировка, перерыв, отсутствие. Слот занят,
+   * но записи за ним нет — и карточка обязана это сказать. Раньше она молча
+   * падала на `appointment.confirmed`, унося собой весь экран оператора:
+   * клик по серой ячейке давал белую страницу.
+   */
+  const closedWithoutAppointment = isBusy && !appointment
+  const closedReason = doctorResource.occupancyKind === 'tech_break'
+    ? 'Перерыв в приёме — записать на это время нельзя.'
+    : doctorResource.occupancyKind === 'blocked'
+      ? 'Время закрыто администратором. Чтобы освободить его, снимите блокировку в шаблоне недели.'
+      : 'Время недоступно для записи.'
+
   const isTarget =
     isBusy &&
     rescheduleTargetTime === time &&
@@ -703,16 +716,15 @@ export const SlotCard = ({
             {appointment.operatorComment ? (
               <Field label="Комментарий" value={appointment.operatorComment} />
             ) : null}
-            <Field
-              label="Цель переноса"
-              value={
-                isTarget
-                  ? `${time} (${doctor.name})`
-                  : rescheduleTargetTime
-                    ? `${rescheduleTargetTime}`
-                    : 'не выбрана'
-              }
-            />
+            {/* Строка появляется только когда перенос начат: «Цель переноса —
+                не выбрана» висела в карточке всегда и занимала место, ничего не
+                сообщая. */}
+            {hasRescheduleTarget || isTarget ? (
+              <Field
+                label="Цель переноса"
+                value={isTarget ? `${time}, ${doctor.name}` : String(rescheduleTargetTime)}
+              />
+            ) : null}
             {appointment.status === 'cancelled' && (
               <Field
                 label="Причина отмены"
@@ -783,8 +795,24 @@ export const SlotCard = ({
           </Box>
         )}
 
+        {closedWithoutAppointment && (
+          <Box
+            bg="surfaceLight"
+            borderLeftWidth="3px"
+            borderLeftColor="borderDark"
+            borderRadius="compact"
+            px="3"
+            py="2"
+            data-testid="card-closed-reason"
+          >
+            <Text fontSize="13px" color="textPrimary" lineHeight="18px">
+              {closedReason}
+            </Text>
+          </Box>
+        )}
+
         <HStack gap="2" flexWrap="wrap">
-          {isBusy ? (
+          {isBusy && appointment ? (
             <>
               {canReschedule ? (
                 <Button
@@ -887,7 +915,7 @@ export const SlotCard = ({
                 </Text>
               ) : null}
             </>
-          ) : (
+          ) : closedWithoutAppointment ? null : (
             <Button
               onClick={handleBook}
               disabled={busy || !patientId || !selectedService || !fit.ok}

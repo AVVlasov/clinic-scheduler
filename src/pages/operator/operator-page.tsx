@@ -615,7 +615,10 @@ export const OperatorPage = () => {
               <ShiftOverview appointments={overviewAppointments} />
             </Stack>
 
-            <Box w="320px" flex="none">
+            {/* Колонка карточки прокручивается сама: она выше сетки, и без
+                собственной прокрутки её низ — «Записать», «Перенести»,
+                «Отменить» — просто обрезался краем экрана. */}
+            <Box w="320px" flex="none" minH="0" overflowY="auto" data-testid="slot-card-column">
               {selected && selectedDoctor && selectedResource ? (
                 <SlotCard
                   key={`${selected.date}:${selected.time}:${selected.doctorId}`}
