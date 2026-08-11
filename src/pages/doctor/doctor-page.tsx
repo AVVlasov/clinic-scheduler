@@ -4,14 +4,14 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { getAppointments, getAppointmentHistory, getDoctors, getServices, createWaitlist, rescheduleAppointment } from '../../__data__/api'
 import { paymentTypeLabel } from '../../__data__/booking'
-import { parseArmDate, parseArmDoctorId, withArmDate } from '../../__data__/dates'
+import { formatEventMoment, parseArmDate, parseArmDoctorId, withArmDate } from '../../__data__/dates'
 import { plural } from '../../__data__/plural'
-import { appointmentStatusLabel, appointmentStatusTone } from '../../__data__/status-labels'
+import { actorLabel, appointmentStatusLabel, appointmentStatusTone, historyEventLabel } from '../../__data__/status-labels'
 import type { Appointment, AppointmentHistoryEntry, CreateWaitlistInput, Service } from '../../__data__/types'
 import { URLs } from '../../__data__/urls'
 
 import { DayList } from './day-list'
-import { formatDayMonth, formatVisitRange, historyActorLabel } from './labels'
+import { formatDayMonth, formatVisitRange } from './labels'
 import { serviceNameById } from './service-access'
 import {
   emptyVisitFormState,
@@ -528,17 +528,26 @@ export const DoctorPage = () => {
               </Flex>
               {history.length > 0 && (
                 <Box data-testid="appointment-history">
-                  <Text fontSize="12px" color="textSecondary" mb="1">История статусов</Text>
-                  {history.map((entry, idx) => (
-                    <Text
-                      key={`${entry.at}-${idx}`}
-                      fontSize="12px"
-                      color="textPrimary"
-                      data-testid={`history-entry-${idx}`}
-                    >
-                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {historyActorLabel(entry.actor)}
-                    </Text>
-                  ))}
+                  <Text fontSize="12px" color="textSecondary" mb="1">История записи</Text>
+                  <Stack gap="1">
+                    {history.map((entry, idx) => (
+                      <Box
+                        key={`${entry.at}-${idx}`}
+                        display="grid"
+                        gridTemplateColumns="auto 1fr"
+                        columnGap="8px"
+                        data-testid={`history-entry-${idx}`}
+                      >
+                        <Text fontSize="12px" color="textSecondary" fontFamily="mono">
+                          {formatEventMoment(entry.at, selected.start.slice(0, 10))}
+                        </Text>
+                        <Text fontSize="12px" color="textPrimary">
+                          {historyEventLabel(entry.from, entry.to)}
+                          <Text as="span" color="textSecondary">{`, ${actorLabel(entry.actor)}`}</Text>
+                        </Text>
+                      </Box>
+                    ))}
+                  </Stack>
                 </Box>
               )}
             </Box>

@@ -111,6 +111,24 @@ describe('язык интерфейса — клиника, а не разраб
     expect(hits, hits.join('\n')).toEqual([])
   })
 
+  it('журнал показывает события, а не переходы конечного автомата', () => {
+    /**
+     * «— → Ожидает, оператор» — это диаграмма автомата, вынесенная на экран:
+     * прочерк вместо события, стрелка и половина строки, повторяющая предыдущую.
+     * Название события даёт `historyEventLabel`.
+     */
+    const hits: string[] = []
+    for (const { file, code } of productSources()) {
+      for (const m of code.matchAll(/appointmentStatusLabel\([^)]*\)\}?\s*(→|&rarr;)/g)) {
+        hits.push(`${file}: стрелка перехода в разметке — «${m[0].trim()}»`)
+      }
+      if (/\?\s*appointmentStatusLabel\([^)]*\)\s*:\s*'—'/.test(code)) {
+        hits.push(`${file}: прочерк вместо названия события`)
+      }
+    }
+    expect(hits, hits.join('\n')).toEqual([])
+  })
+
   it('роль автора перехода выводится по-русски', () => {
     const labels = fs.readFileSync(path.join(DATA_DIR, 'status-labels.ts'), 'utf8')
     for (const actor of ['operator', 'doctor', 'registrar', 'admin', 'system']) {

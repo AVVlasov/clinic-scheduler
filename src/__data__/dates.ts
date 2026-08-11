@@ -79,3 +79,19 @@ export const formatShortDate = (isoDate: string): string => {
   const [, mm, dd] = isoDate.split('-')
   return `${dd}.${mm}`
 }
+
+/**
+ * Момент события журнала: «14:20», а если событие не в день приёма — «08.08, 14:20».
+ * Без времени журнал изменений не отвечает на единственный вопрос, ради которого
+ * его открывают: когда это случилось.
+ */
+export const formatEventMoment = (at: string, onDate?: string): string => {
+  const t = new Date(at)
+  if (Number.isNaN(t.getTime())) return '—'
+  const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
+  const yyyy = t.getFullYear()
+  const mm = String(t.getMonth() + 1).padStart(2, '0')
+  const dd = String(t.getDate()).padStart(2, '0')
+  const sameDay = onDate == null || onDate === `${yyyy}-${mm}-${dd}`
+  return sameDay ? hhmm : `${dd}.${mm}, ${hhmm}`
+}

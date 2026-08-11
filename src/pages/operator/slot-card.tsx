@@ -18,7 +18,7 @@ import {
   serviceLimitedForDoctor,
   serviceOfferedByDoctor,
 } from '../../__data__/booking'
-import { formatArmDateLabel } from '../../__data__/dates'
+import { formatArmDateLabel, formatEventMoment } from '../../__data__/dates'
 import { ageYearsOn } from '../../__data__/duration'
 import type {
   Appointment,
@@ -32,7 +32,7 @@ import type {
   SlotResource,
   VisitType,
 } from '../../__data__/types'
-import { actorLabel, appointmentStatusLabel } from '../../__data__/status-labels'
+import { actorLabel, appointmentStatusLabel, historyEventLabel } from '../../__data__/status-labels'
 import { isTerminalAppointmentStatus } from '../../__data__/types'
 
 export type SlotActionNotice =
@@ -722,18 +722,25 @@ export const SlotCard = ({
             {history.length > 0 && (
               <Box data-testid="appointment-history">
                 <Text fontSize="12px" color="textSecondary" mb="1">
-                  История статусов
+                  История записи
                 </Text>
                 <Stack gap="1">
                   {history.map((entry, idx) => (
-                    <Text
+                    <Box
                       key={`${entry.at}-${idx}`}
-                      fontSize="12px"
-                      color="textPrimary"
+                      display="grid"
+                      gridTemplateColumns="auto 1fr"
+                      columnGap="8px"
                       data-testid={`history-entry-${idx}`}
                     >
-                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {actorLabel(entry.actor)}, {entry.at.slice(11, 16)}
-                    </Text>
+                      <Text fontSize="12px" color="textSecondary" fontFamily="mono">
+                        {formatEventMoment(entry.at, scheduleDate)}
+                      </Text>
+                      <Text fontSize="12px" color="textPrimary">
+                        {historyEventLabel(entry.from, entry.to)}
+                        <Text as="span" color="textSecondary">{`, ${actorLabel(entry.actor)}`}</Text>
+                      </Text>
+                    </Box>
                   ))}
                 </Stack>
               </Box>

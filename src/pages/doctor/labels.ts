@@ -1,9 +1,9 @@
 /**
  * Русские подписи АРМ врача.
  *
- * Словарь локальный, а не в `src/__data__/`: сервер отдаёт роль автора перехода
- * машинным ключом («doctor», «registrar»), и на экран такой ключ выпускать нельзя —
- * равно как и ISO-дату из `nextVisit.date`.
+ * Здесь только форматы дат этого АРМ. Роли автора переходов живут в общем
+ * словаре `src/__data__/status-labels.ts`: своя копия расходится с чужой на
+ * первой же правке.
  */
 
 const MONTHS_GENITIVE = [
@@ -25,26 +25,4 @@ export const formatVisitRange = (start: string, durationMin: number): string => 
   const to = new Date(from.getTime() + durationMin * 60000)
   const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   return `${from.getDate()} ${MONTHS_GENITIVE[from.getMonth()]}, ${hhmm(from)}–${hhmm(to)}`
-}
-
-const HISTORY_ACTOR_LABELS: Readonly<Record<string, string>> = {
-  operator: 'оператор',
-  doctor: 'врач',
-  registrar: 'регистратор',
-  admin: 'администратор',
-  system: 'система',
-  patient: 'пациент',
-}
-
-/**
- * Автор перехода в журнале статусов. В `actor` сервер кладёт и роль, и иногда
- * имя сотрудника из «кто отменил», поэтому готовую русскую подпись пропускаем как есть,
- * а незнакомую латиницу не показываем вовсе.
- */
-export const historyActorLabel = (actor: string | null | undefined): string => {
-  const raw = (actor ?? '').trim()
-  const known = HISTORY_ACTOR_LABELS[raw.toLowerCase()]
-  if (known) return known
-  if (raw.length > 0 && /[а-яё]/i.test(raw) && !/[a-z]/i.test(raw)) return raw
-  return 'система'
 }

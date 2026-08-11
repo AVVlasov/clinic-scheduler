@@ -27,11 +27,40 @@ const ACTOR_LABELS: Readonly<Record<string, string>> = {
   registrar: 'регистратор',
   admin: 'администратор',
   system: 'система',
+  patient: 'пациент',
 }
 
 export const actorLabel = (actor: string | null | undefined): string => {
-  if (!actor) return 'система'
-  return ACTOR_LABELS[actor] ?? actor
+  const raw = (actor ?? '').trim()
+  const known = ACTOR_LABELS[raw.toLowerCase()]
+  if (known) return known
+  // Сервер иногда кладёт в actor готовое имя сотрудника («Регистратура»):
+  // русский текст пропускаем как есть, незнакомую латиницу — не показываем.
+  if (raw.length > 0 && /[а-яё]/i.test(raw) && !/[a-z]/i.test(raw)) return raw
+  return 'система'
+}
+
+/**
+ * Событие журнала записи.
+ *
+ * Журнал показывал переход конечного автомата: «— → Ожидает, оператор»,
+ * «Ожидает → Пришёл, регистратор». Читать это должен человек: прочерк вместо
+ * события, стрелка, и каждая строка наполовину повторяет предыдущую — хвост
+ * прошлого перехода и есть начало следующего. Здесь — то, ЧТО произошло.
+ */
+export const historyEventLabel = (
+  from: AppointmentStatus | null | undefined,
+  to: AppointmentStatus,
+): string => {
+  if (from == null) return 'Запись создана'
+  switch (to) {
+    case 'scheduled': return 'Возвращена в очередь'
+    case 'arrived': return 'Отмечен приход'
+    case 'in_progress': return 'Приём начат'
+    case 'completed': return 'Приём завершён'
+    case 'cancelled': return 'Запись отменена'
+    case 'no_show': return 'Отмечена неявка'
+  }
 }
 
 /**
