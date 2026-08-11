@@ -124,7 +124,7 @@ describe('RegistrarPage — действия очереди и палитра с
     fireEvent.click(cancelBtn)
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-arrived', { status: 'scheduled' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-arrived', { status: 'scheduled', actor: 'Регистратура' })
     })
 
     expect(screen.queryByTestId('registrar-error')).toBeNull()
@@ -153,7 +153,7 @@ describe('RegistrarPage — действия очереди и палитра с
     fireEvent.click(arriveBtn)
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-scheduled', { status: 'arrived' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-scheduled', { status: 'arrived', actor: 'Регистратура' })
     })
   })
 
@@ -183,11 +183,11 @@ describe('RegistrarPage — действия очереди и палитра с
     fireEvent.click(primary)
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-card-arrived', { status: 'scheduled' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-card-arrived', { status: 'scheduled', actor: 'Регистратура' })
     })
   })
 
-  it('для записи в no_show нет кнопки «Восстановить» — терминальный статус, допустимых действий нет', async () => {
+  it('в строке no_show нет кнопок обычных переходов, но есть «Вернуть в очередь»', async () => {
     const noShow: Appointment[] = [
       makeAppointment({
         id: 'a-no-show',
@@ -209,6 +209,7 @@ describe('RegistrarPage — действия очереди и палитра с
     expect(actionLabels).not.toContain('Восстановить')
     expect(actionLabels).not.toContain('Отменить приход')
     expect(actionLabels).not.toContain('Отметить приход')
+    expect(actionLabels).toContain('Вернуть в очередь')
   })
 
   it('очередь с записью в cancelled рендерится целиком: badge с палитрой и подписью «Отменён»', async () => {

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 
+import { palette } from '../../__data__/tokens'
+
 import { filterServicesByQuery } from '../../__data__/booking'
 import { doctorsWord } from '../../__data__/plural'
 import type { Service } from '../../__data__/types'
@@ -60,7 +62,7 @@ export const ServicePicker = ({ services, selectedId, onSelect, onClose }: Servi
         style={{
           height: '32px',
           padding: '0 10px',
-          border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
+          border: `1px solid ${palette.borderLight}`,
           borderRadius: '4px',
           fontSize: '13px',
           width: '100%',
@@ -106,7 +108,7 @@ export const ServicePicker = ({ services, selectedId, onSelect, onClose }: Servi
       </Stack>
       {selected ? (
         <Text fontSize="12px" color="brandGreen700" data-testid="service-picker-active">
-          Выбрано: {selected.name} — в сетке {selected.doctorIds.length} колонок
+          Выбрано: {selected.name} — в сетке {selected.doctorIds.length} {doctorsWord(selected.doctorIds.length)}
         </Text>
       ) : null}
     </Stack>

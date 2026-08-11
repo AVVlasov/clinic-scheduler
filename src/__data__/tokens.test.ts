@@ -33,7 +33,6 @@ describe('design tokens ↔ _ds', () => {
   const typography = readTokenCss('typography.css')
   const shape = readTokenCss('shape.css')
   const spacing = readTokenCss('spacing.css')
-  const fontsCss = readTokenCss('fonts.css')
 
   it('палитра 500 совпадает с комментариями _ds (точные hex бренда)', () => {
     expect(colors).toContain('#0D9B6C')
@@ -72,7 +71,8 @@ describe('design tokens ↔ _ds', () => {
     expect(fonts.body).toContain('Golos Text')
     expect(fonts.heading).toContain('Golos Text')
     expect(fonts.mono).toContain('JetBrains Mono')
-    expect(fontsCss).toContain('Golos+Text')
+    // Стек начинается с Golos Text: если он установлен в системе, применится он.
+    expect(fonts.body).toContain('Open Sans')
   })
 
   it('веса 400/500/600/700 из typography.css', () => {
@@ -104,14 +104,22 @@ describe('design tokens ↔ _ds', () => {
     expect(gridStep).toBe(4)
   })
 
-  it('шрифты подключены в продукте (css + файлы mono)', () => {
+  it('шрифты подключены в продукте локально, без внешних запросов', () => {
+    /**
+     * Раньше здесь требовался `Golos+Text` — то есть `@import` с
+     * fonts.googleapis.com. Проверка закрепляла ровно тот дефект, из-за которого
+     * на площадке заказчика интерфейс мог отрисоваться системным шрифтом:
+     * решение о самохостинге записано в docs/DESIGN-SOURCES.md.
+     */
     const fontsProduct = path.join(process.cwd(), 'src/assets/smclinic-fonts.css')
     expect(fs.existsSync(fontsProduct)).toBe(true)
     const css = fs.readFileSync(fontsProduct, 'utf8')
-    expect(css).toContain('Golos+Text')
+    expect(css, 'шрифт тянется из интернета').not.toMatch(/https?:/)
     expect(css).toContain('JetBrainsMono-Regular.woff2')
+    expect(css).toContain('OpenSans-Variable.ttf')
     expect(fs.existsSync(path.join(process.cwd(), 'src/assets/fonts/JetBrainsMono-Regular.woff2'))).toBe(true)
     expect(fs.existsSync(path.join(process.cwd(), 'src/assets/fonts/JetBrainsMono-Bold.woff2'))).toBe(true)
+    expect(fs.existsSync(path.join(process.cwd(), 'src/assets/fonts/OpenSans-Variable.ttf'))).toBe(true)
   })
 
   it('контраст: белый на brandOrange запрещён правилом textOnOrange ≠ white', () => {

@@ -69,20 +69,28 @@ describe('journey operator-waitlist — заявка, подбор, страхо
     fireEvent.change(within(form).getByTestId('waitlist-comment'), { target: { value: 'нужен слот' } })
     fireEvent.click(within(form).getByTestId('waitlist-submit'))
 
+    // Ждём именно СВОЮ заявку: на стенде есть посевные, и проверка «есть хоть
+    // одна заявка типа nearest» зеленела бы до того, как форма отправилась.
     await waitFor(async () => {
       const list = await apiGet<WaitlistList>(server, '/waitlist?status=open')
-      expect(list.openCount).toBeGreaterThanOrEqual(1)
-      expect(list.items.some((w) => w.kind === 'nearest')).toBe(true)
+      expect(list.items.some((w) => w.comment === 'нужен слот' && w.kind === 'nearest')).toBe(true)
     })
 
     await screen.findByTestId('waitlist-open-count')
-    const row = await screen.findByTestId(/^waitlist-row-W-/)
+    // На стенде уже есть посевные заявки, поэтому берём свою — созданную только
+    // что, а не «первую в списке».
+    const created = await apiGet<WaitlistList>(server, '/waitlist?status=open')
+    const mine = created.items.find((w) => w.comment === 'нужен слот')
+    expect(mine, 'своя заявка не найдена в списке').toBeTruthy()
+    const row = await screen.findByTestId(`waitlist-row-${mine!.id}`)
     fireEvent.click(row)
 
+    const nearestBefore = (await apiGet<WaitlistList>(server, '/waitlist'))
+      .items.filter((w) => w.comment === 'нужен слот').length
     fireEvent.click(screen.getByTestId('waitlist-copy'))
     await waitFor(async () => {
       const list = await apiGet<WaitlistList>(server, '/waitlist')
-      expect(list.items.filter((w) => w.kind === 'nearest').length).toBeGreaterThanOrEqual(2)
+      expect(list.items.filter((w) => (w.comment ?? '').startsWith('нужен слот')).length).toBe(nearestBefore + 1)
     })
 
     fireEvent.click(screen.getByTestId('waitlist-match'))
@@ -90,9 +98,12 @@ describe('journey operator-waitlist — заявка, подбор, страхо
     const bookBtn = within(matches).getAllByTestId(/^waitlist-book-/)[0]
     fireEvent.click(bookBtn)
 
+    // Проверяем свою заявку, а не «первую закрытую в списке»: на стенде есть
+    // посевная закрытая заявка, и она зеленела бы тест без единого действия.
     await waitFor(async () => {
       const list = await apiGet<WaitlistList>(server, '/waitlist')
-      const fulfilled = list.items.filter((w) => w.status === 'fulfilled')
+      const own = list.items.filter((w) => (w.comment ?? '').startsWith('нужен слот'))
+      const fulfilled = own.filter((w) => w.status === 'fulfilled')
       expect(fulfilled.length).toBeGreaterThanOrEqual(1)
       expect(fulfilled[0].fulfilledAppointmentId).toBeTruthy()
     })
@@ -130,6 +141,10 @@ describe('journey operator-waitlist — заявка, подбор, страхо
 
   it('четыре типа фильтруются; заявка от врача видна оператору', async () => {
     const date = todayDate()
+    // Считаем прирост от своих действий: на стенде уже лежат посевные заявки,
+    // и абсолютное число проверяло бы состав демо-данных, а не фильтр.
+    const before = await apiGet<WaitlistList>(server, '/waitlist?kind=from_doctor')
+    const fromDoctorBefore = before.items.length
     for (const kind of ['from_doctor', 'distant', 'reschedule', 'nearest'] as const) {
       const r = await apiPost(server, '/waitlist', {
         kind,
@@ -143,8 +158,8 @@ describe('journey operator-waitlist — заявка, подбор, страхо
     }
 
     const fromDoctor = await apiGet<WaitlistList>(server, '/waitlist?kind=from_doctor')
-    expect(fromDoctor.items.length).toBe(1)
-    expect(fromDoctor.items[0].kind).toBe('from_doctor')
+    expect(fromDoctor.items.length).toBe(fromDoctorBefore + 1)
+    expect(fromDoctor.items.every((w) => w.kind === 'from_doctor')).toBe(true)
 
     render(
       <MemoryRouter initialEntries={[armPath('operator', date)]}>

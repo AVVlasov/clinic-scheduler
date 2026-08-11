@@ -11,7 +11,8 @@ import type { DurationRule, Service, VisitType } from './types'
 
 export interface DurationContext {
   service: Pick<Service, 'duration' | 'category'>
-  visitType: VisitType
+  /** Тип приёма может быть не выбран: тогда правила по типу не применяются. */
+  visitType: VisitType | null
   doctorId?: string | null
   /** Полных лет пациента на дату приёма; null — пациент ещё не выбран. */
   patientAgeYears?: number | null

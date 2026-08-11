@@ -1,18 +1,19 @@
 import React from 'react'
-import { Box, HStack, Stack, Text } from '@chakra-ui/react'
+import { Box, HStack, Text } from '@chakra-ui/react'
 
 import type { Appointment } from '../../__data__/types'
+import { StatTile } from '../ui-kit'
 
 interface ShiftOverviewProps {
   appointments: Appointment[]
 }
 
-const formatMinutes = (total: number) => {
-  const mm = Math.round(total)
-  const h = Math.floor(mm / 60)
-  const rest = mm % 60
-  return `${String(h).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
-}
+/**
+ * Средняя длительность приёма — это минуты, а не время суток. Формат ЧЧ:ММ
+ * читался как «00:22», то есть как момент, и подпись «Среднее время записи»
+ * это подтверждала: показатель понимали неправильно оба раза.
+ */
+const formatMinutes = (total: number) => `${Math.round(total)} мин`
 
 export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
   const total = appointments.length
@@ -24,31 +25,6 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
     (a) => a.status === 'no_show' || a.status === 'arrived',
   ).length
 
-  const Stat = ({
-    value,
-    label,
-    testId,
-  }: {
-    value: string
-    label: string
-    testId: string
-  }) => (
-    <Stack gap="2px">
-      <Text
-        fontSize="24px"
-        lineHeight="30px"
-        fontWeight="600"
-        letterSpacing="-0.02em"
-        fontFamily="mono"
-        data-testid={testId}
-      >
-        {value}
-      </Text>
-      <Text fontSize="12px" lineHeight="16px" color="textSecondary">
-        {label}
-      </Text>
-    </Stack>
-  )
 
   return (
     <Box
@@ -72,17 +48,17 @@ export const ShiftOverview = ({ appointments }: ShiftOverviewProps) => {
         Обзор смены
       </Text>
       <HStack gap="6" align="flex-start">
-        <Stat
+        <StatTile
           value={String(total)}
           label="Записей в смене"
           testId="shift-stat-total"
         />
-        <Stat
+        <StatTile
           value={avg > 0 ? formatMinutes(avg) : '—'}
-          label="Среднее время записи"
+          label="Средняя длительность приёма"
           testId="shift-stat-avg"
         />
-        <Stat
+        <StatTile
           value={needsAction > 0 ? String(needsAction) : '0'}
           label="Требуют действия"
           testId="shift-stat-needs-action"

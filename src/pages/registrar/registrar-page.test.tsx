@@ -208,7 +208,7 @@ describe('RegistrarPage', () => {
     fireEvent.click(arriveBtn)
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-001', { status: 'arrived' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-001', { status: 'arrived', actor: 'Регистратура' })
     })
 
     await waitFor(() => {

@@ -1,10 +1,22 @@
 'use strict';
 
 const { Router } = require('express');
+const { PAYMENT_TYPES } = require('./lifecycle');
+/** Возраст пациента на дату — возрастное правило удлиняет приём. */
+const patientAgeOn = (birthDate, onDate) => {
+  const [by, bm, bd] = String(birthDate).split('-').map(Number);
+  const [ny, nm, nd] = String(onDate).split('-').map(Number);
+  let years = ny - by;
+  if (nm < bm || (nm === bm && nd < bd)) years -= 1;
+  return years;
+};
+
 const {
   state,
   buildSlots,
   addDays,
+  seedDurationFor,
+  seedVisitTypeFor,
 } = require('./data');
 
 const router = Router();
@@ -56,12 +68,16 @@ const createEntry = (body) => {
     ? String(body.insuranceAppointmentId)
     : null;
   const createdBy = body.createdBy != null ? String(body.createdBy) : 'operator';
+  const paymentType = body.paymentType != null && body.paymentType !== '' ? String(body.paymentType) : 'regular';
 
   if (!KINDS.has(kind)) {
     return { ok: false, status: 400, error: 'invalid_kind', message: 'Неизвестный тип заявки' };
   }
   if (!PRIORITIES.has(priority)) {
     return { ok: false, status: 400, error: 'invalid_priority', message: 'Неизвестный приоритет' };
+  }
+  if (!PAYMENT_TYPES.includes(paymentType)) {
+    return { ok: false, status: 400, error: 'invalid_payment_type', message: 'Неизвестное основание оплаты' };
   }
   if (!findPatient(patientId)) {
     return { ok: false, status: 400, error: 'patient_not_found', message: 'Пациент не найден' };
@@ -105,6 +121,7 @@ const createEntry = (body) => {
     dateFrom,
     dateTo,
     comment,
+    paymentType,
     insuranceAppointmentId,
     createdAt: new Date().toISOString(),
     createdBy,
@@ -154,6 +171,7 @@ router.post('/waitlist/:id/copy', (req, res) => {
     dateFrom: src.dateFrom,
     dateTo: src.dateTo,
     priority: src.priority,
+    paymentType: src.paymentType,
     comment: src.comment ? `${src.comment} (копия)` : 'Копия заявки',
     createdBy: 'operator',
   });
@@ -174,7 +192,16 @@ router.get('/waitlist/:id/matches', (req, res) => {
   const service = entry.serviceId
     ? state.services.find((s) => s.id === entry.serviceId)
     : null;
-  const durationMin = service ? service.duration : 30;
+  // Длительность считают те же правила, что и запись из АРМ: иначе подбор
+  // предлагает окна под норматив справочника, а сервер отклоняет запись,
+  // потому что реальный приём длиннее.
+  const patient = state.patients.find((p) => p.id === entry.patientId) || null;
+  const ageYears = patient ? patientAgeOn(patient.birthDate, entry.dateFrom) : null;
+  const durationMin = service
+    ? seedDurationFor(service, seedVisitTypeFor(service), ageYears)
+    : 30;
+  const stepMinutes = 15;
+  const stepsNeeded = Math.max(1, Math.ceil(durationMin / stepMinutes));
 
   const doctorFilter = entry.doctorId
     ? [entry.doctorId]
@@ -188,12 +215,20 @@ router.get('/waitlist/:id/matches', (req, res) => {
   while (cursor <= entry.dateTo && guard < 60) {
     guard += 1;
     const slots = buildSlots(cursor);
-    for (const slot of slots) {
+    for (let i = 0; i < slots.length; i += 1) {
+      const slot = slots[i];
       for (const doc of slot.doctors) {
         if (doc.busy) continue;
         if (!doctorFilter.includes(doc.id)) continue;
         if (service && Array.isArray(service.doctorIds) && service.doctorIds.length > 0
           && !service.doctorIds.includes(doc.id)) continue;
+        // Окно должно вмещать приём целиком, а не одну ячейку сетки.
+        let fits = true;
+        for (let k = 0; k < stepsNeeded; k += 1) {
+          const cell = (slots[i + k] || { doctors: [] }).doctors.find((d) => d.id === doc.id);
+          if (!cell || cell.busy) { fits = false; break; }
+        }
+        if (!fits) continue;
         items.push({
           date: cursor,
           time: slot.time,

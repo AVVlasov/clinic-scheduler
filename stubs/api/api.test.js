@@ -134,7 +134,7 @@ describe('stubs/api — express-стабы расписания, записей 
           serviceId: 's-001',
         });
       expect(res.status).toBe(201);
-      expect(res.body.id).toMatch(/^a-\d{3}$/);
+      expect(res.body.id).toMatch(/^a-\d+$/);
       expect(res.body.doctorName).toContain('Волков');
 
       const after = (await request(app).get('/appointments?date=2030-04-15')).body.items;
@@ -332,7 +332,7 @@ describe('stubs/api — express-стабы расписания, записей 
         });
       expect(create.status).toBe(201);
       const id = create.body.id;
-      expect(id).toMatch(/^a-\d{3}$/);
+      expect(id).toMatch(/^a-\d+$/);
 
       const patch = await request(app)
         .patch(`/appointments/${id}`)

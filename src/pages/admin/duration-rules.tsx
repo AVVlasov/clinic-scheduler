@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 
+import { palette } from '../../__data__/tokens'
+
 import { getDurationRules, getEquipment, getPatients, getServices, setDurationRuleEnabled } from '../../__data__/api'
 import { ageYearsOn, evaluateDuration } from '../../__data__/duration'
 import type { DurationRule, Equipment, Patient, Service, VisitType } from '../../__data__/types'
@@ -19,13 +21,13 @@ const VISIT_TYPES: Array<{ id: VisitType; label: string }> = [
 
 const labelStyle: React.CSSProperties = {
   fontSize: '11px',
-  color: 'var(--chakra-colors-textSecondary, #6B7280)',
+  color: palette.textSecondary,
 }
 
 const selectStyle: React.CSSProperties = {
   height: '32px',
   padding: '0 8px',
-  border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
+  border: `1px solid ${palette.borderLight}`,
   borderRadius: '4px',
   fontSize: '13px',
   width: '100%',
@@ -328,7 +330,7 @@ export const DurationRulesScreen = () => {
                   </Text>
                 </Flex>
                 <Text fontSize="12px" color="textSecondary" lineHeight="18px">
-                  Столько же займёт слот при записи из АРМ оператора: расчёт общий.
+                  Столько же займёт приём при записи оператором.
                 </Text>
               </Stack>
             ) : null}

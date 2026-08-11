@@ -1,7 +1,14 @@
-import React from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Flex, Grid, GridItem, Input, Text, Textarea } from '@chakra-ui/react'
 
+import { formatRub } from '../../__data__/money'
+import { palette } from '../../__data__/tokens'
+
+import { todayDate } from '../../__data__/dates'
 import type { Appointment, Service } from '../../__data__/types'
+
+import { formatDayMonth } from './labels'
+import { servicesAllowedForDoctor } from './service-access'
 
 export type VisitType = 'first' | 'repeat'
 
@@ -38,14 +45,22 @@ interface VisitFormProps {
   onDismissError: () => void
 }
 
+/**
+ * Пресеты рекомендаций под специальности площадки: терапевт, кардиолог,
+ * педиатр, невролог, эндокринолог, хирург. Прежний набор был перенесён из
+ * стоматологического макета вместе с «Снятием швов через 10 дней» — врачу
+ * такого профиля эта строка не нужна ни разу за смену.
+ */
 const FOLLOW_UP_PRESETS = [
   'Контрольный осмотр через 7 дней',
-  'КТ контрольная через 14 дней',
-  'Снятие швов через 10 дней',
+  'Явка с результатами анализов',
+  'Контроль давления через 14 дней',
   'Повторная консультация',
 ]
 
-const formatPrice = (s: Service): string => `${s.price} ₽`
+// Цена строки и «Итого» проходят через один форматтер: иначе в одной
+// таблице соседствуют «2500 ₽» и «2 500 ₽».
+const formatPrice = (s: Service): string => formatRub(s.price)
 
 const formatCode = (s: Service): string => {
   const prefix = s.category === 'Приём' ? 'PRM' : s.category === 'Диагностика' ? 'DGN' : 'LAB'
@@ -53,8 +68,31 @@ const formatCode = (s: Service): string => {
   return `${prefix}.${id}`
 }
 
-export const isVisitFormValid = (state: VisitFormState): boolean =>
-  state.complaints.trim().length > 0 && state.diagnosis.trim().length > 0
+/** День приёма в формате ГГГГ-ММ-ДД — нижняя граница для даты следующего визита. */
+export const visitDayOf = (appointment: Appointment | null): string | null => {
+  if (!appointment) return null
+  const start = new Date(appointment.start)
+  if (Number.isNaN(start.getTime())) return null
+  return todayDate(start)
+}
+
+/**
+ * Причина, по которой дата следующего визита не годится. Без нижней границы заявка
+ * уходила оператору задним числом: подобрать слот во вчерашнем дне нечем.
+ */
+export const nextVisitDateProblem = (
+  state: VisitFormState,
+  visitDay: string | null,
+): string | null => {
+  if (!state.nextVisitDate || !visitDay) return null
+  if (state.nextVisitDate >= visitDay) return null
+  return `Дата следующего визита не может быть раньше дня приёма — ${formatDayMonth(visitDay)}`
+}
+
+export const isVisitFormValid = (state: VisitFormState, visitDay: string | null = null): boolean =>
+  state.complaints.trim().length > 0
+  && state.diagnosis.trim().length > 0
+  && nextVisitDateProblem(state, visitDay) === null
 
 export const VisitForm = ({
   appointment,
@@ -68,9 +106,27 @@ export const VisitForm = ({
   submitError,
   onDismissError,
 }: VisitFormProps) => {
-  const isValid = isVisitFormValid(state)
+  const visitDay = visitDayOf(appointment)
+  const nextVisitProblem = nextVisitDateProblem(state, visitDay)
+  const isValid = isVisitFormValid(state, visitDay)
   const canSubmit =
     isValid && !isSubmitting && !alreadyCompleted && blockReason === null && Boolean(appointment)
+
+  const [isConfirming, setIsConfirming] = useState(false)
+  // Подтверждение живёт ровно на том приёме, где его открыли: смена записи или
+  // закрытие протокола делают вопрос бессмысленным.
+  useEffect(() => {
+    setIsConfirming(false)
+  }, [appointment?.id, alreadyCompleted])
+
+  const doctorId = appointment?.doctorId ?? null
+  // Допуск врача решает не только запись, но и деньги: отмеченная услуга уходит
+  // в «К оплате» регистратора, поэтому чужих позиций в списке быть не должно.
+  const availableServices = useMemo(
+    () => servicesAllowedForDoctor(services, doctorId),
+    [services, doctorId],
+  )
+  const hiddenServicesCount = services.length - availableServices.length
 
   const update = <K extends keyof VisitFormState>(key: K, value: VisitFormState[K]) => {
     onChange({ ...state, [key]: value })
@@ -92,7 +148,7 @@ export const VisitForm = ({
     )
   }
 
-  const chosenServices = services.filter((s) => state.selectedServiceIds.includes(s.id))
+  const chosenServices = availableServices.filter((s) => state.selectedServiceIds.includes(s.id))
 
   return (
     <Box display="flex" flexDirection="column" gap="5" maxW="760px" data-arm-section="protocol">
@@ -114,7 +170,7 @@ export const VisitForm = ({
           <Input
             value={state.diagnosis}
             onChange={(e) => update('diagnosis', e.target.value)}
-            placeholder="Например, K01.1 Ретенированный зуб"
+            placeholder="Например, J06.9 Острая инфекция верхних дыхательных путей"
             data-testid="visit-diagnosis"
             borderColor="borderDark"
           />
@@ -158,12 +214,19 @@ export const VisitForm = ({
 
       <Box display="flex" flexDirection="column" gap="2">
         <Text fontSize="13px" fontWeight="700" color="textPrimary">Выполненные услуги</Text>
-        {services.length === 0 && (
-          <Text fontSize="12px" color="textSecondary">
-            Справочник услуг пуст — выберите услуги из загруженного списка.
+        {availableServices.length === 0 && (
+          <Text fontSize="12px" color="textSecondary" data-testid="visit-services-empty">
+            {services.length === 0
+              ? 'Справочник услуг пуст — отметить нечего.'
+              : 'У врача этой записи нет допуска ни к одной услуге справочника.'}
           </Text>
         )}
-        {services.length > 0 && (
+        {availableServices.length > 0 && hiddenServicesCount > 0 && (
+          <Text fontSize="12px" color="textSecondary" data-testid="visit-services-scope">
+            Показаны только услуги из допуска врача: {availableServices.length} из {services.length}
+          </Text>
+        )}
+        {availableServices.length > 0 && (
           <Box borderWidth="1px" borderStyle="solid" borderColor="borderLight" borderRadius="compact">
             <Grid templateColumns="1fr 120px 110px" fontSize="12px" color="textSecondary" bg="surfaceLight">
               <GridItem px="3" py="2" borderBottomWidth="1px" borderBottomStyle="solid" borderBottomColor="borderLight">
@@ -175,7 +238,7 @@ export const VisitForm = ({
               <GridItem px="3" py="2" textAlign="right" borderBottomWidth="1px" borderBottomStyle="solid" borderBottomColor="borderLight">
                 Стоимость
               </GridItem>
-              {services.map((s) => {
+              {availableServices.map((s) => {
                 const selected = state.selectedServiceIds.includes(s.id)
                 return (
                   <React.Fragment key={s.id}>
@@ -278,11 +341,7 @@ export const VisitForm = ({
                   color="textPrimary"
                   fontVariantNumeric="tabular-nums"
                 >
-                  {chosenServices
-                    .reduce((acc, s) => acc + s.price, 0)
-                    .toString()
-                    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}{' '}
-                  ₽
+                  {formatRub(chosenServices.reduce((acc, s) => acc + s.price, 0))}
                 </GridItem>
               )}
             </Grid>
@@ -326,7 +385,9 @@ export const VisitForm = ({
             onChange={(e) => update('nextVisitDate', e.target.value)}
             placeholder="Дата"
             data-testid="visit-next-date"
-            borderColor="borderDark"
+            borderColor={nextVisitProblem ? 'danger' : 'borderDark'}
+            min={visitDay ?? undefined}
+            aria-invalid={nextVisitProblem ? true : undefined}
             maxW="180px"
           />
           <select
@@ -336,18 +397,23 @@ export const VisitForm = ({
             style={{
               maxWidth: 280,
               padding: '4px 8px',
-              border: '1px solid var(--chakra-colors-borderDark, #ccc)',
+              border: `1px solid ${palette.borderDark}`,
               borderRadius: 6,
               background: 'white',
               fontSize: 13,
             }}
           >
             <option value="">Услуга повторного визита</option>
-            {services.map((s) => (
+            {availableServices.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </Flex>
+        {nextVisitProblem !== null && (
+          <Text fontSize="12px" color="danger" data-testid="visit-next-date-error">
+            {nextVisitProblem}
+          </Text>
+        )}
       </Box>
 
       <Flex align="center" gap="2" pt="2" borderTopWidth="1px" borderTopStyle="solid" borderTopColor="borderLight">
@@ -360,9 +426,11 @@ export const VisitForm = ({
             ? 'Протокол закрыт'
             : blockReason !== null
               ? blockReason
-              : isValid
-                ? 'Заполните протокол и завершите приём'
-                : 'Заполните жалобы и диагноз, чтобы закрыть приём'}
+              : nextVisitProblem !== null
+                ? nextVisitProblem
+                : isValid
+                  ? 'Заполните протокол и завершите приём'
+                  : 'Заполните жалобы и диагноз, чтобы закрыть приём'}
         </Text>
         <Box flex="1" />
         <Button
@@ -371,13 +439,69 @@ export const VisitForm = ({
           bg="brandGreenDark"
           color="textOnGreen"
           _hover={{ bg: 'brandGreen700' }}
-          onClick={onFinish}
+          onClick={() => setIsConfirming(true)}
           disabled={!canSubmit}
           data-testid="visit-finish"
         >
           {isSubmitting ? 'Завершаем…' : 'Завершить приём'}
         </Button>
       </Flex>
+
+      {/* Завершение — единственное необратимое действие врача: `completed` терминален,
+          и после него протокол не правит никто. Спрашиваем до запроса, а не объясняем после. */}
+      {isConfirming && !alreadyCompleted && (
+        <Box
+          role="alertdialog"
+          aria-label="Подтверждение завершения приёма"
+          data-testid="visit-finish-confirm"
+          borderWidth="1px"
+          borderStyle="solid"
+          borderColor="brandGreenDark"
+          borderRadius="compact"
+          bg="brandGreenFaint"
+          px="3"
+          py="3"
+          display="flex"
+          flexDirection="column"
+          gap="2"
+        >
+          <Text fontSize="13px" color="textPrimary" data-testid="visit-finish-confirm-text">
+            Завершить приём? После завершения протокол станет неизменяемым: жалобы, диагноз,
+            услуги и рекомендации исправить будет нельзя.
+          </Text>
+          <Flex gap="2" flexWrap="wrap">
+            <Button
+              type="button"
+              size="sm"
+              borderRadius="pill"
+              bg="brandGreenDark"
+              color="textOnGreen"
+              _hover={{ bg: 'brandGreen700' }}
+              onClick={() => {
+                setIsConfirming(false)
+                onFinish()
+              }}
+              data-testid="visit-finish-confirm-yes"
+            >
+              Да, завершить приём
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              borderRadius="pill"
+              borderColor="borderDark"
+              color="textPrimary"
+              bg="white"
+              _hover={{ bg: 'surfaceLight' }}
+              onClick={() => setIsConfirming(false)}
+              data-testid="visit-finish-confirm-no"
+            >
+              Вернуться к протоколу
+            </Button>
+          </Flex>
+        </Box>
+      )}
       {submitError !== null && (
         <Flex
           align="center"

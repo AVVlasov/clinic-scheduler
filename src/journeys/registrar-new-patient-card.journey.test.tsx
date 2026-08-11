@@ -64,7 +64,7 @@ const renderRegistrar = (date: string) =>
 
 describe('journey registrar-new-patient-card', () => {
   it('поиск по картотеке, заведение карты, запись на смену', async () => {
-    const { date, doctorId, time } = await findBookableDate()
+    const { date } = await findBookableDate()
     renderRegistrar(date)
 
     // Картотека — отдельный раздел рабочего места: путь начинается с навигации.
@@ -103,20 +103,24 @@ describe('journey registrar-new-patient-card', () => {
       expect(timeSelect.value).not.toBe('')
     }, { timeout: 10000 })
 
+    /**
+     * Панель сама подставляет сочетание, которое существует: врача, его услугу
+     * и окно нужной длины. Регистратор на стойке жмёт «Записать», а не
+     * подбирает совместимые значения — этот путь и проверяем.
+     */
     const doctorSelect = within(bookPanel).getByTestId('patient-book-doctor') as HTMLSelectElement
-    if (Array.from(doctorSelect.options).some((o) => o.value === doctorId)) {
-      fireEvent.change(doctorSelect, { target: { value: doctorId } })
-      await waitFor(() => {
-        const timeSelect = within(bookPanel).getByTestId('patient-book-time') as HTMLSelectElement
-        expect(Array.from(timeSelect.options).map((o) => o.value)).toContain(time)
-      }, { timeout: 8000 })
-      fireEvent.change(within(bookPanel).getByTestId('patient-book-time'), {
-        target: { value: time },
-      })
-    }
-    fireEvent.change(within(bookPanel).getByTestId('patient-book-service'), {
-      target: { value: 's-001' },
-    })
+    const serviceSelect = within(bookPanel).getByTestId('patient-book-service') as HTMLSelectElement
+    const timeSelect = within(bookPanel).getByTestId('patient-book-time') as HTMLSelectElement
+    const chosenDoctor = doctorSelect.value
+    const chosenService = serviceSelect.value
+    expect(chosenDoctor, 'врач не подставлен').toBeTruthy()
+    expect(chosenService, 'услуга не подставлена').toBeTruthy()
+    expect(timeSelect.value, 'время не подставлено').toBeTruthy()
+
+    // Услуга предложена только из допусков врача — иначе сервер откажет.
+    const servicesList = await apiGet<{ items: Array<{ id: string; doctorIds: string[] }> }>(server, '/services')
+    const offered = servicesList.items.find((sv) => sv.id === chosenService)
+    expect(offered?.doctorIds.length === 0 || offered?.doctorIds.includes(chosenDoctor)).toBe(true)
 
     fireEvent.click(within(bookPanel).getByTestId('patient-book-submit'))
 

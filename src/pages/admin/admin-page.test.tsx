@@ -256,7 +256,7 @@ describe('AdminPage — шаблоны недели', () => {
     expect(postPublishCalls(fetchMock)).toHaveLength(0)
     const confirm = await screen.findByTestId('publish-confirm')
     expect(confirm).toHaveTextContent('Отмена')
-    expect(confirm).toHaveTextContent('снять')
+    expect(confirm).toHaveTextContent('Снять публикацию можно позже')
     expect(screen.queryByTestId('publish-result')).not.toBeInTheDocument()
 
     // отказ от подтверждения тоже не публикует

@@ -4,6 +4,7 @@ const request = require('supertest');
 const express = require('express');
 
 const apiRouter = require('./index');
+const { findFreePatient } = require('./free-slot.testkit');
 
 const buildApp = () => {
   const app = express();
@@ -21,10 +22,20 @@ const doctorCell = (scheduleBody, time, doctorId) => {
 // Свободную ячейку берём из настоящей сетки, а не назначаем константой: демо-данные дня
 // правдоподобны и занимают часть слотов, поэтому «09:00 у d-001» — это не «свободно», а
 // совпадение. Тест, который этого не различает, проверяет удачу, а не освобождение слота.
-const findFreeCell = (scheduleBody) => {
-  for (const slot of scheduleBody.slots) {
-    const free = slot.doctors.find((d) => d.busy === false);
-    if (free) return { time: slot.time, doctorId: free.id };
+// Свободное окно на всю длительность записи: одна свободная ячейка на плотном
+// дне ничего не гарантирует — соседние 15 минут уже могут быть заняты.
+const findFreeCell = (scheduleBody, minutes = 30) => {
+  const steps = Math.ceil(minutes / 15);
+  const slots = scheduleBody.slots;
+  for (let i = 0; i + steps <= slots.length; i += 1) {
+    for (const doc of slots[i].doctors) {
+      if (doc.busy !== false) continue;
+      const ok = slots.slice(i, i + steps).every((slot) => {
+        const cell = slot.doctors.find((d) => d.id === doc.id);
+        return cell && cell.busy === false;
+      });
+      if (ok) return { time: slots[i].time, doctorId: doc.id };
+    }
   }
   return null;
 };
@@ -290,7 +301,7 @@ describe('stubs/api — освобождение слота после отме�
 
     const collide = await request(app)
       .post('/appointments')
-      .send({ doctorId: busy.doctorId, patientId: 'p-002', start: busyStart, durationMin: 30 });
+      .send({ doctorId: busy.doctorId, patientId: findFreePatient(busyStart, 30), start: busyStart, durationMin: 30 });
     expect(collide.status).toBe(409);
     expect(collide.body.error).toBe('slot_taken');
 
@@ -298,7 +309,7 @@ describe('stubs/api — освобождение слота после отме�
     expect(free).not.toBeNull();
     const mine = await request(app).post('/appointments').send({
       doctorId: free.doctorId,
-      patientId: 'p-002',
+      patientId: findFreePatient(startIsoOf(date, free.time), 30),
       start: startIsoOf(date, free.time),
       durationMin: 30,
     });

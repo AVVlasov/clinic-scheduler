@@ -136,9 +136,9 @@ export const CompetencyMatrixScreen = () => {
         </Text>
         <Box flex="1" />
         <Flex gap="16px" fontSize="12px" color="textSecondary" data-testid="matrix-counts">
-          <Box>допусков: {counts.yes}</Box>
-          <Box>с ограничением: {counts.limited}</Box>
-          <Box>закрыто: {counts.no}</Box>
+          <Box>Выполняют: {counts.yes}</Box>
+          <Box>С ограничением: {counts.limited}</Box>
+          <Box>Не выполняют: {counts.no}</Box>
         </Flex>
       </Flex>
 
@@ -261,7 +261,7 @@ export const CompetencyMatrixScreen = () => {
             <span>✓ — выполняет</span>
             <span>! — выполняет с ограничением</span>
             <span>· — не выполняет</span>
-            <span>Клик по клетке меняет допуск</span>
+            <span>Допуск меняется нажатием на клетку</span>
           </Flex>
 
           {lastChange ? (
@@ -279,8 +279,8 @@ export const CompetencyMatrixScreen = () => {
                 Сохранено: {lastChange}
               </Text>
               <Text fontSize="12px" color="textSecondary" lineHeight="18px">
-                Допуск действует сразу: закрытая услуга больше не предлагается в АРМ оператора,
-                и сервер отклонит запись к этому врачу.
+                Допуск действует сразу: закрытую услугу оператор больше не предложит,
+                и записать к этому врачу на неё будет нельзя.
               </Text>
             </Box>
           ) : null}

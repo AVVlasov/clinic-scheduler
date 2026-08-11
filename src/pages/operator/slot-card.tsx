@@ -10,6 +10,7 @@ import {
   rescheduleAppointment,
 } from '../../__data__/api'
 import {
+  defaultVisitTypeForService,
   formatTimeRange,
   PAYMENT_TYPE_OPTIONS,
   paymentTypeLabel,
@@ -31,7 +32,7 @@ import type {
   SlotResource,
   VisitType,
 } from '../../__data__/types'
-import { appointmentStatusLabel } from '../../__data__/status-labels'
+import { actorLabel, appointmentStatusLabel } from '../../__data__/status-labels'
 import { isTerminalAppointmentStatus } from '../../__data__/types'
 
 export type SlotActionNotice =
@@ -50,6 +51,12 @@ interface SlotCardProps {
   onBookingDone?: (notice?: SlotActionNotice) => void
   rescheduleTargetTime?: string | null
   rescheduleTargetDoctorId?: string | null
+  /**
+   * День цели переноса. Без него карточка собирала момент из даты ИСХОДНОЙ
+   * записи: в режиме «Неделя» оператор выбирал четверг, подсветка вставала на
+   * четверг, а PATCH уходил на вторник — пациент молча уезжал не в тот день.
+   */
+  rescheduleTargetDate?: string | null
   onClearRescheduleTarget?: () => void
   onFitDurationChange?: (durationMin: number | null) => void
   /** Услуга, выбранная в режиме «запись от услуги» — фиксируется в карточке. */
@@ -111,6 +118,7 @@ export const SlotCard = ({
   onBookingDone,
   rescheduleTargetTime,
   rescheduleTargetDoctorId,
+  rescheduleTargetDate,
   onClearRescheduleTarget,
   onFitDurationChange,
   preferredServiceId = null,
@@ -151,7 +159,15 @@ export const SlotCard = ({
     appointment?.patientId ?? null,
   )
   const [serviceId, setServiceId] = useState<string | null>(initialServiceId)
-  const [visitType, setVisitType] = useState<VisitType>('repeat')
+  /**
+   * Тип приёма не подставляется константой: раньше здесь стояло `'repeat'`, и
+   * первичная консультация считалась как повторная — 30 минут вместо 60,
+   * вопреки экрану «Правила длительности». Значение выводится из услуги и
+   * пересчитывается при её смене; оператор может переключить вручную.
+   */
+  const [visitType, setVisitType] = useState<VisitType | null>(null)
+  const [visitTypeTouched, setVisitTypeTouched] = useState(false)
+  const [serviceTouched, setServiceTouched] = useState(false)
   const [paymentType, setPaymentType] = useState<PaymentType>('regular')
   const [operatorComment, setOperatorComment] = useState('')
   const [cancelReason, setCancelReason] = useState('')
@@ -162,11 +178,35 @@ export const SlotCard = ({
       setServiceId(preferredServiceId)
       return
     }
+    /**
+     * Услуга по умолчанию — та, что ПОМЕЩАЕТСЯ в это окно. Раньше бралась первая
+     * по списку, и оператор, кликнув свободные пятнадцать минут, видел
+     * заблокированную кнопку «Записать» с подписью «На пути услуги есть занятый
+     * слот» — вместо того чтобы записать на то, что сюда влезает. Выбор
+     * оператора руками не трогаем.
+     */
+    const fitsHere = (s: Service): boolean => slotFitsDuration(
+      schedule,
+      doctor.id,
+      time,
+      resolveBookingDuration(s, defaultVisitTypeForService(s), {
+        rules: durationRules,
+        doctorId: doctor.id,
+        requiresEquipment: s.requiresEquipment,
+      }),
+    ).ok
+
     setServiceId((prev) => {
-      if (prev && offeredServices.some((s) => s.id === prev)) return prev
-      return offeredServices[0]?.id ?? null
+      const current = prev ? offeredServices.find((s) => s.id === prev) : undefined
+      if (current && (serviceTouched || fitsHere(current))) return prev
+      return offeredServices.find(fitsHere)?.id ?? current?.id ?? offeredServices[0]?.id ?? null
     })
-  }, [preferredServiceId, offeredServices])
+  }, [preferredServiceId, offeredServices, durationRules, doctor.id, schedule, time, serviceTouched])
+
+  useEffect(() => {
+    if (visitTypeTouched) return
+    setVisitType(defaultVisitTypeForService(offeredServices.find((s) => s.id === serviceId)))
+  }, [serviceId, offeredServices, visitTypeTouched])
 
   const isBusy = doctorResource.busy
   const isTerminal = isTerminalAppointmentStatus(appointment?.status)
@@ -273,14 +313,16 @@ export const SlotCard = ({
       setError('Выберите свободный слот для переноса')
       return
     }
+    const targetDate = rescheduleTargetDate ?? scheduleDate
     if (
       rescheduleTargetTime === time &&
-      rescheduleTargetDoctorId === doctor.id
+      rescheduleTargetDoctorId === doctor.id &&
+      targetDate === scheduleDate
     ) {
       setError('Выберите другой слот — текущий уже и есть исходный')
       return
     }
-    const targetIso = buildStartIso(scheduleDate, rescheduleTargetTime)
+    const targetIso = buildStartIso(targetDate, rescheduleTargetTime)
     setError(null)
     await runBusy(async () => {
       try {
@@ -381,7 +423,7 @@ export const SlotCard = ({
         ?? (doctorResource.occupancyKind === 'blocked'
           ? 'Блокировка'
           : doctorResource.occupancyKind === 'tech_break'
-            ? 'Техперерыв'
+            ? 'Перерыв'
             : 'Занят'))
       : 'Свободен')
   const statusTone = isBusy ? 'brandGreenTint' : 'brandGreenFaint'
@@ -492,7 +534,7 @@ export const SlotCard = ({
                 data-testid="card-service"
                 value={serviceId ?? ''}
                 disabled={Boolean(preferredServiceId)}
-                onChange={(e) => setServiceId(e.target.value || null)}
+                onChange={(e) => { setServiceId(e.target.value || null); setServiceTouched(true) }}
                 style={{ fontSize: '13px', height: '32px', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '0 8px' }}
               >
                 {offeredServices.map((s) => (
@@ -515,8 +557,8 @@ export const SlotCard = ({
             <Stack gap="1">
               <Text fontSize="12px" color="textSecondary">Тип приёма</Text>
               <HStack gap="2">
-                <Button size="sm" variant={visitType === 'first' ? 'solid' : 'outline'} bg={visitType === 'first' ? 'brandGreen' : 'white'} color={visitType === 'first' ? 'white' : 'textPrimary'} data-testid="card-visit-first" onClick={() => setVisitType('first')}>Первичный</Button>
-                <Button size="sm" variant={visitType === 'repeat' ? 'solid' : 'outline'} bg={visitType === 'repeat' ? 'brandGreen' : 'white'} color={visitType === 'repeat' ? 'white' : 'textPrimary'} data-testid="card-visit-repeat" onClick={() => setVisitType('repeat')}>Повторный</Button>
+                <Button size="sm" variant={visitType === 'first' ? 'solid' : 'outline'} bg={visitType === 'first' ? 'brandGreenDark' : 'white'} color={visitType === 'first' ? 'white' : 'textPrimary'} data-testid="card-visit-first" onClick={() => { setVisitType('first'); setVisitTypeTouched(true) }}>Первичный</Button>
+                <Button size="sm" variant={visitType === 'repeat' ? 'solid' : 'outline'} bg={visitType === 'repeat' ? 'brandGreenDark' : 'white'} color={visitType === 'repeat' ? 'white' : 'textPrimary'} data-testid="card-visit-repeat" onClick={() => { setVisitType('repeat'); setVisitTypeTouched(true) }}>Повторный</Button>
               </HStack>
             </Stack>
             <Stack gap="1">
@@ -553,7 +595,7 @@ export const SlotCard = ({
               </Text>
               <Input
                 size="sm"
-                placeholder="Поиск по имени, телефону или UID"
+                placeholder="Фамилия, телефон или номер карты"
                 value={patientQuery}
                 onChange={(e) => setPatientQuery(e.target.value)}
                 bg="white"
@@ -690,7 +732,7 @@ export const SlotCard = ({
                       color="textPrimary"
                       data-testid={`history-entry-${idx}`}
                     >
-                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {entry.actor}, {entry.at.slice(11, 16)}
+                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {actorLabel(entry.actor)}, {entry.at.slice(11, 16)}
                     </Text>
                   ))}
                 </Stack>

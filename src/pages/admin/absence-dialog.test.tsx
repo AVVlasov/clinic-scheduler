@@ -86,7 +86,7 @@ describe('AbsenceDialog — превью и необратимое подтве�
 
     fireEvent.click(within(dialog).getByTestId('absence-apply'))
     expect(onApplied).not.toHaveBeenCalled()
-    expect(within(dialog).getByTestId('absence-apply')).toHaveTextContent(/Подтвердить необратимо/)
+    expect(within(dialog).getByTestId('absence-apply')).toHaveTextContent(/Да, отменить записи/)
 
     fireEvent.click(within(dialog).getByTestId('absence-apply'))
     await waitFor(() => {

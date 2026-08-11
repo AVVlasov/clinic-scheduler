@@ -1,5 +1,7 @@
 import type React from 'react'
 
+import { palette } from '../__data__/tokens'
+
 /**
  * Поле ввода в плотных формах АРМ.
  *
@@ -12,7 +14,13 @@ import type React from 'react'
 export const fieldStyle: React.CSSProperties = {
   height: '32px',
   padding: '0 10px',
-  border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
+  /*
+   * Цвет берётся из токенов напрямую. Chakra печатает CSS-переменные в
+   * kebab-case (`--chakra-colors-border-light`), поэтому запись camelCase
+   * никогда не резолвилась и работало только запасное значение — то есть тема
+   * на эти места не влияла вовсе.
+   */
+  border: `1px solid ${palette.borderLight}`,
   borderRadius: '4px',
   fontSize: '13px',
   width: '100%',

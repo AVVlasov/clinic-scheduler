@@ -1,23 +1,32 @@
 import React, { useState } from 'react'
-import { Badge, Box, Flex, Table } from '@chakra-ui/react'
+import { Badge, Box, Flex, Table, Text } from '@chakra-ui/react'
 
 import { paymentTypeLabel } from '../../__data__/booking'
-import { appointmentStatusLabel } from '../../__data__/status-labels'
-import type { Appointment, AppointmentStatus, PaymentType } from '../../__data__/types'
-import { isRegistrarTerminal } from '../../__data__/lifecycle'
+import { appointmentStatusLabel, appointmentStatusTone } from '../../__data__/status-labels'
+import type { Appointment, PaymentType } from '../../__data__/types'
+import { canAcceptPayment, canReturnToQueue, isRegistrarTerminal } from '../../__data__/lifecycle'
+import { fieldStyle } from '../field-style'
+
+import { cashDue, formatRub } from './payment'
 
 export type QueueFilter = 'all' | 'scheduled' | 'arrived' | 'no_show'
 
 export interface QueueTableProps {
   items: Appointment[]
+  totalCount: number
   serviceNames: Map<string, string>
+  priceMap: Map<string, number>
   selectedId: string | null
   filter: QueueFilter
+  query: string
+  onQueryChange: (next: string) => void
   onFilterChange: (next: QueueFilter) => void
   onSelect: (id: string) => void
   onMarkArrived: (id: string) => void
   onMarkWaiting: (id: string) => void
   onMarkNoShow: (id: string) => void
+  onReturnToQueue: (id: string) => void
+  onPay: (id: string) => void
   onPrintTicket: (id: string) => void
 }
 
@@ -29,24 +38,20 @@ const formatTime = (iso: string): string => {
   return `${hh}:${mm}`
 }
 
-const statusPalette = (s: AppointmentStatus): { bg: string; fg: string } => {
-  switch (s) {
-    case 'scheduled': return { bg: 'gray.100', fg: 'textSecondary' }
-    case 'arrived': return { bg: 'brandGreenTint', fg: 'brandGreen700' }
-    case 'in_progress': return { bg: 'brandOrange', fg: 'textOnOrange' }
-    case 'completed': return { bg: 'gray.200', fg: 'textPrimary' }
-    case 'cancelled': return { bg: 'gray.200', fg: 'textSecondary' }
-    case 'no_show': return { bg: 'danger', fg: 'white' }
-  }
-}
+/**
+ * Тон статуса берётся из общего словаря: свой набор здесь пользовался чужой
+ * палитрой Chakra (`gray.*`) мимо токенов дизайн-системы, и «Не пришёл» у
+ * регистратора выглядел иначе, чем у врача.
+ */
+const statusPalette = appointmentStatusTone
 
 const paymentPalette = (p: PaymentType): { bg: string; fg: string } => {
   switch (p) {
-    case 'regular': return { bg: 'gray.100', fg: 'textPrimary' }
+    case 'regular': return { bg: 'surfaceLight', fg: 'textPrimary' }
     case 'dms': return { bg: 'brandOrange', fg: 'textOnOrange' }
     case 'promo': return { bg: 'brandGreenFaint', fg: 'brandGreen700' }
     case 'discount': return { bg: 'brandGreenTint', fg: 'brandGreen700' }
-    case 'certificate': return { bg: 'gray.200', fg: 'textPrimary' }
+    case 'certificate': return { bg: 'borderLight', fg: 'textPrimary' }
   }
 }
 
@@ -127,17 +132,48 @@ const RowActionButton = ({
   )
 }
 
+/** Отметка оплаты в строке: основание — это ещё не деньги в кассе. */
+const PaymentCell = ({ visit, priceMap }: { visit: Appointment; priceMap: Map<string, number> }) => {
+  const pp = paymentPalette(visit.paymentType)
+  const due = cashDue(visit, priceMap)
+  return (
+    <Flex direction="column" align="flex-start" gap="2px">
+      <Badge bg={pp.bg} color={pp.fg} px="8px" borderRadius="compact">
+        {paymentTypeLabel(visit.paymentType)}
+      </Badge>
+      {visit.paidAt ? (
+        <Box fontSize="11px" lineHeight="14px" color="brandGreen700" data-testid={`paid-${visit.id}`}>
+          Оплачено {formatTime(visit.paidAt)}
+          {typeof visit.paidAmount === 'number' ? `, ${formatRub(visit.paidAmount)}` : ''}
+        </Box>
+      ) : (
+        <Box fontSize="11px" lineHeight="14px" color="textSecondary" data-testid={`unpaid-${visit.id}`}>
+          {!canAcceptPayment(visit)
+            ? 'Оплата не требуется'
+            : (due > 0 ? `Не оплачено, ${formatRub(due)}` : 'Без оплаты в кассу')}
+        </Box>
+      )}
+    </Flex>
+  )
+}
+
 export const QueueTable = (props: QueueTableProps) => {
   const {
     items,
+    totalCount,
     serviceNames,
+    priceMap,
     selectedId,
     filter,
+    query,
+    onQueryChange,
     onFilterChange,
     onSelect,
     onMarkArrived,
     onMarkWaiting,
     onMarkNoShow,
+    onReturnToQueue,
+    onPay,
     onPrintTicket,
   } = props
   const [confirmNoShowId, setConfirmNoShowId] = useState<string | null>(null)
@@ -155,6 +191,21 @@ export const QueueTable = (props: QueueTableProps) => {
         <Box as="h1" fontSize="18px" lineHeight="24px" fontWeight="700">
           Очередь смены
         </Box>
+        {/* Поиск стоит в шапке таблицы: человека у стойки ищут по тому, чем он
+            себя называет, а не пролистыванием семнадцати строк. */}
+        <input
+          data-testid="queue-search"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Фамилия, телефон или номер карты"
+          aria-label="Поиск по очереди: фамилия, телефон или номер карты"
+          style={{ ...fieldStyle, height: '28px', width: '260px' }}
+        />
+        {query.trim() ? (
+          <Text fontSize="12px" color="textSecondary" data-testid="queue-found">
+            Найдено {items.length} из {totalCount}
+          </Text>
+        ) : null}
         <Box flex="1" />
         {FILTERS.map((f) => {
           const isOn = f.id === filter
@@ -189,7 +240,7 @@ export const QueueTable = (props: QueueTableProps) => {
               <Table.ColumnHeader width="76px">Время</Table.ColumnHeader>
               <Table.ColumnHeader>Пациент</Table.ColumnHeader>
               <Table.ColumnHeader>Врач и услуга</Table.ColumnHeader>
-              <Table.ColumnHeader width="130px">Оплата</Table.ColumnHeader>
+              <Table.ColumnHeader width="150px">Оплата</Table.ColumnHeader>
               <Table.ColumnHeader width="150px">Статус</Table.ColumnHeader>
               <Table.ColumnHeader width="190px"></Table.ColumnHeader>
             </Table.Row>
@@ -198,17 +249,21 @@ export const QueueTable = (props: QueueTableProps) => {
             {items.length === 0 ? (
               <Table.Row>
                 <Table.Cell colSpan={6}>
-                  <Box py="16px" textAlign="center" color="textSecondary" fontSize="14px">
-                    Записей нет
+                  <Box py="16px" textAlign="center" color="textSecondary" fontSize="14px" data-testid="queue-empty">
+                    {query.trim() ? 'По запросу никого не нашли' : 'Записей нет'}
                   </Box>
                 </Table.Cell>
               </Table.Row>
             ) : (
               items.map((a) => {
                 const sp = statusPalette(a.status)
-                const pp = paymentPalette(a.paymentType)
                 const isSelected = a.id === selectedId
                 const confirmingNoShow = confirmNoShowId === a.id
+                // Отменённая запись не обслуживается на стойке: талон на неё
+                // печатать некуда, приход отмечать некому.
+                const isCancelled = a.status === 'cancelled'
+                const showPay = canAcceptPayment(a) && isRegistrarTerminal(a.status) && !isCancelled
+                const showStatusActions = !isRegistrarTerminal(a.status)
                 return (
                   <Table.Row
                     key={a.id}
@@ -247,10 +302,8 @@ export const QueueTable = (props: QueueTableProps) => {
                         {(a.serviceId ? (serviceNames.get(a.serviceId) ?? 'Услуга') : '—')}
                       </Box>
                     </Table.Cell>
-                    <Table.Cell>
-                      <Badge bg={pp.bg} color={pp.fg} px="8px" borderRadius="compact">
-                        {paymentTypeLabel(a.paymentType)}
-                      </Badge>
+                    <Table.Cell verticalAlign="top">
+                      <PaymentCell visit={a} priceMap={priceMap} />
                     </Table.Cell>
                     {/* Статус приёма — плашка, подтверждение — подпись под ней.
                         Две плашки в строку разной ширины при переносе вставали
@@ -272,7 +325,7 @@ export const QueueTable = (props: QueueTableProps) => {
                     </Table.Cell>
                     <Table.Cell minW="280px" whiteSpace="nowrap">
                       <Flex gap="6px" justify="flex-end" align="center" wrap="nowrap">
-                        {isRegistrarTerminal(a.status) ? (
+                        {isCancelled ? null : (
                           <RowActionButton
                             tone="neutral"
                             testId={`print-ticket-${a.id}`}
@@ -283,18 +336,35 @@ export const QueueTable = (props: QueueTableProps) => {
                           >
                             Талон
                           </RowActionButton>
-                        ) : (
+                        )}
+                        {showPay ? (
+                          <RowActionButton
+                            tone="primary"
+                            testId={`pay-${a.id}`}
+                            title={`Принять оплату: ${a.patientName ?? 'пациент'}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onPay(a.id)
+                            }}
+                          >
+                            Оплатить
+                          </RowActionButton>
+                        ) : null}
+                        {canReturnToQueue(a.status) ? (
+                          <RowActionButton
+                            tone="outlineGreen"
+                            testId={`return-to-queue-${a.id}`}
+                            title={`Пациент всё-таки пришёл: ${a.patientName ?? 'пациент'}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onReturnToQueue(a.id)
+                            }}
+                          >
+                            Вернуть в очередь
+                          </RowActionButton>
+                        ) : null}
+                        {showStatusActions ? (
                           <>
-                            <RowActionButton
-                              tone="neutral"
-                              testId={`print-ticket-${a.id}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onPrintTicket(a.id)
-                              }}
-                            >
-                              Талон
-                            </RowActionButton>
                             {a.status === 'arrived' ? (
                               <RowActionButton
                                 tone="outlineGreen"
@@ -306,7 +376,7 @@ export const QueueTable = (props: QueueTableProps) => {
                               >
                                 Отменить приход
                               </RowActionButton>
-                            ) : a.status === 'no_show' ? null : (
+                            ) : (
                               <RowActionButton
                                 tone="primary"
                                 testId={`mark-arrived-${a.id}`}
@@ -318,32 +388,30 @@ export const QueueTable = (props: QueueTableProps) => {
                                 Отметить приход
                               </RowActionButton>
                             )}
-                            {a.status !== 'no_show' ? (
-                              <RowActionButton
-                                tone="danger"
-                                testId={`mark-noshow-${a.id}`}
-                                title={
-                                  confirmingNoShow
-                                    ? `Подтвердите неявку: ${a.patientName ?? 'пациент'}`
-                                    : 'Отметить неявку'
+                            <RowActionButton
+                              tone="danger"
+                              testId={`mark-noshow-${a.id}`}
+                              title={
+                                confirmingNoShow
+                                  ? `Подтвердите неявку: ${a.patientName ?? 'пациент'}`
+                                  : 'Отметить неявку'
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (confirmNoShowId !== a.id) {
+                                  setConfirmNoShowId(a.id)
+                                  return
                                 }
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (confirmNoShowId !== a.id) {
-                                    setConfirmNoShowId(a.id)
-                                    return
-                                  }
-                                  setConfirmNoShowId(null)
-                                  onMarkNoShow(a.id)
-                                }}
-                              >
-                                {confirmingNoShow
-                                  ? `Да, неявка (${formatTime(a.start)})`
-                                  : 'Не пришёл'}
-                              </RowActionButton>
-                            ) : null}
+                                setConfirmNoShowId(null)
+                                onMarkNoShow(a.id)
+                              }}
+                            >
+                              {confirmingNoShow
+                                ? `Да, неявка (${formatTime(a.start)})`
+                                : 'Не пришёл'}
+                            </RowActionButton>
                           </>
-                        )}
+                        ) : null}
                       </Flex>
                     </Table.Cell>
                   </Table.Row>

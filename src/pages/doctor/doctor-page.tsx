@@ -3,16 +3,20 @@ import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { getAppointments, getAppointmentHistory, getDoctors, getServices, createWaitlist, rescheduleAppointment } from '../../__data__/api'
+import { paymentTypeLabel } from '../../__data__/booking'
 import { parseArmDate, parseArmDoctorId, withArmDate } from '../../__data__/dates'
 import { plural } from '../../__data__/plural'
-import { appointmentStatusLabel } from '../../__data__/status-labels'
-import type { Appointment, AppointmentHistoryEntry, Doctor, Service } from '../../__data__/types'
+import { appointmentStatusLabel, appointmentStatusTone } from '../../__data__/status-labels'
+import type { Appointment, AppointmentHistoryEntry, CreateWaitlistInput, Service } from '../../__data__/types'
 import { URLs } from '../../__data__/urls'
 
 import { DayList } from './day-list'
+import { formatDayMonth, formatVisitRange, historyActorLabel } from './labels'
+import { serviceNameById } from './service-access'
 import {
   emptyVisitFormState,
   isVisitFormValid,
+  visitDayOf,
   VisitForm,
   type VisitFormState,
 } from './visit-form'
@@ -27,16 +31,6 @@ export const computeAgeYears = (birthDate: string | null): string | null => {
   if (m < 0 || (m === 0 && now.getDate() < b.getDate())) years -= 1
   // Прежнее правило (`years < 5 ? 'года' : 'лет'`) верно только до 5: 34 давало «34 лет».
   return `${b.getFullYear()} г. р., ${years} ${plural(years, 'год', 'года', 'лет')}`
-}
-
-const formatRange = (start: string, durationMin: number): string => {
-  const s = new Date(start)
-  const e = new Date(s.getTime() + durationMin * 60000)
-  const dd = s.getDate()
-  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
-  const fmt = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  return `${dd} ${months[s.getMonth()]}, ${fmt(s)}–${fmt(e)}`
 }
 
 /** Факт карточки визита: подпись сверху, значение снизу. */
@@ -62,17 +56,6 @@ const VisitFact = ({
   </Stack>
 )
 
-const payerLabel = (paymentType: Appointment['paymentType']): string => {
-  switch (paymentType) {
-    case 'regular': return 'Обычный (платный)'
-    case 'dms': return 'ДМС'
-    case 'promo': return 'Акция'
-    case 'discount': return 'Скидка'
-    case 'certificate': return 'Сертификат'
-    default: return paymentType
-  }
-}
-
 const fromAppointment = (a: Appointment): VisitFormState => ({
   complaints: a.complaints ?? '',
   diagnosis: a.diagnosis ?? '',
@@ -82,6 +65,20 @@ const fromAppointment = (a: Appointment): VisitFormState => ({
   nextVisitDate: a.nextVisit?.date ?? '',
   nextVisitServiceId: a.nextVisit?.serviceId ?? '',
 })
+
+/**
+ * Заявка на повторный визит, отправленная после закрытия приёма. Хранится целиком,
+ * потому что повтор после отказа сервера не должен требовать правки протокола:
+ * приём уже завершён, форма заблокирована, и собрать заявку заново в ней нечем.
+ */
+interface FollowUpRequest {
+  appointmentId: string
+  serviceName: string
+  date: string
+  input: CreateWaitlistInput
+}
+
+type FollowUpPhase = 'idle' | 'sending' | 'created' | 'failed'
 
 const isDoctorActionable = (status: Appointment['status']): boolean =>
   status === 'scheduled' || status === 'arrived' || status === 'in_progress'
@@ -98,7 +95,6 @@ export const DoctorPage = () => {
   const selectedDate = parseArmDate(location.search)
   const doctorIdFromUrl = parseArmDoctorId(location.search)
 
-  const [doctors, setDoctors] = useState<Doctor[]>([])
   const [doctorId, setDoctorId] = useState<string | null>(doctorIdFromUrl)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -111,6 +107,9 @@ export const DoctorPage = () => {
   const [reloadToken, setReloadToken] = useState(0)
   const [history, setHistory] = useState<AppointmentHistoryEntry[]>([])
   const [statusBusy, setStatusBusy] = useState(false)
+  const [followUp, setFollowUp] = useState<FollowUpRequest | null>(null)
+  const [followUpPhase, setFollowUpPhase] = useState<FollowUpPhase>('idle')
+  const [followUpError, setFollowUpError] = useState<string | null>(null)
 
   const blockReasonFor = (status: Appointment['status']): string | null => {
     switch (status) {
@@ -160,7 +159,8 @@ export const DoctorPage = () => {
     getDoctors()
       .then((res) => {
         if (cancelled) return
-        setDoctors(res.items)
+        // Врача выбирает адрес, не экран: список нужен только чтобы понять,
+        // существует ли врач из `?doctorId=`, и чем открыться, если его там нет.
         const preferred = doctorIdFromUrl && res.items.some((d) => d.id === doctorIdFromUrl)
           ? doctorIdFromUrl
           : (res.items[0]?.id ?? null)
@@ -267,13 +267,30 @@ export const DoctorPage = () => {
     [selected],
   )
 
+  const sendFollowUp = useCallback(async (request: FollowUpRequest) => {
+    setFollowUpPhase('sending')
+    setFollowUpError(null)
+    try {
+      await createWaitlist(request.input)
+      setFollowUpPhase('created')
+    } catch (err) {
+      setFollowUpPhase('failed')
+      setFollowUpError(
+        err instanceof Error ? err.message : 'Не удалось создать заявку на повторный визит',
+      )
+    }
+  }, [])
+
   const onFinish = useCallback(async () => {
     if (!selected || !doctorId) return
     const state = visitForm[selected.id] ?? emptyVisitFormState
-    if (!isVisitFormValid(state) || selected.status === 'completed') return
+    if (!isVisitFormValid(state, visitDayOf(selected)) || selected.status === 'completed') return
     if (blockReasonFor(selected.status) !== null) return
     setIsSubmitting(true)
     setSubmitError(null)
+    setFollowUp(null)
+    setFollowUpPhase('idle')
+    setFollowUpError(null)
     try {
       const updated = await rescheduleAppointment(selected.id, {
         status: 'completed',
@@ -289,26 +306,35 @@ export const DoctorPage = () => {
           : null,
       })
       setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
-      if (state.nextVisitDate && state.nextVisitServiceId) {
-        await createWaitlist({
-          kind: 'from_doctor',
-          patientId: selected.patientId,
-          serviceId: state.nextVisitServiceId,
-          doctorId,
-          dateFrom: state.nextVisitDate,
-          dateTo: state.nextVisitDate,
-          priority: 'high',
-          comment: 'Рекомендация врача по следующему визиту',
-          createdBy: 'doctor',
-        })
-      }
       setSubmitError(null)
+      if (state.nextVisitDate && state.nextVisitServiceId) {
+        // Заявка отправляется вторым запросом и уже после того, как приём закрыт:
+        // её отказ — не отказ завершения, и объясняться он обязан отдельно.
+        const request: FollowUpRequest = {
+          appointmentId: selected.id,
+          serviceName: serviceNameById(services, state.nextVisitServiceId),
+          date: state.nextVisitDate,
+          input: {
+            kind: 'from_doctor',
+            patientId: selected.patientId,
+            serviceId: state.nextVisitServiceId,
+            doctorId,
+            dateFrom: state.nextVisitDate,
+            dateTo: state.nextVisitDate,
+            priority: 'high',
+            comment: 'Рекомендация врача по следующему визиту',
+            createdBy: 'doctor',
+          },
+        }
+        setFollowUp(request)
+        await sendFollowUp(request)
+      }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Не удалось завершить приём')
     } finally {
       setIsSubmitting(false)
     }
-  }, [selected, visitForm, doctorId])
+  }, [selected, visitForm, doctorId, services, sendFollowUp])
 
   const onAdvanceStatus = useCallback(async () => {
     if (!selected || !doctorId) return
@@ -347,11 +373,6 @@ export const DoctorPage = () => {
       cancelled = true
     }
   }, [selectedId, selected?.status])
-
-  const onDoctorChange = (nextId: string) => {
-    setDoctorId(nextId)
-    navigate(withArmDate(URLs.arms.doctor, selectedDate, nextId), { replace: true })
-  }
 
   if (loadError && !isAppointmentsLoaded) {
     return (
@@ -397,27 +418,7 @@ export const DoctorPage = () => {
       : 'На сегодня приёмов нет.'
     return (
       <Flex direction="column" p="4" gap="2" data-testid="doctor-empty" data-date={selectedDate} data-doctor={doctorId}>
-        <Flex align="center" gap="3" mb="2">
-          <Text fontSize="16px" fontWeight="700" color="textPrimary">АРМ врача</Text>
-          <select
-            data-testid="doctor-subject"
-            aria-label="Врач, чей день приёма открыт"
-            value={doctorId}
-            onChange={(e) => onDoctorChange(e.target.value)}
-            style={{
-              fontSize: '13px',
-              height: '32px',
-              border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
-              borderRadius: '4px',
-              padding: '0 8px',
-              background: 'white',
-            }}
-          >
-            {doctors.map((doc) => (
-              <option key={doc.id} value={doc.id}>{doc.name}</option>
-            ))}
-          </select>
-        </Flex>
+        <Text fontSize="16px" fontWeight="700" color="textPrimary" mb="2">АРМ врача</Text>
         <Text fontSize="13px" color="textSecondary" data-testid="doctor-empty-reason">{reason}</Text>
       </Flex>
     )
@@ -427,31 +428,12 @@ export const DoctorPage = () => {
     <Flex h="100%" minH="0" bg="surfaceLight" p="3" gap="3" data-testid="doctor-page" data-date={selectedDate} data-doctor={doctorId}>
       <DayList
         appointments={sortedAppointments}
+        services={services}
         selectedId={selectedId}
         onSelect={(id) => {
           setSubmitError(null)
           setSelectedId(id)
         }}
-        doctorSwitcher={(
-          <select
-            data-testid="doctor-subject"
-            aria-label="Врач, чей день приёма открыт"
-            value={doctorId}
-            onChange={(e) => onDoctorChange(e.target.value)}
-            style={{
-              fontSize: '13px',
-              height: '28px',
-              border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
-              borderRadius: '4px',
-              padding: '0 8px',
-              background: 'white',
-            }}
-          >
-            {doctors.map((doc) => (
-              <option key={doc.id} value={doc.id}>{doc.name}</option>
-            ))}
-          </select>
-        )}
       />
 
       <Box
@@ -487,22 +469,8 @@ export const DoctorPage = () => {
                   lineHeight="20px"
                   px="8px"
                   borderRadius="compact"
-                  bg={
-                    selected.status === 'completed'
-                      ? 'brandGreenTint'
-                      : selected.status === 'cancelled' || selected.status === 'no_show'
-                        ? 'gray.200'
-                        : selected.status === 'in_progress' || selected.status === 'arrived'
-                          ? 'brandOrange'
-                          : 'gray.100'
-                  }
-                  color={
-                    selected.status === 'completed'
-                      ? 'brandGreen700'
-                      : selected.status === 'cancelled' || selected.status === 'no_show'
-                        ? 'textSecondary'
-                        : 'textPrimary'
-                  }
+                  bg={appointmentStatusTone(selected.status).bg}
+                  color={appointmentStatusTone(selected.status).fg}
                   data-testid="visit-status-badge"
                 >
                   {appointmentStatusLabel(selected.status)}
@@ -516,17 +484,22 @@ export const DoctorPage = () => {
                   значение · значение» экономит место, но заставляет читателя
                   угадывать, что есть что, и выглядит как машинная склейка. */}
               <Flex gap="24px" flexWrap="wrap">
+                {/* Услуга — первый факт приёма: врач должен знать, зачем пришёл
+                    пациент, до того как читает телефон и плательщика. */}
+                <VisitFact label="Услуга" testId="visit-service">
+                  {serviceNameById(services, selected.serviceId)}
+                </VisitFact>
                 <VisitFact label="Пациент" testId="visit-birth">
                   {computeAgeYears(selected.patientBirthDate) ?? '—'}
                 </VisitFact>
-                <VisitFact label="Плательщик" testId="visit-payer">
-                  {payerLabel(selected.paymentType)}
+                <VisitFact label="Основание оплаты" testId="visit-payer">
+                  {paymentTypeLabel(selected.paymentType)}
                 </VisitFact>
                 <VisitFact label="Телефон" testId="visit-phone" mono>
                   {selected.patientPhone ?? '—'}
                 </VisitFact>
                 <VisitFact label="Приём" testId="visit-slot" mono>
-                  {formatRange(selected.start, selected.durationMin)}
+                  {formatVisitRange(selected.start, selected.durationMin)}
                 </VisitFact>
               </Flex>
               {/* Кнопка говорит, что делать сейчас. Подсказка рядом повторяла
@@ -543,7 +516,7 @@ export const DoctorPage = () => {
                     color="white"
                     borderRadius="4px"
                     fontSize="13px"
-                    _hover={{ bg: 'brandGreenDark' }}
+                    _hover={{ bg: 'brandGreen700' }}
                   >
                     {statusBusy ? 'Обновляем…' : nextStatusAction(selected.status)?.label}
                   </Button>
@@ -563,12 +536,64 @@ export const DoctorPage = () => {
                       color="textPrimary"
                       data-testid={`history-entry-${idx}`}
                     >
-                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {entry.actor}
+                      {entry.from ? appointmentStatusLabel(entry.from) : '—'} → {appointmentStatusLabel(entry.to)}, {historyActorLabel(entry.actor)}
                     </Text>
                   ))}
                 </Box>
               )}
             </Box>
+
+            {followUp !== null && followUp.appointmentId === selected.id && (
+              <Box
+                flex="none"
+                mx="4"
+                mt="3"
+                px="3"
+                py="2"
+                borderWidth="1px"
+                borderStyle="solid"
+                borderColor={followUpPhase === 'failed' ? 'danger' : 'brandGreenTint'}
+                borderRadius="compact"
+                bg={followUpPhase === 'failed' ? 'white' : 'brandGreenFaint'}
+                display="flex"
+                flexDirection="column"
+                gap="2"
+                data-testid="visit-followup"
+              >
+                {followUpPhase === 'sending' && (
+                  <Text fontSize="13px" color="textPrimary" data-testid="visit-followup-pending">
+                    Создаём заявку на повторный визит…
+                  </Text>
+                )}
+                {followUpPhase === 'created' && (
+                  <Text fontSize="13px" color="textPrimary" data-testid="visit-followup-created">
+                    Заявка на повторный визит создана: {followUp.serviceName}, {formatDayMonth(followUp.date)}
+                  </Text>
+                )}
+                {followUpPhase === 'failed' && (
+                  <>
+                    <Text fontSize="13px" color="textPrimary" data-testid="visit-followup-error">
+                      Приём завершён, но заявку на повторный визит создать не удалось:{' '}
+                      {followUpError ?? 'причина неизвестна'}. Услуга: {followUp.serviceName},
+                      дата: {formatDayMonth(followUp.date)}
+                    </Text>
+                    <Button
+                      type="button"
+                      size="sm"
+                      alignSelf="flex-start"
+                      borderRadius="pill"
+                      bg="brandGreenDark"
+                      color="white"
+                      _hover={{ bg: 'brandGreen700' }}
+                      onClick={() => { void sendFollowUp(followUp) }}
+                      data-testid="visit-followup-retry"
+                    >
+                      Повторить заявку
+                    </Button>
+                  </>
+                )}
+              </Box>
+            )}
 
             <Box flex="1" overflowY="auto" p="4">
               <VisitForm

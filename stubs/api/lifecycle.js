@@ -17,13 +17,16 @@ const TERMINAL_STATUSES = new Set([
   'no_show',
 ]);
 
+// Неявка отменяема: пациент опоздал и всё-таки пришёл. Запись остаётся
+// терминальной (править её поля нельзя), но один выход из неявки — обратно в
+// очередь — разрешён: иначе строка мертва во всех АРМ.
 const STATUS_TRANSITIONS = {
   scheduled: new Set(['arrived', 'in_progress', 'cancelled', 'no_show']),
   arrived: new Set(['scheduled', 'in_progress', 'completed', 'cancelled', 'no_show']),
   in_progress: new Set(['completed', 'cancelled', 'no_show']),
   completed: new Set(),
   cancelled: new Set(),
-  no_show: new Set(),
+  no_show: new Set(['scheduled']),
 };
 
 const ACTIVE_APPOINTMENT_STATUSES = new Set([

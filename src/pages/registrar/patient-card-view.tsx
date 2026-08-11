@@ -28,6 +28,13 @@ const formatStart = (iso: string): string => {
   return `${dd}.${mm}.${d.getFullYear()} ${hh}:${mi}`
 }
 
+/**
+ * Сколько визитов показывать в карте. Лента выводилась целиком, и у пациента с
+ * длинной историей карточка превращалась в простыню, где последний визит —
+ * где-то внизу. На стойке нужны последние.
+ */
+const VISIT_FEED_LIMIT = 5
+
 export const PatientCardView = ({ patient, onBack, onCreateNew }: PatientCardViewProps) => {
   const [items, setItems] = useState<Appointment[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +59,12 @@ export const PatientCardView = ({ patient, onBack, onCreateNew }: PatientCardVie
     }
   }, [patient.id])
 
+  // Сервер отдаёт записи по возрастанию времени; в карте первым нужен последний
+  // визит, а не первый в истории.
+  const visible = [...items]
+    .sort((a, b) => b.start.localeCompare(a.start))
+    .slice(0, VISIT_FEED_LIMIT)
+
   return (
     <Stack
       gap="3"
@@ -72,7 +85,7 @@ export const PatientCardView = ({ patient, onBack, onCreateNew }: PatientCardVie
         </Text>
         <Box flex="1" />
         <Button size="sm" variant="outline" onClick={onBack} data-testid="patient-card-back">К очереди</Button>
-        <Button size="sm" bg="brandGreen" color="white" onClick={onCreateNew} data-testid="section-new-patient">
+        <Button size="sm" bg="brandGreenDark" color="white" onClick={onCreateNew} data-testid="section-new-patient">
           Новая карта
         </Button>
       </Flex>
@@ -80,9 +93,14 @@ export const PatientCardView = ({ patient, onBack, onCreateNew }: PatientCardVie
         {formatBirth(patient.birthDate)}, {patient.phone}
       </Text>
 
-      <Text fontSize="14px" fontWeight="700">Другие записи пациента</Text>
+      <Text fontSize="14px" fontWeight="700">Последние записи пациента</Text>
       {error ? (
         <Text fontSize="12px" color="danger">{error}</Text>
+      ) : null}
+      {visible.length < items.length ? (
+        <Text fontSize="12px" color="textSecondary" data-testid="patient-appointments-limit">
+          Показаны последние {visible.length} из {items.length}
+        </Text>
       ) : null}
       <Stack gap="1" data-testid="patient-appointments-list">
         {items.length === 0 ? (
@@ -90,7 +108,7 @@ export const PatientCardView = ({ patient, onBack, onCreateNew }: PatientCardVie
             Записей пока нет
           </Text>
         ) : (
-          items.map((a) => (
+          visible.map((a) => (
             <Box
               key={a.id}
               data-testid={`patient-appointment-${a.id}`}

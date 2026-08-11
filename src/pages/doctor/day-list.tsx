@@ -1,18 +1,19 @@
 import React from 'react'
 import { Box, Flex, Text } from '@chakra-ui/react'
 
-import { appointmentStatusLabel } from '../../__data__/status-labels'
-import type { Appointment, AppointmentStatus } from '../../__data__/types'
+import { palette } from '../../__data__/tokens'
+
+import { appointmentStatusLabel, appointmentStatusTone } from '../../__data__/status-labels'
+import type { Appointment, Service } from '../../__data__/types'
+
+import { serviceNameById } from './service-access'
 
 interface DayListProps {
   appointments: Appointment[]
+  /** Справочник услуг: в строке дня врач должен видеть, зачем пришёл человек. */
+  services: Service[]
   selectedId: string | null
   onSelect: (id: string) => void
-  /**
-   * Переключатель врача. Имя врача показывает он сам — отдельной строкой рядом
-   * его дублировать нельзя: два одинаковых текста подряд читаются как ошибка.
-   */
-  doctorSwitcher?: React.ReactNode
 }
 
 const formatTime = (iso: string): string => {
@@ -22,51 +23,18 @@ const formatTime = (iso: string): string => {
   return `${hh}:${mm}`
 }
 
-const formatDate = (iso: string): string => {
-  const d = new Date(iso)
-  const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
-  return `${d.getDate()} ${months[d.getMonth()]}`
-}
 
-const statusTone = (s: AppointmentStatus): 'neutral' | 'attention' | 'booked' | 'danger' => {
-  const map: { [K in AppointmentStatus]: 'neutral' | 'attention' | 'booked' | 'danger' } = {
-    scheduled: 'neutral',
-    arrived: 'attention',
-    in_progress: 'attention',
-    completed: 'booked',
-    cancelled: 'danger',
-    no_show: 'danger',
-  }
-  return map[s]
-}
 
-const toneBg = (tone: 'neutral' | 'attention' | 'booked' | 'danger'): string => {
-  switch (tone) {
-    case 'booked': return 'brandGreenTint'
-    case 'attention': return 'brandOrange'
-    case 'danger': return 'danger'
-    case 'neutral':
-    default: return 'transparent'
-  }
-}
-
-const toneColor = (tone: 'neutral' | 'attention' | 'booked' | 'danger'): string => {
-  switch (tone) {
-    case 'booked': return 'brandGreen700'
-    case 'attention': return 'textPrimary'
-    case 'danger': return 'textPrimary'
-    case 'neutral':
-    default: return 'textPrimary'
-  }
-}
 
 export const DayList = ({
-  appointments, selectedId, onSelect, doctorSwitcher,
+  appointments, services, selectedId, onSelect,
 }: DayListProps) => {
   const counted = appointments.filter((a) => a.status !== 'cancelled' && a.status !== 'no_show')
   const doneCount = counted.filter((a) => a.status === 'completed').length
   const totalCount = counted.length
+  // Знаменатель меньше числа строк: отменённые и неявки завершить нельзя. Пока
+  // разница ничем не названа, «1 из 2» над списком из трёх читается как ошибка счёта.
+  const skippedCount = appointments.length - counted.length
 
   return (
     <Box
@@ -96,9 +64,9 @@ export const DayList = ({
         </Text>
         <Text fontSize="12px" color="textSecondary" data-testid="doctor-progress">
           {doneCount} из {totalCount} завершено
+          {skippedCount > 0 ? ` · не состоялись: ${skippedCount}` : ''}
         </Text>
         <Box flex="1" />
-        {doctorSwitcher}
       </Flex>
       <Box flex="1" overflowY="auto" p="2">
         {appointments.length === 0 && (
@@ -107,7 +75,7 @@ export const DayList = ({
           </Text>
         )}
         {appointments.map((a) => {
-          const tone = statusTone(a.status)
+          const tone = appointmentStatusTone(a.status)
           const isSelected = a.id === selectedId
           return (
             <button
@@ -127,8 +95,8 @@ export const DayList = ({
                 textAlign: 'left',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
-                background: isSelected ? 'var(--chakra-colors-brandGreenFaint)' : 'transparent',
-                boxShadow: isSelected ? 'inset 0 0 0 1px var(--chakra-colors-brandGreenTint)' : 'none',
+                background: isSelected ? palette.brandGreenFaint : 'transparent',
+                boxShadow: isSelected ? `inset 0 0 0 1px ${palette.brandGreenTint}` : 'none',
               }}
             >
               <Box
@@ -155,14 +123,17 @@ export const DayList = ({
                 >
                   {a.patientName ?? '—'}
                 </Text>
+                {/* Услуга, а не дата: день у всех строк один, и подпись была
+                    одинаковой у каждой записи — врач не видел, зачем пришёл человек. */}
                 <Text
                   fontSize="12px"
                   color="textSecondary"
                   whiteSpace="nowrap"
                   overflow="hidden"
                   textOverflow="ellipsis"
+                  data-testid={`day-visit-service-${a.id}`}
                 >
-                  {formatDate(a.start)}, {a.durationMin} мин
+                  {serviceNameById(services, a.serviceId)}, {a.durationMin} мин
                 </Text>
               </Flex>
               <Box
@@ -171,8 +142,8 @@ export const DayList = ({
                 lineHeight="20px"
                 px="8px"
                 borderRadius="compact"
-                bg={toneBg(tone)}
-                color={toneColor(tone)}
+                bg={tone.bg}
+                color={tone.fg}
                 data-testid={`day-visit-status-${a.id}`}
               >
                 {appointmentStatusLabel(a.status)}

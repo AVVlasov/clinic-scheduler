@@ -40,7 +40,11 @@ const doctors = [
   { id: 'd-003', name: 'Сидорова Мария Александровна', specialty: 'Педиатр', cabinet: '104' },
   { id: 'd-004', name: 'Кузнецов Дмитрий Олегович', specialty: 'Невролог', cabinet: '412' },
   { id: 'd-005', name: 'Морозова Ольга Игоревна', specialty: 'Эндокринолог', cabinet: '207' },
-  { id: 'd-006', name: 'Волков Сергей Петрович', specialty: '', cabinet: '001' },
+  { id: 'd-006', name: 'Волков Сергей Петрович', specialty: 'Хирург', cabinet: '118' },
+  // Врач принят на площадку, карточка ещё не заполнена и смен в шаблоне нет.
+  // На нём проверяется счётчик «Незаполненных карточек»; в сетке смены его быть
+  // не должно — врач без графика не занимает колонку.
+  { id: 'd-007', name: 'Соловьёв Артур Вадимович', specialty: '', cabinet: '' },
 ];
 
 const services = [
@@ -211,65 +215,41 @@ const durationRules = [
   },
 ];
 
+/**
+ * Картотека демо-стенда. Правдоподобие здесь — не украшение: на пяти пациентах
+ * с телефонами-счётчиками любой день смены выглядит подделкой, а поиск по
+ * фамилии и по номеру карты проверить нечем. Возрасты разведены намеренно:
+ * есть дети (педиатр), есть пациенты старше 70 (правило длительности).
+ */
 const patients = [
-  {
-    id: 'p-001',
-    name: 'Алексеев Игорь Николаевич',
-    lastName: 'Алексеев',
-    firstName: 'Игорь',
-    middleName: 'Николаевич',
-    phone: '+7 900 100-00-01',
-    birthDate: '1985-03-12',
-    cardNumber: 'UID 0001 1001',
-  },
-  {
-    id: 'p-002',
-    name: 'Белова Татьяна Викторовна',
-    lastName: 'Белова',
-    firstName: 'Татьяна',
-    middleName: 'Викторовна',
-    phone: '+7 900 100-00-02',
-    birthDate: '1992-07-21',
-    cardNumber: 'UID 0002 1002',
-  },
-  {
-    id: 'p-003',
-    name: 'Григорьев Артём Дмитриевич',
-    lastName: 'Григорьев',
-    firstName: 'Артём',
-    middleName: 'Дмитриевич',
-    phone: '+7 900 100-00-03',
-    birthDate: '1978-11-05',
-    cardNumber: 'UID 0003 1003',
-  },
-  {
-    id: 'p-004',
-    name: 'Дмитриева Анна Сергеевна',
-    lastName: 'Дмитриева',
-    firstName: 'Анна',
-    middleName: 'Сергеевна',
-    phone: '+7 900 100-00-04',
-    birthDate: '2001-01-30',
-    cardNumber: 'UID 0004 1004',
-  },
-  {
-    id: 'p-005',
-    name: 'Кузьмин Пётр Ильич',
-    lastName: 'Кузьмин',
-    firstName: 'Пётр',
-    middleName: 'Ильич',
-    phone: '+7 900 100-00-05',
-    birthDate: '1949-06-18',
-    cardNumber: 'UID 0005 1005',
-  },
-];
+  { id: 'p-001', lastName: 'Алексеев',   firstName: 'Игорь',     middleName: 'Николаевич',  phone: '+7 916 482-31-07', birthDate: '1985-03-12', cardNumber: '0041-2187' },
+  { id: 'p-002', lastName: 'Белова',     firstName: 'Татьяна',   middleName: 'Викторовна',  phone: '+7 903 155-64-28', birthDate: '1992-07-21', cardNumber: '0128-7734' },
+  { id: 'p-003', lastName: 'Григорьев',  firstName: 'Артём',     middleName: 'Дмитриевич',  phone: '+7 925 703-19-45', birthDate: '1978-11-05', cardNumber: '0093-4410' },
+  { id: 'p-004', lastName: 'Дмитриева',  firstName: 'Анна',      middleName: 'Сергеевна',   phone: '+7 909 264-88-13', birthDate: '2001-01-30', cardNumber: '0215-6602' },
+  { id: 'p-005', lastName: 'Кузьмин',    firstName: 'Пётр',      middleName: 'Ильич',       phone: '+7 926 341-70-52', birthDate: '1949-06-18', cardNumber: '0007-9931' },
+  { id: 'p-006', lastName: 'Соколова',   firstName: 'Марина',    middleName: 'Олеговна',    phone: '+7 962 818-27-04', birthDate: '1969-09-14', cardNumber: '0154-3078' },
+  { id: 'p-007', lastName: 'Николаев',   firstName: 'Виктор',    middleName: 'Павлович',    phone: '+7 985 220-56-91', birthDate: '1953-02-27', cardNumber: '0019-8845' },
+  { id: 'p-008', lastName: 'Тарасова',   firstName: 'Юлия',      middleName: 'Андреевна',   phone: '+7 917 604-12-38', birthDate: '1988-12-03', cardNumber: '0187-2261' },
+  { id: 'p-009', lastName: 'Захаров',    firstName: 'Михаил',    middleName: 'Юрьевич',     phone: '+7 906 379-45-60', birthDate: '1996-05-19', cardNumber: '0233-5517' },
+  { id: 'p-010', lastName: 'Лебедева',   firstName: 'Ольга',     middleName: 'Ивановна',    phone: '+7 964 512-83-77', birthDate: '1961-08-08', cardNumber: '0062-1194' },
+  { id: 'p-011', lastName: 'Фомин',      firstName: 'Денис',     middleName: 'Аркадьевич',  phone: '+7 999 147-92-26', birthDate: '1983-04-25', cardNumber: '0176-4083' },
+  { id: 'p-012', lastName: 'Крылова',    firstName: 'Светлана',  middleName: 'Борисовна',   phone: '+7 915 836-05-49', birthDate: '1974-10-11', cardNumber: '0108-7726' },
+  { id: 'p-013', lastName: 'Панкратов',  firstName: 'Алексей',   middleName: 'Романович',   phone: '+7 977 263-71-84', birthDate: '2016-06-02', cardNumber: '0248-3390' },
+  { id: 'p-014', lastName: 'Игнатьева',  firstName: 'Вера',      middleName: 'Степановна',  phone: '+7 903 690-24-15', birthDate: '1947-01-23', cardNumber: '0004-6658' },
+  { id: 'p-015', lastName: 'Романов',    firstName: 'Кирилл',    middleName: 'Сергеевич',   phone: '+7 926 458-13-70', birthDate: '2014-03-17', cardNumber: '0251-1029' },
+  { id: 'p-016', lastName: 'Ковалёва',   firstName: 'Наталья',   middleName: 'Викторовна',  phone: '+7 910 725-38-62', birthDate: '1990-11-29', cardNumber: '0139-8874' },
+  { id: 'p-017', lastName: 'Стрельцов',  firstName: 'Егор',      middleName: '',            phone: '+7 968 314-07-95', birthDate: '1999-07-06', cardNumber: '0224-4517' },
+  { id: 'p-018', lastName: 'Мельникова', firstName: 'Ирина',     middleName: 'Геннадьевна', phone: '+7 985 561-49-23', birthDate: '1966-02-15', cardNumber: '0077-2340' },
+].map((p) => ({
+  ...p,
+  name: [p.lastName, p.firstName, p.middleName].filter(Boolean).join(' '),
+}));
 
 /**
- * Посев записей берёт первую четвёрку: состав демо-дня зафиксирован сценариями,
- * и пятый пациент не должен его двигать. В картотеке он нужен целиком — на нём
- * проверяется правило длительности «старше 70 лет».
+ * В посеве участвует вся картотека: день, собранный на четырёх пациентах, ставит
+ * одного человека к четырём врачам за утро — на стенде это видно глазами.
  */
-const seedPatients = patients.slice(0, 4);
+const seedPatients = patients;
 
 const stepMinutes = 15;
 const dayStart = '08:00';
@@ -315,167 +295,470 @@ const findSeedSlot = (doctorId, dayIdx, durationMin, usedMinutes, seedMap) => {
   return null;
 };
 
-// Фиксированный пул записей: достаточно разный, чтобы покрыть ≥5 записей
-// на каждый рабочий день окна. Порядок важен — поздние записи «добивают»
-// день до нужного минимума независимо от того, какие врачи работают.
-const SEED_PLAN = [
-  { doctorId: 'd-001', patientId: 'p-001', status: 'completed',   paymentType: 'regular',      serviceId: 's-007', durationMin: 30 },
-  { doctorId: 'd-001', patientId: 'p-002', status: 'scheduled',   paymentType: 'promo',      serviceId: 's-001', durationMin: 30 },
-  { doctorId: 'd-001', patientId: 'p-003', status: 'no_show',     paymentType: 'dms', serviceId: 's-002', durationMin: 20 },
-  { doctorId: 'd-002', patientId: 'p-001', status: 'completed',   paymentType: 'promo',      serviceId: 's-007', durationMin: 20 },
-  { doctorId: 'd-002', patientId: 'p-002', status: 'scheduled',   paymentType: 'regular',      serviceId: 's-001', durationMin: 30 },
-  { doctorId: 'd-002', patientId: 'p-003', status: 'arrived',     paymentType: 'promo',      serviceId: 's-002', durationMin: 20 },
-  { doctorId: 'd-002', patientId: 'p-004', status: 'in_progress', paymentType: 'dms', serviceId: 's-001', durationMin: 30 },
-  { doctorId: 'd-002', patientId: 'p-001', status: 'cancelled',   paymentType: 'regular',      serviceId: 's-003', durationMin: 15 },
-  { doctorId: 'd-003', patientId: 'p-002', status: 'scheduled',   paymentType: 'promo',      serviceId: 's-001', durationMin: 30 },
-  { doctorId: 'd-003', patientId: 'p-003', status: 'completed',   paymentType: 'regular',      serviceId: 's-007', durationMin: 20 },
-  { doctorId: 'd-003', patientId: 'p-004', status: 'no_show',     paymentType: 'dms', serviceId: 's-005', durationMin: 10 },
-  { doctorId: 'd-004', patientId: 'p-001', status: 'scheduled',   paymentType: 'regular',      serviceId: 's-001', durationMin: 30 },
-  { doctorId: 'd-004', patientId: 'p-002', status: 'arrived',     paymentType: 'promo',      serviceId: 's-006', durationMin: 15 },
-  { doctorId: 'd-005', patientId: 'p-003', status: 'completed',   paymentType: 'regular',      serviceId: 's-007', durationMin: 20 },
-  { doctorId: 'd-005', patientId: 'p-004', status: 'scheduled',   paymentType: 'dms', serviceId: 's-001', durationMin: 30 },
-  { doctorId: 'd-006', patientId: 'p-001', status: 'scheduled',   paymentType: 'regular',      serviceId: 's-004', durationMin: 30 },
-  { doctorId: 'd-006', patientId: 'p-002', status: 'completed',   paymentType: 'promo',      serviceId: 's-007', durationMin: 20 },
-  // Приёмы на аппаратах: занятость оборудования считается по записям, и без
-  // них лента ресурсов пуста — проверить её на стенде было бы нечем.
-  { doctorId: 'd-004', patientId: 'p-004', status: 'scheduled',   paymentType: 'regular',    serviceId: 's-003', durationMin: 15 },
-  { doctorId: 'd-005', patientId: 'p-001', status: 'scheduled',   paymentType: 'regular',    serviceId: 's-005', durationMin: 10 },
+/**
+ * Посев демо-стенда. Три требования, ради которых он собран именно так:
+ *   1. соседние дни не должны совпадать — иначе «Завтра» и «Неделя» показывают копию;
+ *   2. загрузка врача 45–75% — на пустом дне не показать поиск времени, на полном не записать;
+ *   3. пациент не может быть у двух врачей одновременно и приходить трижды за день.
+ * Всё детерминировано хешем: перезапуск процесса даёт тот же стенд.
+ */
+const seedHash = (str) => {
+  let h = 2166136261;
+  for (let i = 0; i < String(str).length; i += 1) {
+    h ^= String(str).charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+
+/** Услуги, к которым у врача есть допуск: запись вне допуска сервер бы не принял. */
+const servicesOfDoctor = (doctorId) => services.filter((s) => (s.doctorIds || []).includes(doctorId));
+
+const yearsBetween = (birthDate, onDate) => {
+  const [by, bm, bd] = String(birthDate).split('-').map(Number);
+  const [ny, nm, nd] = String(onDate).split('-').map(Number);
+  let years = ny - by;
+  if (nm < bm || (nm === bm && nd < bd)) years -= 1;
+  return years;
+};
+
+/**
+ * Тип приёма по услуге — то же правило, что и в карточке оператора: название
+ * услуги говорит, первичный это приём или повторный. Для диагностики и
+ * лаборатории тип не применяется.
+ */
+const seedVisitTypeFor = (service) => {
+  if (!service || service.category !== 'Приём') return null;
+  if (/первичн/i.test(service.name)) return 'first';
+  if (/повторн|результат/i.test(service.name)) return 'repeat';
+  return 'first';
+};
+
+/**
+ * Длительность посевной записи считают ТЕ ЖЕ правила, что и запись из АРМ.
+ * Иначе стенд показывает первичную консультацию на 30 минут, а оператор,
+ * записывая такую же, получает 60 — и экран «Правила длительности» врёт.
+ */
+const seedDurationFor = (service, visitType, patientAgeYears) => {
+  const ordered = [...durationRules].sort((a, b) => a.priority - b.priority);
+  let total = service.duration;
+  for (const rule of ordered) {
+    if (!rule.enabled && !rule.locked) continue;
+    const m = rule.match || {};
+    if (m.serviceCategory != null && m.serviceCategory !== service.category) continue;
+    if (m.visitType != null && m.visitType !== visitType) continue;
+    if (m.requiresEquipment === true && !service.requiresEquipment) continue;
+    if (m.patientAgeFrom != null) {
+      if (patientAgeYears == null || patientAgeYears < m.patientAgeFrom) continue;
+    }
+    if (rule.effect.kind === 'base') total = service.duration;
+    else if (rule.effect.kind === 'set') total = rule.effect.minutes;
+    else total += rule.effect.minutes;
+    if (total < 5) total = 5;
+  }
+  return total;
+};
+
+const PAYMENT_MIX = ['regular', 'regular', 'dms', 'promo', 'regular', 'discount', 'regular', 'dms', 'certificate', 'promo'];
+
+/**
+ * Заготовки протокола по специальности. Завершённый приём с пустым протоколом
+ * превращает карточку врача в пустой бланк: проверять на ней нечего.
+ */
+const PROTOCOL_BY_SPECIALTY = {
+  'Терапевт': [
+    { complaints: 'Кашель пятый день, температура до 37,6', diagnosis: 'J06.9 Острая инфекция верхних дыхательных путей' },
+    { complaints: 'Слабость, головная боль к вечеру', diagnosis: 'G44.2 Головная боль напряжённого типа' },
+    { complaints: 'Профилактический осмотр, жалоб нет', diagnosis: 'Z00.0 Общий медицинский осмотр' },
+  ],
+  'Кардиолог': [
+    { complaints: 'Перебои в работе сердца при нагрузке', diagnosis: 'I49.3 Преждевременная деполяризация желудочков' },
+    { complaints: 'Давление 160/95 вторую неделю', diagnosis: 'I10 Эссенциальная гипертензия' },
+    { complaints: 'Одышка при подъёме на третий этаж', diagnosis: 'I25.1 Атеросклеротическая болезнь сердца' },
+  ],
+  'Педиатр': [
+    { complaints: 'Насморк и подкашливание третий день', diagnosis: 'J00 Острый назофарингит' },
+    { complaints: 'Плановый осмотр перед детским садом', diagnosis: 'Z00.1 Обычный осмотр состояния здоровья ребёнка' },
+    { complaints: 'Сыпь на предплечьях после нового питания', diagnosis: 'L20.8 Атопический дерматит' },
+  ],
+  'Невролог': [
+    { complaints: 'Боль в пояснице отдаёт в ногу', diagnosis: 'M54.4 Люмбаго с ишиасом' },
+    { complaints: 'Онемение пальцев правой руки по утрам', diagnosis: 'G56.0 Синдром запястного канала' },
+    { complaints: 'Головокружение при повороте головы', diagnosis: 'H81.1 Доброкачественное пароксизмальное головокружение' },
+  ],
+  'Эндокринолог': [
+    { complaints: 'Сухость во рту, жажда, вес снизился на 4 кг', diagnosis: 'E11.9 Сахарный диабет 2 типа' },
+    { complaints: 'Утомляемость, зябкость, отёчность лица', diagnosis: 'E03.9 Гипотиреоз' },
+    { complaints: 'Контроль терапии, самочувствие ровное', diagnosis: 'E11.9 Сахарный диабет 2 типа' },
+  ],
+  'Врач общей практики': [
+    { complaints: 'Осмотр перед плановой операцией', diagnosis: 'Z01.8 Другое уточнённое специальное обследование' },
+    { complaints: 'Боль в горле, глотать больно', diagnosis: 'J02.9 Острый фарингит' },
+    { complaints: 'Оформление справки в бассейн', diagnosis: 'Z02.0 Обследование для поступления в учреждение' },
+  ],
+};
+
+const PROTOCOL_FALLBACK = PROTOCOL_BY_SPECIALTY['Врач общей практики'];
+
+const RECOMMENDATION_POOL = [
+  'Контрольный осмотр через 7 дней',
+  'Обильное питьё и домашний режим три дня',
+  'Дневник артериального давления две недели',
+  'Повторная консультация после анализов',
+  'Ограничить соль до 5 г в сутки',
+  'Явка с результатами обследования',
 ];
 
 /**
- * Услуги на аппаратах, которыми добираются записи-заполнители. Заполнитель
- * приходит без услуги, и лента оборудования на демо-стенде оставалась пустой:
- * занятость аппарата считается по записям, а записей на аппаратные услуги
- * почти не было. Время и длительность заполнителя при этом не меняются —
- * услуга подбирается ровно под уже выбранную длительность и допуск врача.
+ * Статус записи выводится из дня и часа, а не назначается списком: прошедший
+ * день не может содержать «ожидает», а завтрашний — «приём идёт».
  */
-const EQUIPMENT_SERVICES = ['s-003', 's-004', 's-005', 's-006'];
-
-const equipmentServiceFor = (doctorId, durationMin) => {
-  const svc = services.find((s) => EQUIPMENT_SERVICES.includes(s.id)
-    && s.duration === durationMin
-    && s.doctorIds.includes(doctorId));
-  return svc ? svc.id : null;
-};
-
-// Статусы, которые могут появиться на конкретном дне относительно sysDate.
-// Прошедший день — только терминальные статусы; сегодня — смесь; будущий — scheduled.
-const STATUS_POOL_FOR_DAY = (date, sysDate) => {
+const seedStatusFor = (date, sysDate, startMin, key) => {
   const cmp = compareDate(date, sysDate);
-  if (cmp < 0) return ['completed', 'no_show', 'completed', 'cancelled', 'completed'];
-  if (cmp > 0) return ['scheduled', 'scheduled', 'scheduled', 'scheduled', 'scheduled', 'scheduled', 'scheduled'];
-  return ['scheduled', 'arrived', 'in_progress', 'completed', 'scheduled', 'scheduled', 'completed', 'no_show', 'scheduled'];
+  const h = seedHash(key);
+  if (cmp < 0) return ['completed', 'completed', 'completed', 'no_show', 'completed', 'cancelled'][h % 6];
+  if (cmp > 0) return 'scheduled';
+  if (startMin < 11 * 60) return ['completed', 'completed', 'no_show', 'completed'][h % 4];
+  if (startMin < 12 * 60 + 30) return ['in_progress', 'arrived', 'arrived', 'completed'][h % 4];
+  return ['scheduled', 'scheduled', 'scheduled', 'arrived', 'cancelled'][h % 5];
 };
 
-const STATUSES_ALLOWED_IN_PAST = new Set(['completed', 'no_show', 'cancelled']);
-const STATUSES_ALLOWED_IN_FUTURE = new Set(['scheduled']);
+const SEED_AUTHORS = [
+  { createdByName: 'Смирнова А.И.', createdByUnit: 'Колл-центр' },
+  { createdByName: 'Орлова Н.В.', createdByUnit: 'Регистратура «Динамо»' },
+  { createdByName: 'Гончарова Л.П.', createdByUnit: 'Колл-центр' },
+];
 
-const clampStatusForDay = (date, sysDate, status) => {
-  const cmp = compareDate(date, sysDate);
-  if (cmp < 0 && !STATUSES_ALLOWED_IN_PAST.has(status)) return 'completed';
-  if (cmp > 0 && !STATUSES_ALLOWED_IN_FUTURE.has(status)) return 'scheduled';
-  return status;
+/** Цепочка переходов под статус: журнал «Аудит изменений» не бывает пустым у прошедшей записи. */
+const seedHistory = (status, startIso, durationMin, createdShiftMin) => {
+  const shift = (min) => new Date(new Date(startIso).getTime() + min * 60000).toISOString();
+  const created = { from: null, to: 'scheduled', at: shift(-createdShiftMin), actor: 'operator' };
+  if (status === 'scheduled') return [created];
+  if (status === 'cancelled') return [created, { from: 'scheduled', to: 'cancelled', at: shift(-60), actor: 'operator' }];
+  if (status === 'no_show') return [created, { from: 'scheduled', to: 'no_show', at: shift(20), actor: 'registrar' }];
+  const arrived = { from: 'scheduled', to: 'arrived', at: shift(-8), actor: 'registrar' };
+  if (status === 'arrived') return [created, arrived];
+  const inProgress = { from: 'arrived', to: 'in_progress', at: shift(2), actor: 'doctor' };
+  if (status === 'in_progress') return [created, arrived, inProgress];
+  return [created, arrived, inProgress, { from: 'in_progress', to: 'completed', at: shift(durationMin), actor: 'doctor' }];
 };
-
-const patientIds = seedPatients.map((p) => p.id);
 
 const seedAppointments = (date, sysDate, seedMap) => {
   const dIdx = dayIndex(date);
-  const statusPool = STATUS_POOL_FOR_DAY(date, sysDate);
-
-  const usedMinutes = [];
+  const source = seedMap || weekTemplateSeed;
   const placed = [];
+  const used = [];
+  const dayCount = new Map();
 
-  /**
-   * Пациент, свободный в этом интервале. Раньше посев считал занятость только
-   * по врачу, и один пациент оказывался в двух кабинетах в одно время: на
-   * стенде это видно глазами, а сервер (ФТ 3.3.1) такую запись не принял бы.
-   */
-  const pickPatient = (preferredId, startMin, durationMin) => {
-    const busy = (id) => placed.some((a) => a.patientId === id
+  const slotFree = (doctorId, startMin, durationMin) => !used.some((u) => u.doctorId === doctorId
+    && startMin < u.endMin && startMin + durationMin > u.startMin);
+
+  const patientFree = (patientId, startMin, durationMin) => {
+    if ((dayCount.get(patientId) || 0) >= 2) return false;
+    return !placed.some((a) => a.patientId === patientId
       && a.startMin < startMin + durationMin
       && a.startMin + a.durationMin > startMin);
-    if (!busy(preferredId)) return preferredId;
-    return patientIds.find((id) => !busy(id)) ?? null;
   };
 
-  for (let i = 0; i < SEED_PLAN.length; i += 1) {
-    const p = SEED_PLAN[i];
-    const startMin = findSeedSlot(p.doctorId, dIdx, p.durationMin, usedMinutes, seedMap);
-    if (startMin == null) continue;
-    const patientId = pickPatient(p.patientId, startMin, p.durationMin);
-    if (patientId == null) continue;
-    usedMinutes.push({ doctorId: p.doctorId, startMin, endMin: startMin + p.durationMin });
-    const hh = String(Math.floor(startMin / 60)).padStart(2, '0');
-    const mm = String(startMin % 60).padStart(2, '0');
-    const status = clampStatusForDay(date, sysDate, p.status);
-    placed.push({
-      doctorId: p.doctorId,
-      patientId,
-      startMin,
-      start: isoAt(date, hh, mm),
-      durationMin: p.durationMin,
-      status,
-      paymentType: p.paymentType,
-      serviceId: p.serviceId,
-    });
-  }
+  /**
+   * Пациент подбирается с оглядкой на возрастное правило приёма: педиатру —
+   * дети, взрослым специалистам — совершеннолетние. Иначе в справочнике врача
+   * написано «до 18 лет», а в его сетке стоят пенсионеры.
+   */
+  const pickPatient = (doctorId, startMin, durationMin, key) => {
+    const wantsChild = doctorId === 'd-003';
+    const offset = seedHash(key) % patients.length;
+    const ordered = patients.map((_, i) => patients[(offset + i) % patients.length]);
+    const fits = (p) => {
+      const age = yearsBetween(p.birthDate, date);
+      return wantsChild ? age < 18 : age >= 18;
+    };
+    return ordered.find((p) => fits(p) && patientFree(p.id, startMin, durationMin))
+      ?? ordered.find((p) => patientFree(p.id, startMin, durationMin))
+      ?? null;
+  };
 
-  // Добиваем минимум до 5 записей, повторно используя пациентов и укорачивая
-  // длительность до первого доступного слота. Это страхует дни, когда в
-  // SEED_PLAN почти все цели — врачи, которые в этот день не работают.
-  let safety = 0;
-  while (placed.length < 5 && safety < 200) {
-    safety += 1;
-    let grown = false;
-    for (const doc of doctors) {
-      for (const durationMin of [30, 20, 15, 10]) {
-        const startMin = findSeedSlot(doc.id, dIdx, durationMin, usedMinutes, seedMap);
-        if (startMin == null) continue;
-        usedMinutes.push({ doctorId: doc.id, startMin, endMin: startMin + durationMin });
-        const hh = String(Math.floor(startMin / 60)).padStart(2, '0');
-        const mm = String(startMin % 60).padStart(2, '0');
-        const status = clampStatusForDay(date, sysDate, statusPool[placed.length % statusPool.length]);
-        const preferred = patientIds[(placed.length + safety) % patientIds.length];
-        const patientId = pickPatient(preferred, startMin, durationMin);
-        if (patientId == null) continue;
+  for (const doc of doctors) {
+    const intervals = (source[doc.id] || [])[dIdx] || [];
+    const pool = servicesOfDoctor(doc.id);
+    if (pool.length === 0) continue;
+    // Целевая загрузка врача на день: 45–72%. Ниже — «в клинике никого»,
+    // выше — оператору некуда записывать, а показывают именно запись.
+    const fill = 55 + (seedHash(`fill|${date}|${doc.id}`) % 14);
+    for (const interval of intervals) {
+      if (!isWorkingInterval(interval)) continue;
+      const ivStart = toMinutes(interval.start);
+      const ivEnd = toMinutes(interval.end);
+      const targetBusyMin = Math.round(((ivEnd - ivStart) * fill) / 100);
+      let bookedMin = 0;
+      let m = ivStart;
+      let guard = 0;
+      while (m < ivEnd && bookedMin < targetBusyMin && guard < 200) {
+        guard += 1;
+        const key = `${date}|${doc.id}|${m}`;
+        const h = seedHash(key);
+        // Услуга выбирается из тех, что помещаются до конца интервала: иначе
+        // одна длинная услуга у края смены обрывала бы весь остаток дня.
+        const durationOf = (service, patient) => seedDurationFor(
+          service,
+          seedVisitTypeFor(service),
+          patient ? yearsBetween(patient.birthDate, date) : null,
+        );
+        const fitting = pool.filter((s) => m + durationOf(s, null) <= ivEnd);
+        if (fitting.length === 0) break;
+        const svc = fitting[h % fitting.length];
+        const patient = pickPatient(doc.id, m, durationOf(svc, null), `p|${key}`);
+        if (patient == null) { m += stepMinutes; continue; }
+        const durationMin = durationOf(svc, patient);
+        if (m + durationMin > ivEnd) { m += stepMinutes; continue; }
+        const hh = String(Math.floor(m / 60)).padStart(2, '0');
+        const mm = String(m % 60).padStart(2, '0');
         placed.push({
           doctorId: doc.id,
-          patientId,
-          startMin,
+          patientId: patient.id,
+          startMin: m,
           start: isoAt(date, hh, mm),
           durationMin,
-          status,
-          paymentType: 'regular',
-          serviceId: equipmentServiceFor(doc.id, durationMin),
+          status: seedStatusFor(date, sysDate, m, key),
+          paymentType: PAYMENT_MIX[(h >>> 5) % PAYMENT_MIX.length],
+          serviceId: svc.id,
         });
-        grown = true;
-        break;
+        used.push({ doctorId: doc.id, startMin: m, endMin: m + durationMin });
+        dayCount.set(patient.id, (dayCount.get(patient.id) || 0) + 1);
+        bookedMin += durationMin;
+
+        /**
+         * Пауза считается из остатка смены и остатка плана: свободное время
+         * распределяется равномерно до конца интервала. Постоянный коэффициент
+         * давал разброс загрузки от 40% до 100% — то пустой день, в котором
+         * нечего показывать, то полный, в который нечего записать.
+         */
+        const after = m + durationMin;
+        const rawGap = (durationMin * (100 - fill)) / fill;
+        const jitter = (((h >>> 11) % 3) - 1) * stepMinutes;
+        // Приём начинается на границе пятнадцати минут: услуга на 10 минут,
+        // начатая в 09:05, красит в сетке две ячейки вместо одной, и врач
+        // с загрузкой 54% выглядит занятым весь день.
+        const gap = Math.max(stepMinutes, Math.round((rawGap + jitter) / stepMinutes) * stepMinutes);
+        m = Math.ceil((after + gap) / stepMinutes) * stepMinutes;
       }
-      if (placed.length >= 5) break;
+    }
+  }
+
+  /**
+   * Выравнивание загрузки. Шаг сетки — 15 минут, а услуги длятся от 10 до 75:
+   * при постоянной паузе доля занятого времени гуляла от 8% до 100%, то есть
+   * то день, в котором нечего показывать, то день, в который некуда записать.
+   * Поэтому загрузка не только планируется, но и проверяется по факту.
+   */
+  const workSlotsOf = (doctorId) => {
+    const intervals = (source[doctorId] || [])[dIdx] || [];
+    let count = 0;
+    for (const interval of intervals) {
+      if (!isWorkingInterval(interval)) continue;
+      count += Math.floor((toMinutes(interval.end) - toMinutes(interval.start)) / stepMinutes);
+    }
+    return count;
+  };
+  // Занятость считается по АКТИВНЫМ записям: отменённая и неявка освобождают
+  // слот, поэтому в сетке их время выглядит свободным — и должно.
+  const busySlotsOf = (doctorId) => {
+    const marks = new Set();
+    for (const a of placed) {
+      if (a.doctorId !== doctorId) continue;
+      if (a.status === 'cancelled' || a.status === 'no_show') continue;
+      for (let t = Math.floor(a.startMin / stepMinutes) * stepMinutes; t < a.startMin + a.durationMin; t += stepMinutes) marks.add(t);
+    }
+    return marks.size;
+  };
+
+  for (const doc of doctors) {
+    const workSlots = workSlotsOf(doc.id);
+    // Короткая смена (три часа по субботам) в полосу не укладывается: одна
+    // услуга там весит четверть дня, и выравнивать нечего.
+    if (workSlots < 16) continue;
+    const pool = servicesOfDoctor(doc.id);
+    if (pool.length === 0) continue;
+
+    // Перегруз: снимаем последние записи, пока день не перестанет быть «всё занято».
+    let guardTrim = 0;
+    while (busySlotsOf(doc.id) / workSlots > 0.72 && guardTrim < 40) {
+      guardTrim += 1;
+      const own = placed.filter((a) => a.doctorId === doc.id);
+      if (own.length <= 2) break;
+      const drop = own[own.length - 1];
+      placed.splice(placed.indexOf(drop), 1);
+      const usedIdx = used.findIndex((u) => u.doctorId === doc.id && u.startMin === drop.startMin);
+      if (usedIdx >= 0) used.splice(usedIdx, 1);
+      dayCount.set(drop.patientId, Math.max(0, (dayCount.get(drop.patientId) || 1) - 1));
+    }
+
+    // Недогруз: доливаем в самые широкие свободные окна.
+    let guardAdd = 0;
+    while (busySlotsOf(doc.id) / workSlots < 0.48 && guardAdd < 40) {
+      guardAdd += 1;
+      const intervals = (source[doc.id] || [])[dIdx] || [];
+      let booked = false;
+      for (const interval of intervals) {
+        if (!isWorkingInterval(interval) || booked) continue;
+        const ivStart = toMinutes(interval.start);
+        const ivEnd = toMinutes(interval.end);
+        for (let m = ivStart; m < ivEnd && !booked; m += stepMinutes) {
+          const key = `balance|${date}|${doc.id}|${m}|${guardAdd}`;
+          const h = seedHash(key);
+          const nextBusy = used
+            .filter((u) => u.doctorId === doc.id && u.startMin >= m)
+            .reduce((min, u) => Math.min(min, u.startMin), ivEnd);
+          const room = nextBusy - m;
+          const withAge = (service, patient) => seedDurationFor(
+            service,
+            seedVisitTypeFor(service),
+            patient ? yearsBetween(patient.birthDate, date) : null,
+          );
+          const fitting = pool.filter((sv) => withAge(sv, null) <= room);
+          if (fitting.length === 0) continue;
+          const svc = fitting[h % fitting.length];
+          const patient = pickPatient(doc.id, m, withAge(svc, null), key);
+          if (patient == null) continue;
+          const durationMin = withAge(svc, patient);
+          if (durationMin > room || !slotFree(doc.id, m, durationMin)) continue;
+          const hh = String(Math.floor(m / 60)).padStart(2, '0');
+          const mm = String(m % 60).padStart(2, '0');
+          placed.push({
+            doctorId: doc.id,
+            patientId: patient.id,
+            startMin: m,
+            start: isoAt(date, hh, mm),
+            durationMin,
+            status: seedStatusFor(date, sysDate, m, key),
+            paymentType: PAYMENT_MIX[(h >>> 5) % PAYMENT_MIX.length],
+            serviceId: svc.id,
+          });
+          used.push({ doctorId: doc.id, startMin: m, endMin: m + durationMin });
+          dayCount.set(patient.id, (dayCount.get(patient.id) || 0) + 1);
+          booked = true;
+        }
+      }
+      if (!booked) break;
+    }
+  }
+
+  /**
+   * Короткая смена (одна суббота с единственным работающим врачом) даёт три
+   * записи, и день выглядит закрытым. Добираем до шести, уплотняя паузы:
+   * это единственное место, где посев жертвует разрежённостью ради того,
+   * чтобы в окне не было пустых рабочих дней.
+   */
+  let guardFill = 0;
+  while (placed.length < 6 && guardFill < 60) {
+    guardFill += 1;
+    let grown = false;
+    for (const doc of doctors) {
+      if (placed.length >= 6) break;
+      const intervals = (source[doc.id] || [])[dIdx] || [];
+      const pool = servicesOfDoctor(doc.id);
+      if (pool.length === 0) continue;
+      for (const interval of intervals) {
+        if (!isWorkingInterval(interval)) continue;
+        const ivStart = toMinutes(interval.start);
+        const ivEnd = toMinutes(interval.end);
+        let booked = false;
+        for (let m = ivStart; m < ivEnd && !booked; m += stepMinutes) {
+          const key = `fill|${date}|${doc.id}|${m}|${guardFill}`;
+          const h = seedHash(key);
+          // Уплотнение идёт в оставшиеся окна, поэтому услуга подбирается под
+          // размер окна: иначе шестидесятиминутная услуга не влезает в
+          // получасовую дыру, и день так и остаётся полупустым.
+          const nextBusy = used
+            .filter((u) => u.doctorId === doc.id && u.startMin >= m)
+            .reduce((min, u) => Math.min(min, u.startMin), ivEnd);
+          const room = nextBusy - m;
+          const durationOfService = (service, patient) => seedDurationFor(
+            service,
+            seedVisitTypeFor(service),
+            patient ? yearsBetween(patient.birthDate, date) : null,
+          );
+          const fitting = pool.filter((s) => durationOfService(s, null) <= room);
+          if (fitting.length === 0) continue;
+          const svc = fitting[h % fitting.length];
+          const patient = pickPatient(doc.id, m, durationOfService(svc, null), key);
+          if (patient == null) continue;
+          // Возрастное правило удлиняет приём, поэтому длительность считается
+          // уже с пациентом — и окно проверяется заново.
+          const durationMin = durationOfService(svc, patient);
+          if (durationMin > room) continue;
+          if (!slotFree(doc.id, m, durationMin)) continue;
+          const hh = String(Math.floor(m / 60)).padStart(2, '0');
+          const mm = String(m % 60).padStart(2, '0');
+          placed.push({
+            doctorId: doc.id,
+            patientId: patient.id,
+            startMin: m,
+            start: isoAt(date, hh, mm),
+            durationMin,
+            status: seedStatusFor(date, sysDate, m, key),
+            paymentType: PAYMENT_MIX[(h >>> 5) % PAYMENT_MIX.length],
+            serviceId: svc.id,
+          });
+          used.push({ doctorId: doc.id, startMin: m, endMin: m + durationMin });
+          dayCount.set(patient.id, (dayCount.get(patient.id) || 0) + 1);
+          booked = true;
+          grown = true;
+        }
+        if (booked) break;
+      }
     }
     if (!grown) break;
   }
 
-  const AUTHORS = [
-    { createdByName: 'Смирнова А.И.', createdByUnit: 'Колл-центр' },
-    { createdByName: 'Орлова Н.В.', createdByUnit: 'Регистратура Динамо' },
-  ];
-  const out = placed.map(({ startMin: _startMin, ...a }, idx) => ({
-    ...a,
-    complaints: null,
-    diagnosis: null,
-    visitType: null,
-    performedServiceIds: [],
-    recommendations: [],
-    nextVisit: null,
-    createdByName: AUTHORS[idx % AUTHORS.length].createdByName,
-    createdByUnit: AUTHORS[idx % AUTHORS.length].createdByUnit,
-    confirmed: idx % 3 === 0,
-  }));
+  placed.sort((a, b) => (a.startMin - b.startMin) || a.doctorId.localeCompare(b.doctorId));
+
+  const out = placed.map(({ startMin, ...a }, idx) => {
+    const doc = doctors.find((d) => d.id === a.doctorId);
+    const svc = services.find((s) => s.id === a.serviceId) || null;
+    const patient = patients.find((p) => p.id === a.patientId);
+    const h = seedHash(`p|${a.start}|${a.doctorId}`);
+    const done = a.status === 'completed';
+    const bank = PROTOCOL_BY_SPECIALTY[doc && doc.specialty] || PROTOCOL_FALLBACK;
+    const protocol = bank[h % bank.length];
+    const visitType = seedVisitTypeFor(svc) ?? 'repeat';
+    const extraService = servicesOfDoctor(a.doctorId).find((s) => s.id !== a.serviceId && s.category !== 'Приём');
+    const performed = done
+      ? [a.serviceId, ...(((h >>> 7) % 3 === 0) && extraService ? [extraService.id] : [])].filter(Boolean)
+      : [];
+    const performedSum = performed.reduce((sum, id) => {
+      const s = services.find((x) => x.id === id);
+      return sum + (s ? s.price : 0);
+    }, 0);
+    // По ДМС пациент в кассу не платит: счёт уходит страховой.
+    const cashDue = a.paymentType === 'dms' ? 0 : performedSum;
+    const author = SEED_AUTHORS[h % SEED_AUTHORS.length];
+    const record = {
+      ...a,
+      complaints: done ? protocol.complaints : null,
+      diagnosis: done ? protocol.diagnosis : null,
+      visitType: done ? visitType : null,
+      performedServiceIds: performed,
+      recommendations: done ? [RECOMMENDATION_POOL[h % RECOMMENDATION_POOL.length]] : [],
+      nextVisit: null,
+      paidAt: done ? new Date(new Date(a.start).getTime() + (a.durationMin + 5) * 60000).toISOString() : null,
+      paidAmount: done ? cashDue : null,
+      createdByName: author.createdByName,
+      createdByUnit: author.createdByUnit,
+      confirmed: (h >>> 9) % 3 !== 0,
+      history: seedHistory(a.status, a.start, a.durationMin, 60 * (24 + (h % 96))),
+      patientAgeYears: patient ? yearsBetween(patient.birthDate, date) : null,
+    };
+    if (!svc) record.serviceId = null;
+    record.seedIndex = idx;
+    return record;
+  });
+
   for (const r of out) {
     globalSeedSeq += 1;
     r.id = `a-${String(globalSeedSeq).padStart(3, '0')}`;
+    delete r.seedIndex;
+    delete r.patientAgeYears;
   }
   for (const r of out) {
     pushDemoTarget(r);
@@ -492,7 +775,7 @@ const doctorCards = [
   {
     id: 'd-001',
     specialties: ['Терапевт', 'Врач общей практики'],
-    site: 'Площадка на Ленина, 15',
+    site: 'Динамо',
     temporarySites: ['Филиал на Гагарина, 3 — до 31 августа'],
     admissionRules: ['Приём по записи', 'Детей не принимает'],
     equipmentAccess: ['ЭКГ-аппарат', 'Тонометр суточный'],
@@ -507,7 +790,7 @@ const doctorCards = [
   {
     id: 'd-002',
     specialties: ['Кардиолог'],
-    site: 'Площадка на Ленина, 15',
+    site: 'Динамо',
     temporarySites: [],
     admissionRules: ['Приём по записи', 'Первичный приём 40 минут'],
     equipmentAccess: ['ЭКГ-аппарат', 'УЗИ сердца'],
@@ -520,7 +803,7 @@ const doctorCards = [
   {
     id: 'd-003',
     specialties: ['Педиатр'],
-    site: 'Площадка на Ленина, 15',
+    site: 'Динамо',
     temporarySites: [],
     admissionRules: ['Приём по записи'],
     equipmentAccess: [],
@@ -530,35 +813,50 @@ const doctorCards = [
     serviceWindows: [],
     specializationTags: ['дети'],
   },
-  // Незаполненные карточки: без основной площадки и/или без специальностей.
   {
     id: 'd-004',
     specialties: ['Невролог'],
-    site: '',
+    site: 'Динамо',
     temporarySites: [],
-    admissionRules: [],
-    equipmentAccess: [],
-    patientAge: '',
-    preferentialLimit: '',
-    pairWork: '',
-    serviceWindows: [],
-    specializationTags: [],
+    admissionRules: ['Приём по записи', 'Первичный приём 40 минут'],
+    equipmentAccess: ['Электромиограф'],
+    patientAge: 'с 14 лет',
+    preferentialLimit: '3',
+    pairWork: 'С массажистом по вторникам',
+    serviceWindows: [{ what: 'Блокады', when: 'вт, чт до 13:00' }],
+    specializationTags: ['боль в спине'],
   },
   {
     id: 'd-005',
     specialties: ['Эндокринолог'],
-    site: '',
+    site: 'Динамо',
     temporarySites: [],
-    admissionRules: [],
-    equipmentAccess: [],
-    patientAge: '',
-    preferentialLimit: '',
+    admissionRules: ['Приём по записи'],
+    equipmentAccess: ['Глюкометр лабораторный'],
+    patientAge: 'с 18 лет',
+    preferentialLimit: '5',
     pairWork: '',
-    serviceWindows: [],
-    specializationTags: [],
+    serviceWindows: [{ what: 'Школа диабета', when: 'ср 15:00' }],
+    specializationTags: ['диабет'],
   },
   {
     id: 'd-006',
+    specialties: ['Хирург'],
+    site: 'Динамо',
+    temporarySites: [],
+    admissionRules: ['Приём по записи', 'Перевязки без записи до 10:00'],
+    equipmentAccess: ['Хирургический набор'],
+    patientAge: 'с 16 лет',
+    preferentialLimit: '2',
+    pairWork: 'С перевязочной медсестрой',
+    serviceWindows: [{ what: 'Перевязки', when: 'ежедневно до 10:00' }],
+    specializationTags: ['амбулаторная хирургия'],
+  },
+  // Ровно одна карточка оставлена незаполненной: счётчик «Незаполненных карточек»
+  // обязан считаться по данным, и на полностью заполненном наборе его нечем проверить.
+  // Это новый врач — смен у него ещё нет, поэтому в сетке смены он не появляется.
+  {
+    id: 'd-007',
     specialties: [],
     site: '',
     temporarySites: [],
@@ -631,6 +929,17 @@ const weekTemplateSeed = {
     [{ start: '08:00', end: '20:00', kind: 'work' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
     [{ start: '08:00', end: '20:00', kind: 'work' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+  ],
+  // Новый врач: смен ещё нет, поэтому в сетке смены колонки у него не будет,
+  // а в шаблоне недели видно, что расписание не заведено.
+  'd-007': [
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
+    [{ start: '00:00', end: '00:00', kind: 'off' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
     [{ start: '00:00', end: '00:00', kind: 'off' }],
   ],
@@ -724,12 +1033,84 @@ const countWeekSlots = (weekStart) => {
   return { slotsCreated, doctorsAffected: doctors.size };
 };
 
+/**
+ * Заявки листа ожидания на стенде. Пустой лист означает, что заявленную MUST HAVE
+ * функцию показывают на экране «Заявок нет»: ни очереди, ни подбора слотов,
+ * ни разницы между типами заявок увидеть нельзя.
+ */
+const seedWaitlist = (sysDate) => {
+  const at = (days) => addDays(sysDate, days);
+  const rows = [
+    {
+      kind: 'nearest', priority: 'high', patientId: 'p-007', serviceId: 's-002', doctorId: 'd-002', paymentType: 'dms',
+      dateFrom: at(0), dateTo: at(3), comment: 'Просит любое окно, готов приехать в течение часа',
+      createdBy: 'operator', status: 'open',
+    },
+    {
+      kind: 'distant', priority: 'normal', patientId: 'p-012', serviceId: 's-004', doctorId: null, paymentType: 'regular',
+      dateFrom: at(21), dateTo: at(35), comment: 'Хочет УЗИ после отпуска, вторая половина дня',
+      createdBy: 'operator', status: 'open',
+    },
+    {
+      kind: 'reschedule', priority: 'high', patientId: 'p-003', serviceId: 's-001', doctorId: 'd-001', paymentType: 'promo',
+      dateFrom: at(1), dateTo: at(7), comment: 'Перенос из-за командировки, удобно до 11:00',
+      createdBy: 'operator', status: 'open',
+    },
+    {
+      kind: 'from_doctor', priority: 'normal', patientId: 'p-006', serviceId: 's-007', doctorId: 'd-005', paymentType: 'regular',
+      dateFrom: at(7), dateTo: at(14), comment: 'Контроль по результатам анализов, назначил врач',
+      createdBy: 'doctor', status: 'open',
+    },
+    {
+      kind: 'nearest', priority: 'normal', patientId: 'p-014', serviceId: 's-002', doctorId: 'd-004', paymentType: 'regular',
+      dateFrom: at(0), dateTo: at(10), comment: 'Пожилая пациентка, нужен сопровождающий',
+      createdBy: 'operator', status: 'open',
+    },
+    {
+      kind: 'from_doctor', priority: 'normal', patientId: 'p-010', serviceId: 's-003', doctorId: 'd-002', paymentType: 'dms',
+      dateFrom: at(-5), dateTo: at(-1), comment: 'ЭКГ по назначению кардиолога',
+      createdBy: 'doctor', status: 'fulfilled',
+    },
+  ];
+  return rows.map((row, idx) => ({
+    id: `W-${String(idx + 1).padStart(4, '0')}`,
+    status: row.status,
+    kind: row.kind,
+    priority: row.priority,
+    patientId: row.patientId,
+    patientName: null,
+    patientPhone: null,
+    serviceId: row.serviceId,
+    doctorId: row.doctorId,
+    dateFrom: row.dateFrom,
+    dateTo: row.dateTo,
+    comment: row.comment,
+    paymentType: row.paymentType,
+    insuranceAppointmentId: null,
+    createdAt: `${addDays(sysDate, -1 - (idx % 4))}T09:${String(10 + idx * 7).padStart(2, '0')}:00.000Z`,
+    createdBy: row.createdBy,
+    fulfilledAppointmentId: null,
+    fulfilledAt: row.status === 'fulfilled' ? `${addDays(sysDate, -2)}T11:20:00.000Z` : null,
+  }));
+};
+
+/** Привязать закрытые заявки к реальным записям того же пациента. */
+const linkFulfilledWaitlist = (entries, appointments) => entries.map((entry) => {
+  if (entry.status !== 'fulfilled') return entry;
+  const match = appointments.find((a) => a.patientId === entry.patientId
+    && a.start.slice(0, 10) >= entry.dateFrom
+    && a.start.slice(0, 10) <= entry.dateTo);
+  return match ? { ...entry, fulfilledAppointmentId: match.id } : entry;
+});
+
 const buildState = () => {
   const sysDate = today();
   const currentWeekStart = weekStartOf(sysDate);
-  const priorWeekStart = addDays(currentWeekStart, -7);
-  const nextWeekStart = addDays(currentWeekStart, 7);
-  const publishedWeeks = [priorWeekStart, currentWeekStart, nextWeekStart];
+  // Окно стенда: две недели назад и четыре вперёд. Трёхнедельное окно означало,
+  // что сдвиг показа на две недели открывает продукт пустым, а на вопрос
+  // «запишите на следующий месяц» отвечать нечем.
+  const publishedWeeks = [];
+  for (let w = -2; w <= 4; w += 1) publishedWeeks.push(addDays(currentWeekStart, w * 7));
   const weekTemplatesByWeek = {};
   for (const ws of publishedWeeks) {
     weekTemplatesByWeek[ws] = cloneWeekSeed();
@@ -742,6 +1123,8 @@ const buildState = () => {
     }
   }
   pushDemoTarget = (record) => { state.demoAppointments.push(record); };
+  // Закрытая заявка обязана ссылаться на запись, которой она закрыта: иначе в
+  // карточке заявки пусто, а «Закрыта записью в расписании» — надпись без опоры.
   let maxDemoSeq = 0;
   const re = /^a-(\d+)$/;
   for (const a of demoAppointments) {
@@ -790,8 +1173,8 @@ const buildState = () => {
     weekTemplatesByWeek,
     seq: maxDemoSeq,
     absences: [],
-    waitlist: [],
-    waitlistSeq: 0,
+    waitlist: linkFulfilledWaitlist(seedWaitlist(sysDate), demoAppointments),
+    waitlistSeq: 6,
     massCancelBatches: [],
     massCancelSeq: 0,
     // Праздник холдинга в окне демо — для видимости в сетке (не «пустой день»).
@@ -871,7 +1254,7 @@ const ABSENCE_REASON_LABEL = {
   repair: 'Ремонт',
   conference: 'Конференция',
   training: 'Учебный день',
-  tech_break: 'Техперерыв',
+  tech_break: 'Перерыв',
 };
 
 const compareDateStr = (a, b) => {
@@ -1010,7 +1393,19 @@ const buildSlots = (date) => {
       }
       if (!covering) continue;
 
-      if (covering.kind === 'block') {
+      // Запись ищется РАНЬШЕ перерыва и блокировки. Прежний порядок делал
+      // обратное: администратор ставил перерыв на время, где уже стоят люди, и
+      // пациенты просто пропадали из сетки, оставаясь в очереди регистратора.
+      const pool = [...state.appointments, ...(state.demoAppointments || [])];
+      const collision = pool.find((a) => {
+        if (a.doctorId !== doc.id) return false;
+        if (!ACTIVE_APPOINTMENT_STATUSES.has(a.status)) return false;
+        const aStart = new Date(a.start).getTime();
+        const aEnd = aStart + a.durationMin * 60000;
+        return aStart < slotEndMs && aEnd > slotStartMs;
+      });
+
+      if (!collision && covering.kind === 'block') {
         slot.doctors.push({
           id: doc.id,
           name: doc.name,
@@ -1020,25 +1415,17 @@ const buildSlots = (date) => {
         });
         continue;
       }
-      if (covering.kind === 'break') {
+      if (!collision && covering.kind === 'break') {
         slot.doctors.push({
           id: doc.id,
           name: doc.name,
           busy: true,
           occupancyKind: 'tech_break',
-          occupancyLabel: 'Техперерыв',
+          occupancyLabel: 'Перерыв',
         });
         continue;
       }
 
-      const pool = [...state.appointments, ...(state.demoAppointments || [])];
-      const collision = pool.find((a) => {
-        if (a.doctorId !== doc.id) return false;
-        if (!ACTIVE_APPOINTMENT_STATUSES.has(a.status)) return false;
-        const aStart = new Date(a.start).getTime();
-        const aEnd = aStart + a.durationMin * 60000;
-        return aStart < slotEndMs && aEnd > slotStartMs;
-      });
       if (collision) {
         const patient = state.patients.find((p) => p.id === collision.patientId);
         slot.doctors.push({
@@ -1048,6 +1435,9 @@ const buildSlots = (date) => {
           appointmentId: collision.id,
           occupancyKind: 'appointment',
           occupancyLabel: patient ? patient.name : 'Запись',
+          // Запись стоит на времени, которое администратор закрыл: оператор
+          // обязан видеть конфликт, а не чистую занятость.
+          conflictWith: covering.kind === 'work' ? null : covering.kind,
         });
       } else {
         slot.doctors.push({
@@ -1303,7 +1693,7 @@ const normalizeIntervals = (raw) => {
   return { ok: true, intervals: out };
 };
 
-const saveWeekTemplateInterval = ({ weekStart, doctorId, date, intervals }) => {
+const saveWeekTemplateInterval = ({ weekStart, doctorId, date, intervals, confirmed }) => {
   const ws = weekStartOf(weekStart);
   const day = String(date);
   if (weekStartOf(day) !== ws) {
@@ -1321,8 +1711,43 @@ const saveWeekTemplateInterval = ({ weekStart, doctorId, date, intervals }) => {
     week[doctorId] = Array.from({ length: 7 }, () => [{ start: '00:00', end: '00:00', kind: 'off' }]);
   }
   const di = dayIndex(day);
+
+  /**
+   * Перед сужением графика считаем, кто под него попадёт. Прежняя версия
+   * переписывала день врача целиком и ни разу не смотрела на записи: пациенты
+   * оставались в базе, но исчезали из сетки — «записи-призраки» под перерывом.
+   */
+  const stillWorking = (startMs, endMs) => normalized.intervals.some((iv) => {
+    if (iv.kind !== 'work') return false;
+    return clinicDateTimeMs(day, iv.start) <= startMs && clinicDateTimeMs(day, iv.end) >= endMs;
+  });
+  const pool = [...state.appointments, ...(state.demoAppointments || [])];
+  const affected = pool.filter((a) => {
+    if (a.doctorId !== doctorId) return false;
+    if (dateOnly(a.start) !== day) return false;
+    if (!ACTIVE_APPOINTMENT_STATUSES.has(a.status)) return false;
+    const aStart = new Date(a.start).getTime();
+    return !stillWorking(aStart, aStart + a.durationMin * 60000);
+  });
+  if (affected.length > 0 && !confirmed) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'interval_has_appointments',
+      affected: affected.map((a) => {
+        const patient = state.patients.find((p) => p.id === a.patientId);
+        return {
+          id: a.id,
+          time: a.start.slice(11, 16),
+          patientName: patient ? patient.name : 'Пациент',
+        };
+      }),
+      message: `На это время уже записаны пациенты: ${affected.length}`,
+    };
+  }
+
   week[doctorId][di] = normalized.intervals.map((iv) => ({ ...iv }));
-  return { ok: true, templates: buildWeekTemplates(ws) };
+  return { ok: true, affected: affected.length, templates: buildWeekTemplates(ws) };
 };
 
 const clearWeekAppointments = (weekStart) => {
@@ -1333,15 +1758,38 @@ const clearWeekAppointments = (weekStart) => {
   state.demoAppointments = state.demoAppointments.filter(keep);
 };
 
-const unpublishWeek = (weekStartRaw) => {
+/** Активные записи недели — их считают перед снятием публикации. */
+const weekAppointments = (weekStart) => {
+  const dates = new Set();
+  for (let i = 0; i < 7; i += 1) dates.add(addDays(weekStart, i));
+  const pool = [...state.appointments, ...(state.demoAppointments || [])];
+  return pool.filter((a) => dates.has(dateOnly(a.start)) && ACTIVE_APPOINTMENT_STATUSES.has(a.status));
+};
+
+/**
+ * Снятие публикации закрывает неделю для новых записей и НЕ трогает уже
+ * созданные. Прежняя версия молча удаляла записи всех статусов, включая
+ * завершённые, и повторная публикация их не возвращала: один клик мышью
+ * уничтожал смену без вопроса и без возможности отменить.
+ */
+const unpublishWeek = (weekStartRaw, options) => {
   const weekStart = weekStartOf(weekStartRaw);
   const idx = state.publishedWeeks.indexOf(weekStart);
   if (idx < 0) {
     return { ok: false, status: 409, error: 'week_not_published', message: 'Неделя не опубликована' };
   }
+  const affected = weekAppointments(weekStart);
+  if (affected.length > 0 && !(options && options.confirmed)) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'week_has_appointments',
+      affected: affected.length,
+      message: `На неделе есть записи: ${affected.length}`,
+    };
+  }
   state.publishedWeeks.splice(idx, 1);
-  clearWeekAppointments(weekStart);
-  return { ok: true, weekStart, templates: buildWeekTemplates(weekStart) };
+  return { ok: true, weekStart, affected: affected.length, templates: buildWeekTemplates(weekStart) };
 };
 
 /** Вернуть стенд к исходному демо-состоянию без перезапуска процесса. */
@@ -1376,6 +1824,8 @@ module.exports = {
   buildWeekTemplates,
   countWeekSlots,
   weekTemplateSeed,
+  seedDurationFor,
+  seedVisitTypeFor,
   ensureWeekTemplates,
   getDoctorDayIntervals,
   saveWeekTemplateInterval,

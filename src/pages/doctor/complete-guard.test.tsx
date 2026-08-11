@@ -252,6 +252,7 @@ describe('DoctorPage — завершение приёма: гард по ста
     const finish = screen.getByTestId('visit-finish') as HTMLButtonElement
     expect(finish.disabled).toBe(false)
     fireEvent.click(finish)
+    fireEvent.click(await screen.findByTestId('visit-finish-confirm-yes'))
 
     await waitFor(() => {
       expect(JSON.parse(String(lastPatchBody))).toMatchObject({ status: 'completed' })
@@ -330,9 +331,14 @@ describe('DoctorPage — завершение приёма: гард по ста
     expect(finish.disabled).toBe(false)
 
     fireEvent.click(finish)
+    fireEvent.click(await screen.findByTestId('visit-finish-confirm-yes'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('visit-submit-error-text').textContent).toContain('in_progress')
+      // Латинские имена статусов из сообщения сервера до врача не доходят —
+      // он читает объяснение, а не разбор перехода.
+      const text = screen.getByTestId('visit-submit-error-text').textContent ?? ''
+      expect(text).toContain('Из текущего состояния так перейти нельзя')
+      expect(text).not.toMatch(/[A-Za-z]/)
     })
 
     const complaintsField = screen.getByTestId('visit-complaints') as HTMLTextAreaElement

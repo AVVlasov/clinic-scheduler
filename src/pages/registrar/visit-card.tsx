@@ -4,7 +4,9 @@ import { Badge, Box, Button, Flex, Stack } from '@chakra-ui/react'
 import { paymentTypeLabel } from '../../__data__/booking'
 import { appointmentStatusLabel } from '../../__data__/status-labels'
 import type { Appointment } from '../../__data__/types'
-import { isRegistrarTerminal } from '../../__data__/lifecycle'
+import { canAcceptPayment, canReturnToQueue, isRegistrarTerminal } from '../../__data__/lifecycle'
+
+import { cashDue, formatRub, isThirdPartyPayment, servicesTotal } from './payment'
 
 export interface VisitCardProps {
   visit: Appointment | null
@@ -13,6 +15,7 @@ export interface VisitCardProps {
   onMarkArrived: () => void
   onMarkWaiting: () => void
   onMarkNoShow: () => void
+  onReturnToQueue: () => void
   onPay: () => void
   onPrintTicket: () => void
   onConfirm: () => void
@@ -44,27 +47,10 @@ const formatAuthor = (name?: string | null, unit?: string | null): string => {
   return '—'
 }
 
-const formatRub = (amount: number): string =>
-  `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`
-
-const visitAmount = (visit: Appointment, priceMap: Map<string, number>): number => {
-  const ids = visit.performedServiceIds.length > 0
-    ? visit.performedServiceIds
-    : visit.serviceId
-      ? [visit.serviceId]
-      : []
-  let sum = 0
-  for (const id of ids) {
-    const price = priceMap.get(id)
-    if (typeof price === 'number') sum += price
-  }
-  return sum
-}
-
 export const VisitCard = (props: VisitCardProps) => {
   const {
-    visit, priceMap, serviceNames, onMarkArrived, onMarkWaiting, onMarkNoShow, onPay, onPrintTicket,
-    onConfirm, payBusy = false, confirmBusy = false,
+    visit, priceMap, serviceNames, onMarkArrived, onMarkWaiting, onMarkNoShow, onReturnToQueue,
+    onPay, onPrintTicket, onConfirm, payBusy = false, confirmBusy = false,
   } = props
   const [confirmNoShow, setConfirmNoShow] = useState(false)
 
@@ -91,7 +77,10 @@ export const VisitCard = (props: VisitCardProps) => {
     )
   }
 
-  const isTerminalVisit = isRegistrarTerminal(visit.status)
+  const hasStatusActions = !isRegistrarTerminal(visit.status)
+  const isCancelled = visit.status === 'cancelled'
+  const canPay = canAcceptPayment(visit) && !isCancelled
+  const canReopen = canReturnToQueue(visit.status)
 
   const primaryLabel =
     visit.status === 'arrived' ? 'Отменить приход' : 'Отметить приход'
@@ -99,8 +88,41 @@ export const VisitCard = (props: VisitCardProps) => {
     visit.status === 'arrived' ? onMarkWaiting : onMarkArrived
   const noShowDisabled = visit.status === 'no_show'
 
-  const amount = visitAmount(visit, priceMap)
-  const amountText = amount > 0 ? formatRub(amount) : '—'
+  const total = servicesTotal(visit, priceMap)
+  const due = cashDue(visit, priceMap)
+  const thirdParty = isThirdPartyPayment(visit.paymentType)
+  const amountText = total > 0 ? formatRub(due) : '—'
+  const payLabel = thirdParty ? 'Провести по ДМС' : 'Принять оплату'
+  const payDisabled = !canPay || payBusy || total <= 0
+  const payTitle = visit.paidAt
+    ? 'Уже оплачено'
+    : (total <= 0 ? 'В визите нет услуг — сумму оплаты определить не по чему' : undefined)
+
+  const payButton = (
+    <Button
+      variant="outline"
+      flex="1"
+      size="sm"
+      onClick={onPay}
+      disabled={payDisabled}
+      title={payTitle}
+      data-testid="visit-pay-button"
+    >
+      {payBusy ? 'Оплата…' : (visit.paidAt ? 'Оплачено' : payLabel)}
+    </Button>
+  )
+
+  const ticketButton = (
+    <Button
+      variant="outline"
+      flex="1"
+      size="sm"
+      onClick={onPrintTicket}
+      data-testid="visit-print-button"
+    >
+      Талон
+    </Button>
+  )
 
   return (
     <Box
@@ -127,7 +149,7 @@ export const VisitCard = (props: VisitCardProps) => {
           </Box>
           <Box flex="1" />
           <Badge
-            bg={visit.status === 'arrived' ? 'brandGreenTint' : 'gray.100'}
+            bg={visit.status === 'arrived' ? 'brandGreenTint' : 'surfaceLight'}
             color={visit.status === 'arrived' ? 'brandGreen700' : 'textSecondary'}
             px="8px"
             borderRadius="compact"
@@ -154,7 +176,7 @@ export const VisitCard = (props: VisitCardProps) => {
           </Box>
         </Flex>
         <Flex gap="10px" align="baseline">
-          <Box w="104px" color="textSecondary" fontSize="12px">UID</Box>
+          <Box w="104px" color="textSecondary" fontSize="12px">Номер карты</Box>
           <Box fontSize="13px" fontFamily="mono" data-testid="visit-uid">{visit.patientUid ?? '—'}</Box>
         </Flex>
         <Flex gap="10px" align="baseline">
@@ -187,64 +209,68 @@ export const VisitCard = (props: VisitCardProps) => {
             <Box fontSize="13px" data-testid="visit-operator-comment">{visit.operatorComment}</Box>
           </Flex>
         ) : null}
+        {/* Стоимость услуг и сумма к оплате — разные числа, когда платит не
+            пациент: по ДМС счёт уходит страховой, и в кассу смены не попадает
+            ничего. Одно поле на оба смысла превращало ДМС в платный приём. */}
+        {total > 0 && due !== total ? (
+          <Flex gap="10px" align="baseline">
+            <Box w="104px" color="textSecondary" fontSize="12px">Стоимость услуг</Box>
+            <Box fontSize="13px" fontFamily="mono" data-testid="visit-services-total">
+              {formatRub(total)}
+            </Box>
+          </Flex>
+        ) : null}
         <Flex gap="10px" align="baseline">
           <Box w="104px" color="textSecondary" fontSize="12px">К оплате</Box>
           <Box fontSize="13px" fontFamily="mono" fontWeight="700" data-testid="visit-amount">
-            {visit.paidAt ? `оплачено ${formatRub(visit.paidAmount ?? amount)}` : amountText}
+            {visit.paidAt ? `оплачено ${formatRub(visit.paidAmount ?? due)}` : amountText}
           </Box>
         </Flex>
+        {total > 0 && due === 0 && !visit.paidAt ? (
+          <Box fontSize="12px" color="textSecondary" data-testid="visit-payment-note">
+            Счёт уходит страховой компании — в кассу смены пациент не платит.
+          </Box>
+        ) : null}
       </Stack>
 
       <Box p="14px 16px" display="flex" flexDirection="column" gap="6px" borderTopWidth="1px" borderColor="borderLight" mt="auto">
-        {isTerminalVisit ? (
-          <Flex gap="6px">
-            <Button
-              variant="outline"
-              flex="1"
-              size="sm"
-              onClick={onPrintTicket}
-              data-testid="visit-print-button"
-            >
-              Талон
-            </Button>
-          </Flex>
-        ) : (
+        {hasStatusActions ? (
+          <Button
+            colorPalette="green"
+            bg="brandGreenDark"
+            color="white"
+            _hover={{ bg: 'brandGreen700' }}
+            size="lg"
+            width="100%"
+            onClick={primaryAction}
+            data-testid="visit-primary-action"
+            data-arm-primary-target="true"
+          >
+            {primaryLabel}
+          </Button>
+        ) : null}
+        {canReopen ? (
+          <Button
+            colorPalette="green"
+            bg="brandGreenDark"
+            color="white"
+            _hover={{ bg: 'brandGreen700' }}
+            size="lg"
+            width="100%"
+            onClick={onReturnToQueue}
+            data-testid="visit-return-to-queue"
+          >
+            Вернуть в очередь
+          </Button>
+        ) : null}
+        {/* Оплата и талон доступны и после приёма: деньги в клинике берут
+            после визита, а не до него. */}
+        <Flex gap="6px" data-arm-section="pay">
+          {canPay || visit.paidAt ? payButton : null}
+          {isCancelled ? null : ticketButton}
+        </Flex>
+        {hasStatusActions ? (
           <>
-            <Button
-              colorPalette="green"
-              bg="brandGreenDark"
-              color="white"
-              _hover={{ bg: 'brandGreenDark' }}
-              size="lg"
-              width="100%"
-              onClick={primaryAction}
-              data-testid="visit-primary-action"
-              data-arm-primary-target="true"
-            >
-              {primaryLabel}
-            </Button>
-            <Flex gap="6px" data-arm-section="pay">
-              <Button
-                variant="outline"
-                flex="1"
-                size="sm"
-                onClick={onPay}
-                disabled={Boolean(visit.paidAt) || payBusy || amount <= 0}
-                title={visit.paidAt ? 'Уже оплачено' : (amount <= 0 ? 'Нет суммы к оплате' : undefined)}
-                data-testid="visit-pay-button"
-              >
-                {payBusy ? 'Оплата…' : (visit.paidAt ? 'Оплачено' : 'К оплате')}
-              </Button>
-              <Button
-                variant="outline"
-                flex="1"
-                size="sm"
-                onClick={onPrintTicket}
-                data-testid="visit-print-button"
-              >
-                Талон
-              </Button>
-            </Flex>
             <Button
               variant="outline"
               size="sm"
@@ -280,7 +306,7 @@ export const VisitCard = (props: VisitCardProps) => {
                 : 'Не пришёл'}
             </Button>
           </>
-        )}
+        ) : null}
       </Box>
     </Box>
   )

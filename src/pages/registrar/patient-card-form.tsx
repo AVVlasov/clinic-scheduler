@@ -2,10 +2,13 @@ import React, { useMemo, useState } from 'react'
 import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 
 import { ApiError, createAppointment, createPatient, getSchedule } from '../../__data__/api'
+import { defaultVisitTypeForService, resolveBookingDuration } from '../../__data__/booking'
 import { fieldStyle } from '../field-style'
 import type {
   CreatePatientInput,
   Doctor,
+  DurationRule,
+  Schedule,
   Patient,
   PatientDocumentType,
   Service,
@@ -34,10 +37,13 @@ const formatBirthDate = (iso: string): string => {
 const formFieldStyle: React.CSSProperties = { ...fieldStyle, maxWidth: '100%' }
 
 const FormField = ({
-  label, required = false, children,
+  label, required = false, error, errorTestId, children,
 }: {
   label: string
   required?: boolean
+  /** Сообщение стоит под своим полем: «что-то не так в форме» не говорит, где именно. */
+  error?: string
+  errorTestId?: string
   children: React.ReactNode
 }) => (
   <Stack gap="4px" minW="0">
@@ -46,12 +52,53 @@ const FormField = ({
       {required ? <Text as="span" color="danger"> *</Text> : null}
     </Text>
     {children}
+    {error ? (
+      <Text fontSize="11px" color="danger" data-testid={errorTestId}>{error}</Text>
+    ) : null}
   </Stack>
 )
+
+type PatientFieldKey = 'lastName' | 'firstName' | 'birthDate' | 'phone'
+
+const PHONE_HINT = 'Телефон из 11 цифр, например +7 900 000-00-00'
+
+/**
+ * Телефон и дата рождения проверяются на стойке, а не в МИС: «123» и 2099 год
+ * уезжали в картотеку молча, и пациента потом не найти и не дозвониться.
+ * «Сегодня» берётся из даты смены, а не из системных часов.
+ */
+export const validatePatientFields = (
+  values: { lastName: string; firstName: string; birthDate: string; phone: string },
+  today: string,
+): Partial<Record<PatientFieldKey, string>> => {
+  const errors: Partial<Record<PatientFieldKey, string>> = {}
+  if (!values.lastName.trim()) errors.lastName = 'Укажите фамилию'
+  if (!values.firstName.trim()) errors.firstName = 'Укажите имя'
+
+  const birthDate = values.birthDate.trim()
+  if (!birthDate) {
+    errors.birthDate = 'Укажите дату рождения'
+  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+    errors.birthDate = 'Дата рождения в формате ДД.ММ.ГГГГ'
+  } else if (birthDate > today) {
+    errors.birthDate = 'Дата рождения не может быть в будущем'
+  } else if (Number(birthDate.slice(0, 4)) < 1900) {
+    errors.birthDate = 'Проверьте год рождения'
+  }
+
+  const digits = values.phone.replace(/\D/g, '')
+  if (!values.phone.trim()) {
+    errors.phone = 'Укажите телефон'
+  } else if (!/^[78]\d{10}$/.test(digits)) {
+    errors.phone = PHONE_HINT
+  }
+  return errors
+}
 
 interface PatientCardFormProps {
   doctors: Doctor[]
   services: Service[]
+  durationRules?: DurationRule[]
   selectedDate: string
   onCreated: (patient: Patient) => void
   onOpenExisting: (patient: Patient) => void
@@ -61,6 +108,7 @@ interface PatientCardFormProps {
 export const PatientCardForm = ({
   doctors,
   services,
+  durationRules = [],
   selectedDate,
   onCreated,
   onOpenExisting,
@@ -76,7 +124,7 @@ export const PatientCardForm = ({
   const [documentNumber, setDocumentNumber] = useState('')
   const [consents, setConsents] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<string[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<PatientFieldKey, string>>>({})
   const [duplicate, setDuplicate] = useState<Patient | null>(null)
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<Patient | null>(null)
@@ -84,18 +132,24 @@ export const PatientCardForm = ({
   const [bookServiceId, setBookServiceId] = useState<string>('')
   const [bookTime, setBookTime] = useState<string>('')
   const [freeTimes, setFreeTimes] = useState<string[]>([])
+  /** Услуги врача по допуску: список без фильтра предлагал ЭКГ у терапевта. */
+  const offeredServices = useMemo(
+    () => services.filter((s) => !s.doctorIds?.length || s.doctorIds.includes(bookDoctorId)),
+    [services, bookDoctorId],
+  )
   const [bookBusy, setBookBusy] = useState(false)
-  const [bookDoneId, setBookDoneId] = useState<string | null>(null)
+  /** Подтверждение записи — человеческими словами: идентификатор «a-023» пациенту ничего не говорит. */
+  const [bookDone, setBookDone] = useState<{ time: string; doctorName: string } | null>(null)
 
-  const missingRequired = useMemo(() => {
-    const miss: string[] = []
-    if (!lastName.trim()) miss.push('фамилия')
-    if (!firstName.trim()) miss.push('имя')
-    if (!middleName.trim()) miss.push('отчество')
-    if (!birthDate.trim()) miss.push('дата рождения')
-    if (!phone.trim()) miss.push('телефон')
-    return miss
-  }, [lastName, firstName, middleName, birthDate, phone])
+  /**
+   * Отчество не обязательно: у иностранных пациентов его нет, а форма сама
+   * предлагает тип документа «Иностранный документ». В макете звёздочки у
+   * отчества тоже нет.
+   */
+  const validationErrors = useMemo(
+    () => validatePatientFields({ lastName, firstName, birthDate, phone }, selectedDate),
+    [lastName, firstName, birthDate, phone, selectedDate],
+  )
 
   const toggleConsent = (label: string) => {
     setConsents((prev) => (prev.includes(label) ? prev.filter((c) => c !== label) : [...prev, label]))
@@ -104,12 +158,12 @@ export const PatientCardForm = ({
   const submit = async () => {
     setError(null)
     setDuplicate(null)
-    if (missingRequired.length > 0) {
-      setFieldErrors(missingRequired)
-      setError(`Заполните обязательные поля: ${missingRequired.join(', ')}`)
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      setError('Проверьте поля карты: отмеченные красным заполнены неверно')
       return
     }
-    setFieldErrors([])
+    setFieldErrors({})
     setBusy(true)
     const input: CreatePatientInput = {
       lastName: lastName.trim(),
@@ -134,26 +188,34 @@ export const PatientCardForm = ({
             if (!d.busy) free.push({ doctorId: d.id, time: slot.time })
           }
         }
-        if (free.length > 0) {
-          setBookDoctorId(free[0].doctorId)
-          setBookTime(free[0].time)
-          setFreeTimes(
-            schedule.slots
-              .filter((s) => s.doctors.some((d) => d.id === free[0].doctorId && !d.busy))
-              .map((s) => s.time),
-          )
-        } else {
-          setBookDoctorId(doctors[0]?.id ?? '')
-          setBookServiceId(services[0]?.id ?? '')
-          if (doctors[0]?.id) await loadFreeTimes(doctors[0].id)
+        /**
+         * Предлагаем сочетание, которое реально существует: врач, его услуга и
+         * окно, куда эта услуга помещается. Раньше подставлялись первый врач и
+         * первая услуга по списку — и регистратор получал пустой список времени
+         * либо отказ сервера при попытке записать.
+         */
+        const candidates = doctors.filter((d) => free.some((f) => f.doctorId === d.id))
+        const pool = candidates.length > 0 ? candidates : doctors
+        let picked: { doctorId: string; serviceId: string; times: string[] } | null = null
+        for (const doc of pool) {
+          const offered = services.filter((sv) => !sv.doctorIds?.length || sv.doctorIds.includes(doc.id))
+          for (const service of offered) {
+            const times = freeTimesFor(schedule, doc.id, service.id)
+            if (times.length > 0) {
+              picked = { doctorId: doc.id, serviceId: service.id, times }
+              break
+            }
+          }
+          if (picked) break
         }
-        const docId = free[0]?.doctorId ?? doctors[0]?.id
-        const offered = services.filter((s) => !s.doctorIds?.length || s.doctorIds.includes(docId ?? ''))
-        setBookServiceId(offered[0]?.id ?? services[0]?.id ?? '')
-        // Если слотов так и нет — ещё раз подтянуть (гонка с setState).
-        if (free.length > 0) {
-          await loadFreeTimes(free[0].doctorId)
-        }
+        const docId = picked?.doctorId ?? pool[0]?.id ?? ''
+        // Услуги — только те, к которым у врача есть допуск: иначе регистратор
+        // выбирает ЭКГ у терапевта и читает отказ сервера вместо подсказки.
+        const offeredForDoc = services.filter((sv) => !sv.doctorIds?.length || sv.doctorIds.includes(docId))
+        setBookDoctorId(docId)
+        setBookServiceId(picked?.serviceId ?? offeredForDoc[0]?.id ?? '')
+        setFreeTimes(picked?.times ?? [])
+        setBookTime(picked?.times[0] ?? '')
       } catch {
         setBookDoctorId(doctors[0]?.id ?? '')
         setBookServiceId(services[0]?.id ?? '')
@@ -173,7 +235,29 @@ export const PatientCardForm = ({
     }
   }
 
-  const loadFreeTimes = async (doctorId: string) => {
+  /**
+   * Свободные окна считаются под длительность выбранной услуги, а не по одной
+   * ячейке сетки. Иначе регистратор выбирает время, жмёт «Записать» и получает
+   * отказ: приём на 60 минут в свободные пятнадцать не помещается.
+   */
+  const freeTimesFor = (schedule: Schedule, doctorId: string, serviceId: string): string[] => {
+    const service = services.find((s) => s.id === serviceId)
+    const minutes = service
+      ? resolveBookingDuration(service, defaultVisitTypeForService(service), { rules: durationRules })
+      : 15
+    const steps = Math.max(1, Math.ceil(minutes / schedule.stepMinutes))
+    const out: string[] = []
+    for (let i = 0; i + steps <= schedule.slots.length; i += 1) {
+      const fits = schedule.slots.slice(i, i + steps).every((slot) => {
+        const cell = slot.doctors.find((d) => d.id === doctorId)
+        return cell != null && !cell.busy
+      })
+      if (fits) out.push(schedule.slots[i].time)
+    }
+    return out
+  }
+
+  const loadFreeTimes = async (doctorId: string, serviceId = bookServiceId) => {
     if (!doctorId) {
       setFreeTimes([])
       setBookTime('')
@@ -181,9 +265,7 @@ export const PatientCardForm = ({
     }
     try {
       const schedule = await getSchedule(selectedDate)
-      const times = schedule.slots
-        .filter((slot) => slot.doctors.some((d) => d.id === doctorId && !d.busy))
-        .map((slot) => slot.time)
+      const times = freeTimesFor(schedule, doctorId, serviceId)
       setFreeTimes(times)
       setBookTime((prev) => (prev && times.includes(prev) ? prev : (times[0] ?? '')))
     } catch {
@@ -203,17 +285,22 @@ export const PatientCardForm = ({
       return
     }
     const svc = services.find((s) => s.id === bookServiceId)
+    const doc = doctors.find((d) => d.id === bookDoctorId)
     setBookBusy(true)
     setError(null)
     try {
-      const appt = await createAppointment({
+      await createAppointment({
         doctorId: bookDoctorId,
         patientId: created.id,
         start: `${selectedDate}T${bookTime}:00+03:00`,
-        durationMin: svc?.duration ?? 30,
+        // Расчёт общий с карточкой оператора: правила администратора действуют
+        // на всех путях записи, а не только там, где о них вспомнили.
+        durationMin: svc
+          ? resolveBookingDuration(svc, defaultVisitTypeForService(svc), { rules: durationRules })
+          : 30,
         serviceId: bookServiceId,
       })
-      setBookDoneId(appt.id)
+      setBookDone({ time: bookTime, doctorName: doc?.name ?? '' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось записать пациента')
     } finally {
@@ -287,20 +374,20 @@ export const PatientCardForm = ({
             gridTemplateColumns="repeat(auto-fit, minmax(220px, 260px))"
             gap="12px"
           >
-            <FormField label="Фамилия" required>
+            <FormField label="Фамилия" required error={fieldErrors.lastName} errorTestId="patient-error-last-name">
               <input data-testid="patient-last-name" aria-label="Фамилия" style={formFieldStyle} value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </FormField>
-            <FormField label="Имя" required>
+            <FormField label="Имя" required error={fieldErrors.firstName} errorTestId="patient-error-first-name">
               <input data-testid="patient-first-name" aria-label="Имя" style={formFieldStyle} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             </FormField>
-            <FormField label="Отчество" required>
+            <FormField label="Отчество">
               <input data-testid="patient-middle-name" aria-label="Отчество" style={formFieldStyle} value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
             </FormField>
 
-            <FormField label="Дата рождения" required>
+            <FormField label="Дата рождения" required error={fieldErrors.birthDate} errorTestId="patient-error-birth-date">
               <input data-testid="patient-birth-date" aria-label="Дата рождения" type="date" style={formFieldStyle} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
             </FormField>
-            <FormField label="Телефон" required>
+            <FormField label="Телефон" required error={fieldErrors.phone} errorTestId="patient-error-phone">
               <input data-testid="patient-phone" aria-label="Телефон" style={formFieldStyle} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 900 000-00-00" />
             </FormField>
             <FormField label="Электронная почта">
@@ -346,16 +433,16 @@ export const PatientCardForm = ({
               mt="3"
               bg="brandGreenDark"
               color="white"
-              _hover={{ bg: 'brandGreenDark' }}
+              _hover={{ bg: 'brandGreen700' }}
               onClick={() => { void submit() }}
               disabled={busy}
               data-testid="patient-create-submit"
             >
               {busy ? 'Сохранение…' : 'Завести карту'}
             </Button>
-            {fieldErrors.length > 0 ? (
+            {Object.keys(fieldErrors).length > 0 ? (
               <Text mt="3" fontSize="12px" color="danger" data-testid="patient-required-hint">
-                Не заполнено: {fieldErrors.join(', ')}
+                Проверьте поля, отмеченные красным
               </Text>
             ) : (
               <Text mt="3" fontSize="12px" color="textSecondary">
@@ -391,9 +478,12 @@ export const PatientCardForm = ({
                 aria-labelledby="patient-book-service-label"
                 style={{ ...fieldStyle, width: 220 }}
                 value={bookServiceId}
-                onChange={(e) => setBookServiceId(e.target.value)}
+                onChange={(e) => {
+                  setBookServiceId(e.target.value)
+                  void loadFreeTimes(bookDoctorId, e.target.value)
+                }}
               >
-                {services.map((s) => (
+                {offeredServices.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
@@ -416,7 +506,7 @@ export const PatientCardForm = ({
             <Button
               bg="brandGreenDark"
               color="white"
-              _hover={{ bg: 'brandGreenDark' }}
+              _hover={{ bg: 'brandGreen700' }}
               disabled={bookBusy || !bookTime}
               onClick={() => { void bookNow() }}
               data-testid="patient-book-submit"
@@ -424,9 +514,9 @@ export const PatientCardForm = ({
               {bookBusy ? 'Запись…' : 'Записать'}
             </Button>
           </Flex>
-          {bookDoneId ? (
+          {bookDone ? (
             <Text fontSize="12px" color="brandGreen700" data-testid="patient-book-done">
-              Запись создана: {bookDoneId}
+              Пациент записан на {bookDone.time}{bookDone.doctorName ? `, ${bookDone.doctorName}` : ''}
             </Text>
           ) : null}
         </Stack>

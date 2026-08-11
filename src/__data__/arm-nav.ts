@@ -25,7 +25,7 @@ export type ArmSlug = 'operator' | 'doctor' | 'registrar' | 'admin'
 export const OPERATOR_NAV: ArmNavItem[] = [
   { id: 'grid', label: 'Расписание' },
   { id: 'waitlist', label: 'Лист ожидания' },
-  { id: 'mass-reschedule', label: 'Снос расписания' },
+  { id: 'mass-reschedule', label: 'Массовая отмена' },
 ]
 
 export const REGISTRAR_NAV: ArmNavItem[] = [

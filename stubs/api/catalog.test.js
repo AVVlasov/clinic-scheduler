@@ -13,11 +13,19 @@ const buildApp = () => {
 };
 
 /** Первый свободный слот у врача на дату — чтобы запись не падала на «слот занят». */
-const findFreeSlot = (date, doctorId) => {
+/**
+ * Свободное окно нужной длительности, а не одна свободная ячейка: шаг сетки —
+ * 15 минут, запись в тесте длится 30, и на плотном дне вторая ячейка уже занята.
+ */
+const findFreeSlot = (date, doctorId, minutes = 30) => {
   const slots = data.buildSlots(date);
-  for (const slot of slots) {
-    const doc = slot.doctors.find((d) => d.id === doctorId);
-    if (doc && !doc.busy) return slot.time;
+  const steps = Math.ceil(minutes / data.stepMinutes);
+  for (let i = 0; i + steps <= slots.length; i += 1) {
+    const ok = slots.slice(i, i + steps).every((slot) => {
+      const doc = slot.doctors.find((d) => d.id === doctorId);
+      return doc && !doc.busy;
+    });
+    if (ok) return slots[i].time;
   }
   return null;
 };
@@ -45,6 +53,32 @@ const findSharedFreeSlot = (fromDate, doctorIds, minutes) => {
 };
 
 const isoAt = (date, time) => `${date}T${time}:00+03:00`;
+
+/**
+ * Окно, свободное у врача и не занятое аппаратом этой услуги. Аппарат —
+ * второй ресурс: запись к свободному врачу законно отклоняется, если тот же
+ * аппарат в это время занят у другого врача.
+ */
+const findFreeSlotWithEquipment = (date, doctorId, minutes, serviceId) => {
+  const slots = data.buildSlots(date);
+  const steps = Math.ceil(minutes / data.stepMinutes);
+  const pool = data.state.appointments.concat(data.state.demoAppointments || []);
+  const equipmentBusy = (startMs, endMs) => pool.some((a) => a.serviceId === serviceId
+    && !['cancelled', 'no_show'].includes(a.status)
+    && new Date(a.start).getTime() < endMs
+    && new Date(a.start).getTime() + a.durationMin * 60000 > startMs);
+  for (let i = 0; i + steps <= slots.length; i += 1) {
+    const ok = slots.slice(i, i + steps).every((slot) => {
+      const doc = slot.doctors.find((d) => d.id === doctorId);
+      return doc && !doc.busy;
+    });
+    if (!ok) continue;
+    const startMs = new Date(isoAt(date, slots[i].time)).getTime();
+    if (equipmentBusy(startMs, startMs + minutes * 60000)) continue;
+    return slots[i].time;
+  }
+  return null;
+};
 
 /**
  * Пациент без записи в этом интервале. Спор в тесте должен идти о ресурсе, а
@@ -217,7 +251,7 @@ describe('stubs/api/catalog — оборудование, компетенции
     test('GET /competencies отдаёт три значения допуска', async () => {
       const res = await request(app).get('/competencies');
       expect(res.status).toBe(200);
-      expect(res.body.doctors.length).toBe(6);
+      expect(res.body.doctors.length).toBe(7);
       expect(res.body.services.length).toBe(8);
 
       const ecg = res.body.cells.find((c) => c.serviceId === 's-003');
@@ -254,7 +288,11 @@ describe('stubs/api/catalog — оборудование, компетенции
     });
 
     test('выданный допуск открывает запись, «с ограничением» её не запрещает', async () => {
-      const time = findFreeSlot(date, 'd-001');
+      // Время нужно свободное и у врача, и у аппарата: ЭКГ — общий ресурс, и
+      // занятость его у другого врача даст 409 equipment_busy, а спор в тесте
+      // идёт о допуске.
+      const time = findFreeSlotWithEquipment(date, 'd-001', 15, 's-003');
+      expect(time, 'нет окна, свободного и у врача, и у аппарата').not.toBeNull();
       const [patientId] = freePatients(date, time, 15);
 
       const before = await request(app).post('/appointments').send({

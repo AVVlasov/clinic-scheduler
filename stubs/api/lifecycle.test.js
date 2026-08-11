@@ -6,6 +6,7 @@ const express = require('express');
 const apiRouter = require('./index');
 const data = require('./data');
 const lifecycle = require('./lifecycle');
+const { findFreeBooking } = require('./free-slot.testkit');
 
 const buildApp = () => {
   const app = express();
@@ -85,7 +86,11 @@ describe('stubs/api/lifecycle — единый источник правил ж�
     expect(lifecycle.isStatusTransitionAllowed('completed', 'arrived')).toBe(false);
     expect(lifecycle.isStatusTransitionAllowed('completed', 'in_progress')).toBe(false);
     expect(lifecycle.isStatusTransitionAllowed('cancelled', 'scheduled')).toBe(false);
-    expect(lifecycle.isStatusTransitionAllowed('no_show', 'scheduled')).toBe(false);
+    // Единственный выход из терминального статуса: ошибочная неявка
+    // возвращается в очередь. Всё остальное закрыто.
+    expect(lifecycle.isStatusTransitionAllowed('no_show', 'scheduled')).toBe(true);
+    expect(lifecycle.isStatusTransitionAllowed('no_show', 'arrived')).toBe(false);
+    expect(lifecycle.isStatusTransitionAllowed('no_show', 'completed')).toBe(false);
     expect(lifecycle.isStatusTransitionAllowed('scheduled', 'arrived')).toBe(true);
     expect(lifecycle.isStatusTransitionAllowed('arrived', 'in_progress')).toBe(true);
     expect(lifecycle.isStatusTransitionAllowed('arrived', 'scheduled')).toBe(true);
@@ -205,10 +210,7 @@ describe('stubs/api/lifecycle — POST валидирует status и paymentTyp
 
   test('POST с валидными status и paymentType проходит', async () => {
     const res = await request(app).post('/appointments').send({
-      doctorId: 'd-001',
-      patientId: 'p-001',
-      start: '2026-08-10T09:00:00',
-      durationMin: 30,
+      ...findFreeBooking('2026-08-10', 'd-001', 30),
       status: 'arrived',
       paymentType: 'promo',
     });
@@ -230,12 +232,7 @@ describe('stubs/api/lifecycle — PATCH при смене start/doctor/duration 
   });
 
   test('PATCH start на интервал вне смены → 409 outside_shift', async () => {
-    const create = await request(app).post('/appointments').send({
-      doctorId: 'd-001',
-      patientId: 'p-001',
-      start: '2026-08-10T11:00:00',
-      durationMin: 30,
-    });
+    const create = await request(app).post('/appointments').send(findFreeBooking('2026-08-10', 'd-001', 30));
     expect(create.status).toBe(201);
     const id = create.body.id;
     const before = await fetchAppointment(app, id);
@@ -251,12 +248,7 @@ describe('stubs/api/lifecycle — PATCH при смене start/doctor/duration 
   });
 
   test('PATCH смены doctorId на врача, который сегодня не работает → 409 outside_shift', async () => {
-    const create = await request(app).post('/appointments').send({
-      doctorId: 'd-002',
-      patientId: 'p-001',
-      start: '2026-08-08T12:00:00',
-      durationMin: 30,
-    });
+    const create = await request(app).post('/appointments').send(findFreeBooking('2026-08-08', 'd-002', 30));
     expect(create.status).toBe(201);
     const id = create.body.id;
     const before = await fetchAppointment(app, id);
@@ -272,12 +264,7 @@ describe('stubs/api/lifecycle — PATCH при смене start/doctor/duration 
   });
 
   test('PATCH с paymentType=bitcoin → 400 invalid_payment_type', async () => {
-    const create = await request(app).post('/appointments').send({
-      doctorId: 'd-001',
-      patientId: 'p-001',
-      start: '2026-08-10T13:00:00',
-      durationMin: 30,
-    });
+    const create = await request(app).post('/appointments').send(findFreeBooking('2026-08-10', 'd-001', 30));
     expect(create.status).toBe(201);
     const id = create.body.id;
     const before = await fetchAppointment(app, id);
@@ -290,6 +277,80 @@ describe('stubs/api/lifecycle — PATCH при смене start/doctor/duration 
 
     const after = await fetchAppointment(app, id);
     expect(baseDecorate(after)).toEqual(baseDecorate(before));
+  });
+});
+
+describe('stubs/api/lifecycle — ошибочная неявка возвращается в очередь', () => {
+  let app;
+
+  beforeAll(async () => {
+    app = buildApp();
+    for (const weekStart of ['2026-08-10', '2026-08-17']) {
+      const res = await request(app).post('/week-templates/publish').send({ weekStart });
+      expect([200, 409]).toContain(res.status);
+    }
+  });
+
+  const createNoShow = async () => {
+    const create = await request(app).post('/appointments').send(findFreeBooking('2026-08-11', 'd-001', 30));
+    expect(create.status).toBe(201);
+    const id = create.body.id;
+    const noShow = await request(app).patch(`/appointments/${id}`).send({ status: 'no_show' });
+    expect(noShow.status).toBe(200);
+    return id;
+  };
+
+  test('PATCH {status: scheduled} на no_show-записи проходит и пишет автора в историю', async () => {
+    const id = await createNoShow();
+
+    const back = await request(app)
+      .patch(`/appointments/${id}`)
+      .send({ status: 'scheduled', actor: 'Регистратура' });
+    expect(back.status).toBe(200);
+    expect(back.body.status).toBe('scheduled');
+
+    const history = await request(app).get(`/appointments/${id}/history`);
+    expect(history.status).toBe(200);
+    const entry = history.body.items.find((h) => h.from === 'no_show' && h.to === 'scheduled');
+    expect(entry).toBeDefined();
+    expect(entry.actor).toBe('Регистратура');
+  });
+
+  test('после отката приход снова отмечается', async () => {
+    const id = await createNoShow();
+    await request(app).patch(`/appointments/${id}`).send({ status: 'scheduled', actor: 'Регистратура' });
+
+    const arrived = await request(app).patch(`/appointments/${id}`).send({ status: 'arrived' });
+    expect(arrived.status).toBe(200);
+    expect(arrived.body.status).toBe('arrived');
+  });
+
+  test('откат не открывает правку закрытой записи: {status, diagnosis} отклоняется целиком', async () => {
+    const id = await createNoShow();
+
+    const sneaky = await request(app)
+      .patch(`/appointments/${id}`)
+      .send({ status: 'scheduled', diagnosis: 'дошёл' });
+    expect(sneaky.status).toBe(409);
+    expect(sneaky.body.error).toBe('terminal_status');
+
+    const after = await request(app).get(`/appointments/${id}`);
+    expect(after.body.status).toBe('no_show');
+    expect(after.body.diagnosis).toBeNull();
+  });
+
+  test('из completed и cancelled выхода по-прежнему нет', async () => {
+    const create = await request(app).post('/appointments').send(findFreeBooking('2026-08-11', 'd-002', 30));
+    expect(create.status).toBe(201);
+    const id = create.body.id;
+    const cancelled = await request(app)
+      .patch(`/appointments/${id}`)
+      .send({ status: 'cancelled', cancelReason: 'тест' });
+    expect(cancelled.status).toBe(200);
+
+    const back = await request(app).patch(`/appointments/${id}`).send({ status: 'scheduled' });
+    expect(back.status).toBe(409);
+    expect(back.body.error).toBe('terminal_status');
   });
 });
 

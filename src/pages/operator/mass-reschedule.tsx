@@ -10,10 +10,20 @@ import {
   rescheduleMassCancelItem,
 } from '../../__data__/api'
 import type { Doctor, MassCancelBatch, MassCancelItem } from '../../__data__/types'
+import { appointmentsWord } from '../../__data__/plural'
+import { formatShortDate } from '../../__data__/dates'
 import { fieldStyle, wideFieldStyle } from '../field-style'
+import { FilterChip } from '../ui-kit'
 
 const handlingLabel = (s: MassCancelItem['handlingStatus']) =>
   (s === 'pending' ? 'Под отмену' : 'Перезаписан')
+
+/**
+ * Момент записи для человека. В списке пациентов под необратимую отмену стояло
+ * машинное «2026-08-12T09:00:00+03:00» — читать такое оператору не надо, а
+ * решение он принимает именно по этой строке.
+ */
+const formatMoment = (iso: string): string => `${formatShortDate(iso.slice(0, 10))}, ${iso.slice(11, 16)}`
 
 interface MassReschedulePanelProps {
   doctors: Doctor[]
@@ -23,7 +33,9 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
   const [doctorId, setDoctorId] = useState(doctors[0]?.id ?? '')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [reason, setReason] = useState('Снос расписания')
+  // Причина уходит в карточку каждой отменённой записи, поэтому по умолчанию
+  // пусто: название раздела причиной отмены не является.
+  const [reason, setReason] = useState('')
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [previewPatients, setPreviewPatients] = useState<Array<{ patientName: string | null; start: string }>>([])
   const [confirming, setConfirming] = useState(false)
@@ -83,7 +95,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
       setSelectedItemId(created.items[0]?.id ?? null)
       setMatches([])
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось снести расписание')
+      setError(err instanceof ApiError ? err.message : 'Не удалось отменить записи')
     } finally {
       setBusy(false)
     }
@@ -156,7 +168,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
       data-testid="mass-reschedule-panel"
     >
       <Flex align="center" gap="3" mb="3" wrap="wrap">
-        <Text fontSize="18px" fontWeight="700">Снос расписания</Text>
+        <Text fontSize="18px" fontWeight="700">Массовая отмена приёма</Text>
         {batch ? (
           <Box
             as="span"
@@ -196,7 +208,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
               </select>
             </Stack>
             <Stack gap="1" flex="0 1 170px" minW="150px">
-              <Text as="span" fontSize="11px" color="textSecondary" id="mass-date-from-label">Снести с даты</Text>
+              <Text as="span" fontSize="11px" color="textSecondary" id="mass-date-from-label">Отменить с даты</Text>
               <input
                 type="date"
                 data-testid="mass-date-from"
@@ -220,7 +232,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
           </Flex>
           <Stack gap="1">
             <Text as="span" fontSize="11px" color="textSecondary" id="mass-reason-label">
-              Причина сноса — попадёт в отчёт и в карточку каждой отменённой записи
+              Причина отмены — попадёт в отчёт и в карточку каждой отменённой записи
             </Text>
             <input
               data-testid="mass-reason"
@@ -237,12 +249,12 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
               <Stack gap="0" mt="1" data-testid="mass-preview-patients">
                 {previewPatients.slice(0, 8).map((p) => (
                   <Text key={`${p.start}-${p.patientName}`} fontSize="12px">
-                    {p.patientName ?? 'Пациент'}, {p.start}
+                    {p.patientName ?? 'Пациент'}, {formatMoment(p.start)}
                   </Text>
                 ))}
               </Stack>
               <Text fontSize="12px" mt="1">
-                {confirming ? 'Подтвердите ещё раз — отменить будет нельзя.' : 'Проверьте список, затем нажмите «Снести».'}
+                {confirming ? 'Подтвердите ещё раз — вернуть записи будет нельзя.' : 'Проверьте список, затем нажмите «Отменить записи».'}
               </Text>
             </Box>
           ) : null}
@@ -254,14 +266,14 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
               onClick={() => { void applyCancel() }}
               data-testid="mass-apply"
             >
-              {busy ? 'Снос…' : (confirming ? 'Подтвердить необратимо' : 'Снести')}
+              {busy ? 'Отменяем…' : (confirming ? `Да, отменить ${previewCount ?? 0} ${appointmentsWord(previewCount ?? 0)}` : 'Отменить записи')}
             </Button>
           </Flex>
         </Stack>
       ) : (
         <Stack gap="3">
           <Flex gap="6px" wrap="wrap" align="center">
-            <Text fontSize="13px">Пакет {batch.id}, врач {batch.doctorName}</Text>
+            <Text fontSize="13px">Отмена по врачу: {batch.doctorName}</Text>
             <Box flex="1" />
             <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="Все" testId="mass-filter-all" />
             <FilterChip active={filter === 'pending'} onClick={() => setFilter('pending')} label="Под отмену" testId="mass-filter-pending" />
@@ -302,11 +314,11 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
                     </Text>
                   </Flex>
                   <Text fontSize="12px" color="textSecondary">
-                    Было: {item.originalStart}, {item.originalDoctorName}
+                    Было: {formatMoment(item.originalStart)}, {item.originalDoctorName}
                   </Text>
                   {item.newStart ? (
                     <Text fontSize="12px" color="brandGreen700" data-testid={`mass-new-start-${item.id}`}>
-                      Новое время: {item.newStart}
+                      Новое время: {formatMoment(item.newStart)}
                     </Text>
                   ) : null}
                 </Box>
@@ -327,7 +339,7 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
                       borderColor="borderLight"
                       borderRadius="compact"
                     >
-                      <Text fontSize="12px" flex="1">{m.date} {m.time}, {m.doctorName}</Text>
+                      <Text fontSize="12px" flex="1">{formatShortDate(m.date)} {m.time}, {m.doctorName}</Text>
                       <Button
                         size="xs"
                         onClick={() => { void onBook(m) }}
@@ -355,31 +367,3 @@ export const MassReschedulePanel = ({ doctors }: MassReschedulePanelProps) => {
   )
 }
 
-const FilterChip = ({
-  active,
-  onClick,
-  label,
-  testId,
-}: {
-  active: boolean
-  onClick: () => void
-  label: string
-  testId?: string
-}) => (
-  <Box
-    as="button"
-    onClick={onClick}
-    px="10px"
-    h="26px"
-    borderRadius="pill"
-    borderWidth="1px"
-    borderColor={active ? 'brandGreen' : 'borderLight'}
-    bg={active ? 'brandGreenTint' : 'white'}
-    color={active ? 'brandGreen700' : 'textPrimary'}
-    fontSize="12px"
-    fontWeight={active ? '600' : '400'}
-    data-testid={testId}
-  >
-    {label}
-  </Box>
-)

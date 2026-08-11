@@ -43,6 +43,9 @@ const appendHistory = (a, fromStatus, toStatus, actor) => {
 };
 
 
+/** Поля, которые допустимы в запросе на выход из терминального статуса. */
+const REOPEN_FIELDS = new Set(['status', 'actor']);
+
 const PROTOCOL_STRING_FIELDS = ['complaints', 'diagnosis'];
 const PROTOCOL_STRING_LIST_FIELDS = ['performedServiceIds', 'recommendations'];
 const PROTOCOL_VISIT_TYPES = new Set(['first', 'repeat']);
@@ -348,7 +351,14 @@ router.patch('/appointments/:id', (req, res) => {
     });
   }
 
-  if (isTerminalStatus(a.status)) {
+  // Из терминального статуса наружу ведёт только явно разрешённый переход и
+  // ничего кроме него: ошибочную неявку регистратор возвращает в очередь, но
+  // переписать закрытую запись «заодно» нельзя — правка едет отдельным PATCH
+  // уже по обычным правилам.
+  const reopening = body.status != null
+    && isStatusTransitionAllowed(a.status, body.status)
+    && Object.keys(body).every((key) => REOPEN_FIELDS.has(key));
+  if (isTerminalStatus(a.status) && !reopening) {
     return res.status(409).json({
       error: 'terminal_status',
       message: `Запись ${a.id} в статусе «${a.status}» неизменяема`,
@@ -466,6 +476,25 @@ router.patch('/appointments/:id', (req, res) => {
       error: 'invalid_field',
       message: `Поле «${protocol.field}» имеет неверный формат`,
     });
+  }
+
+  // Допуск врача (матрица компетенций, ФТ 1.5) решает не только запись, но и деньги:
+  // отмеченная услуга уходит в «К оплате» регистратора. Проверяем правку, сделанную
+  // врачом: терапевт не может закрыть приём услугой «УЗИ брюшной полости».
+  const patchedByDoctor = actorDoctorId != null || body.actor === 'doctor';
+  if (patchedByDoctor && body.performedServiceIds !== undefined) {
+    const foreign = draft.performedServiceIds
+      .map((serviceId) => state.services.find((s) => s.id === serviceId))
+      .find((svc) => svc
+        && Array.isArray(svc.doctorIds)
+        && svc.doctorIds.length > 0
+        && !svc.doctorIds.includes(draft.doctorId));
+    if (foreign) {
+      return res.status(409).json({
+        error: 'service_not_offered',
+        message: `Врач ${draft.doctorId} не оказывает услугу «${foreign.name}»`,
+      });
+    }
   }
 
   const historyPending = draft._historyPending;

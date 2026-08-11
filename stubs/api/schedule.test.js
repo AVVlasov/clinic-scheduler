@@ -376,7 +376,7 @@ describe('stubs/api/schedule — сетка строится по опублик
       expect(thu.status).toBe(200);
       const breaks = thu.body.slots.flatMap((s) => s.doctors.filter((d) => d.occupancyKind === 'tech_break'));
       expect(breaks.length).toBeGreaterThan(0);
-      expect(breaks[0].occupancyLabel).toBe('Техперерыв');
+      expect(breaks[0].occupancyLabel).toBe('Перерыв');
       expect(breaks[0].occupancyLabel).not.toBe(blocked[0].occupancyLabel);
     });
 

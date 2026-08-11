@@ -4,6 +4,7 @@ const request = require('supertest');
 const express = require('express');
 const apiRouter = require('./index');
 const data = require('./data');
+const { isPatientFree, isDoctorFree } = require('./free-slot.testkit');
 
 const buildApp = () => {
   const app = express();
@@ -42,6 +43,10 @@ describe('stubs/api/waitlist — лист ожидания', () => {
   });
 
   test('четыре kind фильтруются отдельно', async () => {
+    // На стенде уже есть посевные заявки: считаем прирост, а не абсолют —
+    // иначе тест ломается от каждой новой демо-заявки, не проверяя фильтр.
+    const before = await request(app).get('/waitlist').query({ kind: 'distant' });
+    const distantBefore = before.body.items.length;
     for (const kind of ['from_doctor', 'distant', 'reschedule', 'nearest']) {
       const res = await request(app).post('/waitlist').send({
         kind,
@@ -54,7 +59,7 @@ describe('stubs/api/waitlist — лист ожидания', () => {
     }
     const distant = await request(app).get('/waitlist').query({ kind: 'distant' });
     expect(distant.body.items.every((w) => w.kind === 'distant')).toBe(true);
-    expect(distant.body.items.length).toBe(1);
+    expect(distant.body.items.length).toBe(distantBefore + 1);
   });
 
   test('улучшение даты: страховочная запись не отменяется', async () => {
@@ -98,9 +103,10 @@ describe('stubs/api/waitlist — лист ожидания', () => {
   });
 
   test('matches → fulfill закрывает заявку записью', async () => {
+    const patientId = 'p-003';
     const created = await request(app).post('/waitlist').send({
       kind: 'nearest',
-      patientId: 'p-003',
+      patientId,
       serviceId: 's-001',
       dateFrom: data.state.date,
       dateTo: data.addDays(data.state.date, 2),
@@ -110,11 +116,16 @@ describe('stubs/api/waitlist — лист ожидания', () => {
     const matches = await request(app).get(`/waitlist/${created.body.id}/matches`);
     expect(matches.status).toBe(200);
     expect(matches.body.items.length).toBeGreaterThan(0);
-    const slot = matches.body.items[0];
+    // Из подобранных окон берём то, где сам пациент свободен: иначе сервер
+    // законно откажет по пересечению, и тест спорил бы не о заявке.
+    const slot = matches.body.items
+      .find((s) => isPatientFree(patientId, `${s.date}T${s.time}:00+03:00`, 30)
+        && isDoctorFree(s.date, s.doctorId, s.time, 30));
+    expect(slot, 'ни одно подобранное окно не свободно у пациента').toBeTruthy();
 
     const booked = await request(app).post('/appointments').send({
       doctorId: slot.doctorId,
-      patientId: 'p-003',
+      patientId,
       start: `${slot.date}T${slot.time}:00+03:00`,
       durationMin: 30,
       serviceId: 's-001',

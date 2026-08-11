@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { palette } from '../__data__/tokens'
+
 import { ARM_NAV, resolveSection } from '../__data__/arm-nav'
 import { formatArmDateLabel, parseArmDate, parseArmDoctorId, shiftDate, todayDate, withArmDate } from '../__data__/dates'
 import { getDoctors } from '../__data__/api'
@@ -120,7 +122,6 @@ const SwitcherItem: React.FC<ArmDescriptor & { active: boolean; to: string; tabI
 }) => (
   <NavLink
     to={to}
-    className="sm-seg__item"
     role="tab"
     aria-selected={active}
     tabIndex={tabIndex}
@@ -136,9 +137,9 @@ const SwitcherItem: React.FC<ArmDescriptor & { active: boolean; to: string; tabI
       fontSize: '13px',
       fontWeight: 400,
       textDecoration: 'none',
-      color: active ? 'white' : 'var(--chakra-colors-textPrimary, #1F1F1F)',
+      color: active ? 'white' : palette.textPrimary,
       // Белый текст мельче 18px — только на ступени ≥600 (_ds --text-on-green).
-      background: active ? 'var(--chakra-colors-brandGreenDark, #0B815A)' : 'transparent',
+      background: active ? palette.brandGreenDark : 'transparent',
       transition: 'background-color 120ms ease, color 120ms ease',
     }}
   >
@@ -194,6 +195,9 @@ const DateSwitcher: React.FC<{ date: string; onChange: (next: string) => void }>
         fontSize="14px"
         lineHeight="1"
         cursor="pointer"
+        // Кнопка без отклика на наведение читается как картинка: непонятно,
+        // нажимается ли она вообще.
+        _hover={{ bg: 'surfaceLight', borderColor: 'borderDark' }}
       >
         ‹
       </Box>
@@ -222,6 +226,7 @@ const DateSwitcher: React.FC<{ date: string; onChange: (next: string) => void }>
         fontSize="14px"
         lineHeight="1"
         cursor="pointer"
+        _hover={{ bg: 'surfaceLight', borderColor: 'borderDark' }}
       >
         ›
       </Box>

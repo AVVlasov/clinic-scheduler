@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 
 import { getPatients } from '../../__data__/api'
+import { fieldStyle } from '../field-style'
 import type { Patient } from '../../__data__/types'
 
 /** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ: в картотеке дата читается по-русски. */
@@ -75,17 +76,9 @@ export const PatientSearch = ({ onSelect, onCreateNew }: PatientSearchProps) => 
         data-testid="patient-search-input"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Фамилия, телефон или номер карты"
-        aria-label="Поиск пациента по фамилии, телефону или номеру карты"
-        style={{
-          height: '32px',
-          padding: '0 10px',
-          border: '1px solid var(--chakra-colors-borderLight, #E2E8F0)',
-          borderRadius: '4px',
-          fontSize: '13px',
-          width: '100%',
-          maxWidth: '420px',
-        }}
+        placeholder="Фамилия, телефон, номер карты или дата рождения"
+        aria-label="Поиск пациента по фамилии, телефону, номеру карты или дате рождения"
+        style={{ ...fieldStyle, maxWidth: '420px' }}
       />
       {busy ? (
         <Text fontSize="12px" color="textSecondary">Ищем…</Text>

@@ -18,3 +18,6 @@ export const plural = (count: number, one: string, few: string, many: string): s
 export const doctorsWord = (count: number): string => plural(count, 'врач', 'врача', 'врачей')
 
 export const slotsWord = (count: number): string => plural(count, 'слот', 'слота', 'слотов')
+
+export const appointmentsWord = (count: number): string =>
+  plural(count, 'запись', 'записи', 'записей')

@@ -30,6 +30,12 @@ const toPatient = (p) => ({
   consents: Array.isArray(p.consents) ? p.consents.slice() : [],
 });
 
+/** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ: картотека показывает дату так, значит и искать по ней надо так. */
+const birthDateRu = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
+};
+
 const matchQuery = (p, q) => {
   const needle = normalizeName(q);
   if (!needle) return true;
@@ -43,6 +49,8 @@ const matchQuery = (p, q) => {
     p.middleName,
     p.phone,
     p.cardNumber,
+    p.birthDate,
+    birthDateRu(p.birthDate),
     p.id,
   ].map((v) => normalizeName(v)).join(' ');
   return hay.includes(needle);
@@ -196,10 +204,12 @@ router.post('/patients', (req, res) => {
   const birthDate = body.birthDate != null ? String(body.birthDate).trim() : '';
   const phone = body.phone != null ? String(body.phone).trim() : '';
 
+  // Отчества нет у иностранных пациентов и у части карт: обязательным оно быть
+  // не может. Полное имя собирается из непустых частей (fullNameFromParts),
+  // поэтому лишнего пробела в «Фамилия Имя» не появляется.
   const missing = [];
   if (!lastName) missing.push('фамилия');
   if (!firstName) missing.push('имя');
-  if (!middleName) missing.push('отчество');
   if (!birthDate) missing.push('дата рождения');
   if (!phone) missing.push('телефон');
   if (missing.length > 0) {

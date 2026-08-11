@@ -1,6 +1,7 @@
 import { getConfigValue } from '@brojs/cli'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { ERROR_MESSAGE_BY_CODE } from './error-messages'
 import { ApiError, createAppointment, getAppointments, getSchedule, rescheduleAppointment } from './api'
 import type { Appointment, CreateAppointmentInput, Schedule } from './types'
 
@@ -73,7 +74,7 @@ describe('API client', () => {
     await expect(getAppointments('2026-08-10')).rejects.toBeInstanceOf(ApiError)
   })
 
-  it('409 slot_taken: машинный код в code, человеческий текст — в message', async () => {
+  it('409 slot_taken: машинный текст сервера не доходит до экрана', async () => {
     mockedGetConfigValue.mockReturnValue('https://clinic.test/api')
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       error: 'slot_taken',
@@ -94,9 +95,14 @@ describe('API client', () => {
     await expect(request).rejects.toMatchObject({
       status: 409,
       code: 'slot_taken',
-      message: 'Слот 2030-01-01T09:00 у врача d-001 уже занят (запись a-007)',
+      message: 'Это время уже занято — выберите другое',
     })
     await expect(request).rejects.toBeInstanceOf(ApiError)
+    // Оригинал сервера сохранён для журнала, но на экран не попадает.
+    const error = await request.catch((e: unknown) => e as ApiError)
+    expect(error.message).not.toMatch(/d-001|a-007|T09:00/)
+    expect((error.payload as { serverMessage?: string }).serverMessage)
+      .toBe('Слот 2030-01-01T09:00 у врача d-001 уже занят (запись a-007)')
   })
 
   it('400 validation: код validation отделён от текста', async () => {
@@ -119,8 +125,36 @@ describe('API client', () => {
     await expect(request).rejects.toMatchObject({
       status: 400,
       code: 'validation',
-      message: 'Поля doctorId, patientId, start и durationMin обязательны',
+      message: 'Проверьте заполнение полей',
     })
+  })
+
+  it('каждому коду отказа сервера соответствует человеческая формулировка', () => {
+    // Список кодов снят с роутеров стабов. Незакрытый код означает, что на
+    // экране появится общая фраза вместо объяснения — это регресс, а не мелочь.
+    const codes = [
+      'slot_taken', 'outside_shift', 'service_not_offered', 'equipment_busy',
+      'terminal_status', 'invalid_status', 'invalid_payment_type', 'invalid_duration',
+      'duplicate_patient', 'week_not_published', 'week_already_published', 'empty_week',
+      'week_has_appointments', 'interval_has_appointments', 'date_outside_week',
+      'invalid_kind', 'invalid_priority', 'invalid_range', 'patient_mismatch', 'not_open',
+      'doctor_not_found', 'patient_not_found', 'service_not_found', 'appointment_not_found',
+      'already_paid', 'missing_cancel_reason', 'nothing_to_cancel', 'foreign_doctor',
+      'item_not_found', 'item_not_pending', 'already_handled', 'invalid_amount',
+      'invalid_reason', 'invalid_field', 'invalid_state_transition', 'missing_date',
+      'invalid_date', 'invalid_week_start', 'invalid_interval_patch', 'validation',
+    ]
+    for (const code of codes) {
+      expect(ERROR_MESSAGE_BY_CODE[code], `нет формулировки для кода ${code}`).toBeTruthy()
+    }
+  })
+
+  it('формулировки не содержат идентификаторов, ISO-дат и латиницы', () => {
+    for (const [code, text] of Object.entries(ERROR_MESSAGE_BY_CODE)) {
+      expect(text, `${code}: латиница в тексте`).not.toMatch(/[A-Za-z]/)
+      expect(text, `${code}: идентификатор в тексте`).not.toMatch(/[a-z]-\d{3}/)
+      expect(text, `${code}: ISO-дата в тексте`).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+    }
   })
 
   it('400 без server-message: возвращает осмысленный message, а не пустоту', async () => {

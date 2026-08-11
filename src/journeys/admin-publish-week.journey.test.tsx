@@ -149,12 +149,12 @@ describe('journey admin-publish-week — правка шаблона → пуб�
       for (let i = 0; i < weeksAhead; i += 1) {
         fireEvent.click(screen.getByTestId('week-next'))
         await waitFor(() => {
-          expect(screen.getByTestId('week-current').textContent).toBe(
+          expect(screen.getByTestId('week-current').getAttribute('data-week-start')).toBe(
             shiftDate(current, 7 * (i + 1)),
           )
         }, { timeout: 15000 })
       }
-      expect(screen.getByTestId('week-current')).toHaveTextContent(weekStart)
+      expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', weekStart)
 
       const tpl = await apiGet<WeekTemplatesResponse>(server, `/week-templates?weekStart=${weekStart}`)
       const doctorId = tpl.rows[0].doctorId

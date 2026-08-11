@@ -132,6 +132,15 @@ export interface SaveWeekTemplateIntervalInput {
   doctorId: string
   date: string
   intervals: WeekTemplateInterval[]
+  /** Согласие убрать время у уже записанных пациентов: без него сервер отказывает. */
+  confirmed?: boolean
+}
+
+/** Пациент, попавший под сужение графика врача. */
+export interface AffectedAppointment {
+  id: string
+  time: string
+  patientName: string
 }
 
 /**
@@ -504,6 +513,11 @@ export interface WaitlistEntry {
   dateFrom: string
   dateTo: string
   comment: string
+  /**
+   * Основание оплаты будущей записи. Без него запись из заявки создавалась как
+   * обычная платная, и пациент по ДМС приезжал к регистратору с чужим счётом.
+   */
+  paymentType: PaymentType
   /** Существующая страховочная запись (улучшение даты) — не отменяется. */
   insuranceAppointmentId: string | null
   createdAt: string
@@ -526,6 +540,7 @@ export interface CreateWaitlistInput {
   dateTo: string
   priority?: WaitlistPriority
   comment?: string
+  paymentType?: PaymentType
   insuranceAppointmentId?: string | null
   createdBy?: string
 }

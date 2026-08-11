@@ -288,7 +288,10 @@ describe('SlotCard — перенос проверяется по правила
     fireEvent.click(rescheduleBtn)
 
     const err = await screen.findByTestId('card-error')
-    expect(err).toHaveTextContent(/опубликованный рабочий шаблон/)
+    // Машинная строка сервера с ISO-датой и d-001 на экран не выходит:
+    // оператор читает объяснение, а не разбор запроса.
+    expect(err).toHaveTextContent('Врач в это время не принимает')
+    expect(err.textContent ?? '').not.toMatch(/d-001|2030-03-04|\+03:00/)
   })
 
   it('перенос в свободный слот внутри смены: PATCH уходит, карточка закрывается', async () => {

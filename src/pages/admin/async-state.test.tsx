@@ -218,7 +218,7 @@ describe('AdminPage — асинхронное состояние (TASK-31)', ()
     renderPage()
 
     await screen.findByTestId('week-templates')
-    expect(screen.getByTestId('week-current')).toHaveTextContent(CURRENT_WEEK_START)
+    expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', CURRENT_WEEK_START)
 
     fireEvent.click(screen.getByTestId('week-next'))
 
@@ -240,7 +240,7 @@ describe('AdminPage — асинхронное состояние (TASK-31)', ()
 
     await screen.findByTestId(`tpl-row-doc-${NEXT_WEEK_START}`)
     await waitFor(() => {
-      expect(screen.getByTestId('week-current')).toHaveTextContent(NEXT_WEEK_START)
+      expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', NEXT_WEEK_START)
     })
     expect(screen.getByTestId('publish-week')).not.toBeDisabled()
   })
@@ -281,7 +281,7 @@ describe('AdminPage — асинхронное состояние (TASK-31)', ()
     })
 
     await waitFor(() => {
-      expect(screen.getByTestId('week-current')).toHaveTextContent(WEEK_AFTER_NEXT)
+      expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', WEEK_AFTER_NEXT)
     })
 
     // Подтверждаем — POST уходит с той неделей, которую сейчас видим

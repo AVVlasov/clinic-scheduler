@@ -183,7 +183,7 @@ export const EquipmentSchedule = ({ date }: EquipmentScheduleProps) => {
                 fontSize="13px"
                 cursor="pointer"
                 color={active ? 'white' : 'textPrimary'}
-                bg={active ? 'brandGreen' : 'transparent'}
+                bg={active ? 'brandGreenDark' : 'transparent'}
               >
                 {v.label}
               </Box>
@@ -337,7 +337,7 @@ export const EquipmentSchedule = ({ date }: EquipmentScheduleProps) => {
                   <Box w="90px" flex="none">Кабинет</Box>
                   <Box w="110px" flex="none">График</Box>
                   <Box flex="1.4" minW="0">Обслуживает</Box>
-                  <Box w="150px" flex="none">Техперерыв</Box>
+                  <Box w="150px" flex="none">Перерыв</Box>
                   <Box w="90px" flex="none" textAlign="right">Занято</Box>
                 </Flex>
                 {visible.map((item) => (
@@ -401,7 +401,7 @@ export const EquipmentSchedule = ({ date }: EquipmentScheduleProps) => {
                     `${pair.cabinet}: ${pair.names.join(' и ')}`
                   )).join('; ')}
                   {' — '}
-                  занятость одного закрывает время у другого: сервер не пустит вторую запись.
+                  работают в одном кабинете, поэтому занятость одного закрывает время у другого.
                 </Text>
               </Box>
             ) : null}

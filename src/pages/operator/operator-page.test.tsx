@@ -420,7 +420,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
     expect(totalA).not.toBe('0')
     expect(totalA).toBe('1')
     expect(needsA).toBe('0')
-    expect(avgA).toBe('00:30')
+    expect(avgA).toBe('30 мин')
 
     unmount()
 
@@ -438,7 +438,7 @@ describe('OperatorPage — сетка из данных стаба', () => {
 
     expect(totalBText).toBe('3')
     expect(needsB).toBe('2')
-    expect(avgB).toBe('01:00')
+    expect(avgB).toBe('60 мин')
 
     expect(totalBText).not.toBe(totalA)
     expect(needsB).not.toBe(needsA)

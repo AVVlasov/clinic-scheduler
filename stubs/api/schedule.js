@@ -82,9 +82,14 @@ router.patch('/week-templates/interval', (req, res) => {
     doctorId,
     date,
     intervals: body.intervals,
+    confirmed: body.confirmed === true,
   });
   if (!result.ok) {
-    res.status(result.status).json({ error: result.error, message: result.message });
+    res.status(result.status).json({
+      error: result.error,
+      message: result.message,
+      ...(result.affected != null ? { affected: result.affected } : {}),
+    });
     return;
   }
   res.json(result.templates);
@@ -97,12 +102,16 @@ router.post('/week-templates/unpublish', (req, res) => {
     res.status(400).json({ error: 'invalid_week_start', message: 'Начало недели должно быть датой в формате ГГГГ-ММ-ДД' });
     return;
   }
-  const result = unpublishWeek(raw);
+  const result = unpublishWeek(raw, { confirmed: body.confirmed === true });
   if (!result.ok) {
-    res.status(result.status).json({ error: result.error, message: result.message });
+    res.status(result.status).json({
+      error: result.error,
+      message: result.message,
+      ...(result.affected != null ? { affected: result.affected } : {}),
+    });
     return;
   }
-  res.json(result.templates);
+  res.json({ ...result.templates, affected: result.affected });
 });
 
 router.get('/schedule/:date', (req, res) => {

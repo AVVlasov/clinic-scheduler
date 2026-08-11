@@ -3,8 +3,10 @@ import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 import { useSearchParams } from 'react-router-dom'
 
 import { resolveSection } from '../../__data__/arm-nav'
-import { getDoctorCards, getDoctors, getWeekTemplates, publishWeek, saveDoctorCard, saveWeekTemplateInterval, unpublishWeek } from '../../__data__/api'
+import { formatShortDate } from '../../__data__/dates'
+import { ApiError, getAbsenceAffected, getDoctorCards, getDoctors, getPatients, getWeekTemplates, publishWeek, saveDoctorCard, saveWeekTemplateInterval, unpublishWeek } from '../../__data__/api'
 import type {
+  AffectedAppointment,
   Doctor,
   DoctorCard,
   PublishWeekResult,
@@ -89,11 +91,18 @@ export const AdminPage = () => {
   const [publishResult, setPublishResult] = useState<PublishWeekResult | null>(null)
   const [publishError, setPublishError] = useState<string | null>(null)
   const [unpublishBusy, setUnpublishBusy] = useState(false)
+  const [unpublishAffected, setUnpublishAffected] = useState<number | null>(null)
+  const [intervalAffected, setIntervalAffected] = useState<AffectedAppointment[] | null>(null)
   const [saveIntervalBusy, setSaveIntervalBusy] = useState(false)
   const [saveIntervalError, setSaveIntervalError] = useState<string | null>(null)
   const [absenceOpen, setAbsenceOpen] = useState(false)
   const [absenceDoctors, setAbsenceDoctors] = useState<Doctor[]>([])
   const [absenceNotice, setAbsenceNotice] = useState<string | null>(null)
+  const [absenceAffected, setAbsenceAffected] = useState<
+    Array<{ id: string; start?: string; patientName: string }> | null
+  >(null)
+  const patientsRef = useRef<Record<string, string>>({})
+  const patientNameById = (id?: string): string => (id ? patientsRef.current[id] ?? 'Пациент' : 'Пациент')
 
   const [cards, setCards] = useState<DoctorCard[]>([])
   const [cardsError, setCardsError] = useState<string | null>(null)
@@ -243,19 +252,44 @@ export const AdminPage = () => {
       })
   }, [publishState, weekStart])
 
-  const handleUnpublish = useCallback(() => {
+  /**
+   * Снятие публикации спрашивает, если на неделе есть записи. Сервер отвечает
+   * 409 с их числом — оно и показывается в подтверждении: администратор должен
+   * узнать о последствиях до действия, а не после.
+   */
+  useEffect(() => {
+    // Имена пациентов нужны, чтобы разбор отсутствия читался по-человечески,
+    // а не списком идентификаторов записей.
+    let alive = true
+    void getPatients()
+      .then((res) => {
+        if (!alive) return
+        patientsRef.current = Object.fromEntries(res.items.map((p) => [p.id, p.name]))
+      })
+      .catch(() => undefined)
+    return () => { alive = false }
+  }, [])
+
+  const handleUnpublish = useCallback((confirmed = false) => {
     const targetWeekStart = weekStart
     setUnpublishBusy(true)
     setPublishError(null)
     setPublishResult(null)
-    unpublishWeek(targetWeekStart)
+    unpublishWeek(targetWeekStart, confirmed)
       .then((templatesNext) => {
         if (weekStartRef.current !== targetWeekStart) return
         setTemplates(templatesNext)
+        setUnpublishAffected(null)
         setUnpublishBusy(false)
       })
       .catch((err: unknown) => {
         if (weekStartRef.current !== targetWeekStart) return
+        if (err instanceof ApiError && err.code === 'week_has_appointments') {
+          const affected = (err.payload as { affected?: number } | undefined)?.affected ?? 0
+          setUnpublishAffected(affected)
+          setUnpublishBusy(false)
+          return
+        }
         setPublishError(err instanceof Error ? err.message : 'Не удалось снять публикацию')
         setUnpublishBusy(false)
       })
@@ -265,6 +299,7 @@ export const AdminPage = () => {
     doctorId: string
     date: string
     intervals: WeekTemplateInterval[]
+    confirmed?: boolean
   }) => {
     const targetWeekStart = weekStart
     setSaveIntervalBusy(true)
@@ -275,11 +310,20 @@ export const AdminPage = () => {
         doctorId: input.doctorId,
         date: input.date,
         intervals: input.intervals,
+        confirmed: input.confirmed === true,
       })
       if (weekStartRef.current !== targetWeekStart) return
       setTemplates(next)
+      setIntervalAffected(null)
     } catch (err: unknown) {
       if (weekStartRef.current !== targetWeekStart) return
+      // Сужение графика поверх записанных пациентов сервер не пропускает без
+      // согласия: показываем, кто попадёт под изменение, поимённо.
+      if (err instanceof ApiError && err.code === 'interval_has_appointments') {
+        const affected = (err.payload as { affected?: AffectedAppointment[] } | undefined)?.affected ?? []
+        setIntervalAffected(affected)
+        throw err
+      }
       setSaveIntervalError(err instanceof Error ? err.message : 'Не удалось сохранить интервал')
       throw err
     } finally {
@@ -328,7 +372,7 @@ export const AdminPage = () => {
             }}
             data-testid="section-absence-block"
           >
-            Блокировка расписания
+            Отпуск, больничный, ремонт
           </Button>
         ) : null}
       </Flex>
@@ -347,14 +391,54 @@ export const AdminPage = () => {
         </Box>
       ) : null}
 
+      {absenceAffected && absenceAffected.length > 0 ? (
+        <Box
+          bg="white"
+          borderWidth="1px"
+          borderColor="brandOrange"
+          borderRadius="compact"
+          px="12px"
+          py="8px"
+          data-testid="absence-affected-list"
+        >
+          <Text fontSize="13px" fontWeight="700" color="brandOrange700" mb="1">
+            Записи, снятые отсутствием
+          </Text>
+          <Stack gap="0.5">
+            {absenceAffected.map((item) => (
+              <Text key={item.id} fontSize="13px" color="textPrimary">
+                {item.start ? `${formatShortDate(item.start.slice(0, 10))}, ${item.start.slice(11, 16)} — ` : ''}
+                {item.patientName}
+              </Text>
+            ))}
+          </Stack>
+        </Box>
+      ) : null}
+
       <AbsenceDialog
         open={absenceOpen}
         doctors={absenceDoctors}
         onClose={() => setAbsenceOpen(false)}
         onApplied={({ absenceId, affectedCount }) => {
+          // Строка «Отсутствие abs-001 применено. Отменено записей: 4» не говорит
+          // администратору главного: кого именно он отменил и кому теперь звонить.
           setAbsenceNotice(
-            `Отсутствие ${absenceId} применено. Отменено записей: ${affectedCount}.`,
+            affectedCount > 0
+              ? `Отсутствие применено. Отменено записей: ${affectedCount}. Этим пациентам нужно предложить другое время.`
+              : 'Отсутствие применено. Записей на это время не было.',
           )
+          setAbsenceAffected(null)
+          if (affectedCount > 0) {
+            void getAbsenceAffected(absenceId)
+              .then((res) => {
+                setAbsenceAffected(res.items.map((item) => ({
+                  id: item.id,
+                  start: item.start,
+                  patientName: patientNameById(item.patientId),
+                })))
+              })
+              .catch(() => setAbsenceAffected(null))
+          }
         }}
       />
 
@@ -379,6 +463,8 @@ export const AdminPage = () => {
             onPublishConfirm={handlePublishConfirm}
             onPublishCancel={handlePublishCancel}
             onUnpublish={handleUnpublish}
+            unpublishAffected={unpublishAffected}
+            intervalAffected={intervalAffected}
             unpublishBusy={unpublishBusy}
             onSaveInterval={handleSaveInterval}
             saveIntervalBusy={saveIntervalBusy}

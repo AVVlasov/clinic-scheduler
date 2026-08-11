@@ -12,14 +12,19 @@ import {
 } from '../../__data__/api'
 import type {
   Doctor,
+  DurationRule,
   Patient,
+  PaymentType,
   Service,
   WaitlistEntry,
   WaitlistKind,
   WaitlistMatchSlot,
   WaitlistPriority,
 } from '../../__data__/types'
+import { defaultVisitTypeForService, PAYMENT_TYPE_OPTIONS, paymentTypeLabel, resolveBookingDuration } from '../../__data__/booking'
+import { formatShortDate } from '../../__data__/dates'
 import { fieldStyle, wideFieldStyle } from '../field-style'
+import { FilterChip } from '../ui-kit'
 
 const KIND_LABEL: Record<WaitlistKind, string> = {
   from_doctor: 'От врача',
@@ -34,6 +39,8 @@ interface WaitlistPanelProps {
   patients: Patient[]
   services: Service[]
   doctors: Doctor[]
+  /** Правила администратора: длительность записи из заявки считается ими же. */
+  durationRules?: DurationRule[]
   onOpenCountChange?: (count: number) => void
 }
 
@@ -41,6 +48,7 @@ export const WaitlistPanel = ({
   patients,
   services,
   doctors,
+  durationRules = [],
   onOpenCountChange,
 }: WaitlistPanelProps) => {
   const [items, setItems] = useState<WaitlistEntry[]>([])
@@ -60,8 +68,12 @@ export const WaitlistPanel = ({
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [priority, setPriority] = useState<WaitlistPriority>('normal')
+  const [paymentType, setPaymentType] = useState<PaymentType>('regular')
   const [comment, setComment] = useState('')
   const [insuranceAppointmentId, setInsuranceAppointmentId] = useState('')
+
+  const serviceName = (id: string | null) => (id ? services.find((sv) => sv.id === id)?.name ?? null : null)
+  const doctorName = (id: string | null) => (id ? doctors.find((d) => d.id === id)?.name ?? null : null)
 
   const reload = useCallback(async () => {
     const res = await getWaitlist(kindFilter === 'all' ? undefined : { kind: kindFilter })
@@ -95,14 +107,18 @@ export const WaitlistPanel = ({
         dateFrom,
         dateTo,
         priority,
+        paymentType,
         comment,
         insuranceAppointmentId: insuranceAppointmentId.trim() || null,
         createdBy: 'operator',
       })
       setFormOpen(false)
-      setSelectedId(created.id)
       setInsuranceAppointmentId('')
+      // Сначала список, потом выбор: при обратном порядке выбранной заявки ещё
+      // нет в списке, карточка справа исчезает и появляется заново — мигание
+      // на каждое действие.
       await reload()
+      setSelectedId(created.id)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось создать заявку')
     }
@@ -113,8 +129,8 @@ export const WaitlistPanel = ({
     setError(null)
     try {
       const copy = await copyWaitlist(selected.id)
-      setSelectedId(copy.id)
       await reload()
+      setSelectedId(copy.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось скопировать')
     }
@@ -140,7 +156,16 @@ export const WaitlistPanel = ({
     setError(null)
     try {
       const service = services.find((s) => s.id === selected.serviceId)
-      const durationMin = service?.duration ?? 30
+      // Длительность считают правила администратора — те же, что и в карточке
+      // слота. Константа `?? 30` давала заявке чужой хронометраж и ломала
+      // обещание экрана «Правила длительности».
+      const visitType = defaultVisitTypeForService(service)
+      const durationMin = service
+        ? resolveBookingDuration(service, visitType, {
+          rules: durationRules,
+          requiresEquipment: service.requiresEquipment,
+        })
+        : 30
       const start = `${slot.date}T${slot.time}:00+03:00`
       const appt = await createAppointment({
         doctorId: slot.doctorId,
@@ -148,6 +173,10 @@ export const WaitlistPanel = ({
         start,
         durationMin,
         serviceId: selected.serviceId,
+        // Заявка помнит основание оплаты: без него запись по ДМС приезжала к
+        // регистратору как платная.
+        paymentType: selected.paymentType,
+        visitType,
         createdByName: 'Оператор колл-центра',
         createdByUnit: 'Колл-центр, Динамо',
       })
@@ -273,6 +302,22 @@ export const WaitlistPanel = ({
                 <option value="high">Высокий</option>
               </select>
             </Stack>
+            <Stack gap="1" flex="0 1 180px" minW="150px">
+              <Text as="span" fontSize="11px" color="textSecondary" id="waitlist-payment-label">
+                Основание оплаты
+              </Text>
+              <select
+                data-testid="waitlist-payment"
+                aria-labelledby="waitlist-payment-label"
+                style={{ ...fieldStyle, maxWidth: 180 }}
+                value={paymentType}
+                onChange={(e) => setPaymentType(e.target.value as PaymentType)}
+              >
+                {PAYMENT_TYPE_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+            </Stack>
           </Flex>
           <input
             data-testid="waitlist-comment"
@@ -284,7 +329,7 @@ export const WaitlistPanel = ({
           <input
             data-testid="waitlist-insurance-id"
             style={wideFieldStyle}
-            placeholder="ID страховочной записи (улучшение даты)"
+            placeholder="Номер уже существующей записи, если пациент ждёт время получше"
             value={insuranceAppointmentId}
             onChange={(e) => setInsuranceAppointmentId(e.target.value)}
           />
@@ -329,15 +374,20 @@ export const WaitlistPanel = ({
                   data-status={w.status}
                 >
                   <Flex gap="2" align="center">
-                    <Text fontSize="12px" fontFamily="mono" fontWeight="700">{w.id}</Text>
+                    {/* Служебный номер заявки оператору не нужен: он ищет по фамилии
+                        и по тому, чего пациент ждёт. */}
+                    <Text fontSize="13px" fontWeight="600">{w.patientName ?? '—'}</Text>
                     <Text fontSize="12px" color="textSecondary">{KIND_LABEL[w.kind]}</Text>
                     <Box flex="1" />
                     <Text fontSize="12px">{w.status === 'open' ? 'Открыта' : w.status === 'fulfilled' ? 'Закрыта' : 'Отменена'}</Text>
                   </Flex>
-                  <Text fontSize="13px" fontWeight="600">{w.patientName ?? '—'}</Text>
                   <Text fontSize="12px" color="textSecondary">
-                    {w.dateFrom}–{w.dateTo}
-                    {w.insuranceAppointmentId ? ', есть страховочная запись' : ''}
+                    {serviceName(w.serviceId) ?? doctorName(w.doctorId) ?? 'Без услуги'}
+                    {w.patientPhone ? `, ${w.patientPhone}` : ''}
+                  </Text>
+                  <Text fontSize="12px" color="textSecondary">
+                    {formatShortDate(w.dateFrom)} – {formatShortDate(w.dateTo)}
+                    {w.insuranceAppointmentId ? ', есть запасная запись' : ''}
                   </Text>
                 </Box>
               ))}
@@ -347,8 +397,9 @@ export const WaitlistPanel = ({
           <Box w="320px" flex="none" data-testid="waitlist-detail">
             {selected ? (
               <Stack gap="2">
-                <Text fontSize="14px" fontWeight="700">Заявка {selected.id}</Text>
+                <Text fontSize="14px" fontWeight="700">{selected.patientName ?? 'Заявка'}</Text>
                 <Text fontSize="13px">{KIND_LABEL[selected.kind]}, приоритет {selected.priority === 'high' ? 'высокий' : 'обычный'}</Text>
+                <Text fontSize="13px" color="textSecondary">Оплата: {paymentTypeLabel(selected.paymentType)}</Text>
                 <Text fontSize="13px">{selected.comment || 'Без комментария'}</Text>
                 {selected.fulfilledAppointmentId ? (
                   <Text fontSize="12px" color="brandGreen700" data-testid="waitlist-fulfilled-by">
@@ -402,31 +453,3 @@ export const WaitlistPanel = ({
   )
 }
 
-const FilterChip = ({
-  active,
-  onClick,
-  label,
-  testId,
-}: {
-  active: boolean
-  onClick: () => void
-  label: string
-  testId?: string
-}) => (
-  <Box
-    as="button"
-    onClick={onClick}
-    px="10px"
-    h="26px"
-    borderRadius="pill"
-    borderWidth="1px"
-    borderColor={active ? 'brandGreen' : 'borderLight'}
-    bg={active ? 'brandGreenTint' : 'white'}
-    color={active ? 'brandGreen700' : 'textPrimary'}
-    fontSize="12px"
-    fontWeight={active ? '600' : '400'}
-    data-testid={testId}
-  >
-    {label}
-  </Box>
-)

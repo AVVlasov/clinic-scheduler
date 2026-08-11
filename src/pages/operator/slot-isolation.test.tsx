@@ -290,7 +290,7 @@ describe('ShiftOverview — статистика считается по дан�
     vi.restoreAllMocks()
   })
 
-  it('при 1 записи с durationMin=30 обзор показывает total=1 и avg=00:30', async () => {
+  it('при 1 записи с durationMin=30 обзор показывает total=1 и среднюю длительность 30 мин', async () => {
     const date = '2026-08-10'
     const appts: AppointmentList = {
       date: '2026-08-10',
@@ -307,13 +307,13 @@ describe('ShiftOverview — статистика считается по дан�
     expect(totalEl).toHaveTextContent('1')
 
     const avgEl = await screen.findByTestId('shift-stat-avg')
-    expect(avgEl).toHaveTextContent('00:30')
+    expect(avgEl).toHaveTextContent('30 мин')
 
     const needsEl = await screen.findByTestId('shift-stat-needs-action')
     expect(needsEl).toHaveTextContent('0')
   })
 
-  it('при 3 записях с разной длительностью total=3, avg=00:45 и needs=2', async () => {
+  it('при 3 записях с разной длительностью total=3, средняя 45 мин и needs=2', async () => {
     const date = '2026-08-10'
     const appts: AppointmentList = {
       date: '2026-08-10',
@@ -332,7 +332,7 @@ describe('ShiftOverview — статистика считается по дан�
     expect(totalEl).toHaveTextContent('3')
 
     const avgEl = await screen.findByTestId('shift-stat-avg')
-    expect(avgEl).toHaveTextContent('00:45')
+    expect(avgEl).toHaveTextContent('45 мин')
 
     const needsEl = await screen.findByTestId('shift-stat-needs-action')
     expect(needsEl).toHaveTextContent('2')

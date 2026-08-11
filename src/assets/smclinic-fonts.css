@@ -1,5 +1,22 @@
-/* Шрифты из _ds: Golos Text (UI), JetBrains Mono (идентификаторы), Open Sans — запас. */
-@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap');
+/*
+ * Шрифты из _ds: Open Sans (UI), JetBrains Mono (идентификаторы).
+ *
+ * ЗАЧЕМ САМОХОСТИНГ. Здесь стоял `@import` с fonts.googleapis.com. На площадке
+ * заказчика внешний запрос может не пройти — и весь интерфейс отрисовывался бы
+ * системным Segoe UI, то есть чужой типографикой на показе. Решение о
+ * самохостинге зафиксировано в docs/DESIGN-SOURCES.md; файл Open Sans взят из
+ * рабочей сборки дизайн-системы (_ds/assets/fonts).
+ *
+ * «Golos Text» остаётся первым в стеке: если он установлен в системе, он и
+ * применится. Скачиваемой копии у нас нет — в _ds её тоже нет.
+ */
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./fonts/OpenSans-Variable.ttf') format('truetype-variations');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
 
 @font-face {
   font-family: 'JetBrains Mono';

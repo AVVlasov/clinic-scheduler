@@ -243,6 +243,8 @@ describe('DoctorPage', () => {
     expect(finish.disabled).toBe(false)
 
     fireEvent.click(finish)
+    // завершение необратимо, поэтому запрос уходит только после подтверждения
+    fireEvent.click(await screen.findByTestId('visit-finish-confirm-yes'))
 
     await waitFor(() => {
       expect(patchedId).toBe('a-001')
@@ -336,8 +338,8 @@ describe('DoctorPage', () => {
     })
     fireEvent.click(screen.getByTestId('visit-type-repeat'))
     fireEvent.click(screen.getByTestId('visit-service-s-003'))
-    fireEvent.click(screen.getByTestId('visit-rec-КТ контрольная через 14 дней'))
-    fireEvent.click(screen.getByTestId('visit-rec-Снятие швов через 10 дней'))
+    fireEvent.click(screen.getByTestId('visit-rec-Контроль давления через 14 дней'))
+    fireEvent.click(screen.getByTestId('visit-rec-Явка с результатами анализов'))
     fireEvent.change(screen.getByTestId('visit-next-date'), {
       target: { value: '2026-08-17' },
     })
@@ -346,6 +348,7 @@ describe('DoctorPage', () => {
     })
 
     fireEvent.click(screen.getByTestId('visit-finish'))
+    fireEvent.click(await screen.findByTestId('visit-finish-confirm-yes'))
 
     await waitFor(() => {
       expect(patchedBody).not.toBeNull()
@@ -368,8 +371,8 @@ describe('DoctorPage', () => {
     expect(persisted.visitType).toBe('repeat')
     expect(persisted.performedServiceIds).toEqual(['s-003'])
     expect(persisted.recommendations).toEqual([
-      'КТ контрольная через 14 дней',
-      'Снятие швов через 10 дней',
+      'Контроль давления через 14 дней',
+      'Явка с результатами анализов',
     ])
     expect(persisted.nextVisit).toEqual({ date: '2026-08-17', serviceId: 's-002' })
 
@@ -393,9 +396,9 @@ describe('DoctorPage', () => {
     const reloadServiceS001 = screen.getByTestId('visit-service-s-001')
     expect(reloadServiceS001.textContent).not.toContain('✓')
 
-    const reloadRec1 = screen.getByTestId('visit-rec-КТ контрольная через 14 дней')
+    const reloadRec1 = screen.getByTestId('visit-rec-Контроль давления через 14 дней')
     expect(reloadRec1.getAttribute('data-active')).toBe('true')
-    const reloadRec2 = screen.getByTestId('visit-rec-Снятие швов через 10 дней')
+    const reloadRec2 = screen.getByTestId('visit-rec-Явка с результатами анализов')
     expect(reloadRec2.getAttribute('data-active')).toBe('true')
 
     const reloadNextVisit = screen.getByTestId('visit-next-date') as HTMLInputElement

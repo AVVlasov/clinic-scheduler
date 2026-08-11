@@ -14,7 +14,7 @@ const REASONS: Array<{ id: AbsenceReason; label: string }> = [
   { id: 'repair', label: 'Ремонт' },
   { id: 'conference', label: 'Конференция' },
   { id: 'training', label: 'Учебный день' },
-  { id: 'tech_break', label: 'Техперерыв' },
+  { id: 'tech_break', label: 'Перерыв' },
 ]
 
 interface AbsenceDialogProps {
@@ -210,12 +210,12 @@ export const AbsenceDialog = ({ doctors, open, onClose, onApplied }: AbsenceDial
           <Button
             bg="brandGreenDark"
             color="white"
-            _hover={{ bg: 'brandGreenDark' }}
+            _hover={{ bg: 'brandGreen700' }}
             disabled={busy}
             onClick={() => { void apply() }}
             data-testid="absence-apply"
           >
-            {busy ? 'Применение…' : (confirming ? 'Подтвердить необратимо' : 'Применить')}
+            {busy ? 'Применение…' : (confirming ? 'Да, отменить записи' : 'Применить')}
           </Button>
         </Flex>
       </Stack>

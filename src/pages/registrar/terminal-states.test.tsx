@@ -306,7 +306,7 @@ describe('RegistrarPage — «Отменить приход» НЕ ведёт в
     fireEvent.click(cancelBtn)
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-cancel-arrived', { status: 'scheduled' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-cancel-arrived', { status: 'scheduled', actor: 'Регистратура' })
     })
     const calls = mockedRescheduleAppointment.mock.calls
     const noShowCall = calls.find(([, body]) => (body as { status: string }).status === 'no_show')
@@ -331,7 +331,7 @@ describe('RegistrarPage — «Отменить приход» НЕ ведёт в
     fireEvent.click(within(card).getByTestId('visit-noshow-button'))
 
     await waitFor(() => {
-      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-noshow-visit', { status: 'no_show' })
+      expect(mockedRescheduleAppointment).toHaveBeenCalledWith('a-noshow-visit', { status: 'no_show', actor: 'Регистратура' })
     })
   })
 })

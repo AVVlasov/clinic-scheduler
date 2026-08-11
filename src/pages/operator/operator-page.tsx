@@ -20,7 +20,7 @@ import {
   weekDates,
   withArmDate,
 } from '../../__data__/dates'
-import { resolveBookingDuration, serviceOfferedByDoctor } from '../../__data__/booking'
+import { defaultVisitTypeForService, resolveBookingDuration, serviceOfferedByDoctor } from '../../__data__/booking'
 import type {
   Appointment,
   Doctor,
@@ -85,20 +85,29 @@ export const OperatorPage = () => {
   const [waitlistOpenCount, setWaitlistOpenCount] = useState(0)
   const [actionNotice, setActionNotice] = useState<string | null>(null)
 
+  /**
+   * Сетка всегда показывает день из шапки. «Сегодня» и «Завтра» — не отдельные
+   * режимы просмотра, а быстрый переход по датам: раньше «Завтра» считалось от
+   * системного дня, и после стрелок в шапке заголовок показывал одно число, а
+   * сетка — другое.
+   */
   const viewDates = useMemo(() => {
     if (range === 'week') return weekDates(selectedDate)
-    if (range === 'tomorrow') return [shiftDate(todayDate(), 1)]
     return [selectedDate]
+  }, [range, selectedDate])
+
+  /** Какая вкладка диапазона подсвечена — выводится из даты, а не хранится отдельно. */
+  const activeRange: OperatorRange | null = useMemo(() => {
+    if (range === 'week') return 'week'
+    if (selectedDate === todayDate()) return 'today'
+    if (selectedDate === shiftDate(todayDate(), 1)) return 'tomorrow'
+    return null
   }, [range, selectedDate])
 
   const primaryDate = viewDates[0]
 
   const load = useCallback(async () => {
-    const dates = range === 'week'
-      ? weekDates(selectedDate)
-      : range === 'tomorrow'
-        ? [shiftDate(todayDate(), 1)]
-        : [selectedDate]
+    const dates = range === 'week' ? weekDates(selectedDate) : [selectedDate]
 
     const [schedResults, apptResults, docs, svcs, pats, waitlist] = await Promise.all([
       Promise.all(dates.map((d) => getSchedule(d))),
@@ -145,6 +154,12 @@ export const OperatorPage = () => {
     }
   }, [])
 
+  // Зелёная плашка «Запись создана» не должна висеть весь день: она про
+  // последнее действие, а после смены дня относится уже не к тому, что на экране.
+  useEffect(() => {
+    setActionNotice(null)
+  }, [selectedDate, range])
+
   const handleRangeChange = (next: OperatorRange) => {
     setRange(next)
     setSelected(null)
@@ -166,14 +181,33 @@ export const OperatorPage = () => {
     [filterServiceId, services],
   )
 
+  /**
+   * В сетке — только врачи, у которых в этот день есть смена. Справочник
+   * содержит и тех, кому расписание ещё не завели: их пустая колонка занимает
+   * место и читается как «врач весь день свободен».
+   */
+  const doctorsOnDuty = useMemo(() => {
+    const onDuty = new Set<string>()
+    for (const schedule of schedules) {
+      if (!viewDates.includes(schedule.date)) continue
+      for (const slot of schedule.slots) {
+        for (const cell of slot.doctors) onDuty.add(cell.id)
+      }
+    }
+    return onDuty.size > 0 ? doctors.filter((d) => onDuty.has(d.id)) : doctors
+  }, [doctors, schedules, viewDates])
+
   const visibleDoctors = useMemo(() => {
-    if (!filterService) return doctors
-    return doctors.filter((d) => serviceOfferedByDoctor(filterService, d.id))
-  }, [doctors, filterService])
+    if (!filterService) return doctorsOnDuty
+    return doctorsOnDuty.filter((d) => serviceOfferedByDoctor(filterService, d.id))
+  }, [doctorsOnDuty, filterService])
 
   const serviceFitDuration = useMemo(() => {
     if (!filterService) return null
-    return resolveBookingDuration(filterService, 'repeat', {
+    // Тип приёма берётся из услуги, а не приколочен к «повторному»: иначе зона
+    // занятости в сетке считается по чужой длительности и «не влезет»
+    // появляется там, где на самом деле влезает.
+    return resolveBookingDuration(filterService, defaultVisitTypeForService(filterService), {
       rules: durationRules,
       requiresEquipment: filterService.requiresEquipment,
     })
@@ -309,11 +343,14 @@ export const OperatorPage = () => {
     if (primary?.holiday) {
       return `${primary.holiday.name} — приём не ведётся.`
     }
+    // Пустое состояние называет ВЫБРАННЫЙ день, а не «сегодня»: оператор
+    // листает даты стрелками, и «сегодня» на 14 августа читается как ошибка.
+    const label = formatShortDate(primaryDate)
     const weekday = weekdayOf(primaryDate)
     if (weekday === 0 || weekday === 6) {
-      return 'Сегодня выходной — смена не опубликована.'
+      return `${label} — выходной, смена не опубликована.`
     }
-    return 'Смена на сегодня не опубликована.'
+    return `Смена на ${label} не опубликована.`
   })()
 
   const overviewAppointments = appointments.filter(
@@ -358,6 +395,7 @@ export const OperatorPage = () => {
           patients={patients}
           services={services}
           doctors={doctors}
+          durationRules={durationRules}
           onOpenCountChange={setWaitlistOpenCount}
         />
       ) : null}
@@ -450,7 +488,7 @@ export const OperatorPage = () => {
                   borderRadius="compact"
                   data-testid="operator-range"
                   onKeyDown={(e) => {
-                    const idx = RANGE_ITEMS.findIndex((i) => i.id === range)
+                    const idx = RANGE_ITEMS.findIndex((i) => i.id === (activeRange ?? range))
                     if (e.key === 'ArrowRight' && idx < RANGE_ITEMS.length - 1) {
                       e.preventDefault()
                       handleRangeChange(RANGE_ITEMS[idx + 1].id)
@@ -462,7 +500,7 @@ export const OperatorPage = () => {
                   }}
                 >
                   {RANGE_ITEMS.map((item) => {
-                    const active = range === item.id
+                    const active = activeRange === item.id
                     return (
                       <Box
                         as="button"
@@ -478,7 +516,7 @@ export const OperatorPage = () => {
                         fontSize="13px"
                         cursor="pointer"
                         color={active ? 'white' : 'textPrimary'}
-                        bg={active ? 'brandGreen' : 'transparent'}
+                        bg={active ? 'brandGreenDark' : 'transparent'}
                       >
                         {item.label}
                       </Box>
@@ -492,7 +530,7 @@ export const OperatorPage = () => {
                   color="textSecondary"
                   data-testid="reschedule-hint"
                 >
-                  Клик по свободному слоту выберет его целью переноса.
+                  Выберите свободное время — туда и переедет запись.
                 </Text>
               )}
               {isScheduleEmpty ? (
@@ -600,6 +638,7 @@ export const OperatorPage = () => {
                   }
                   rescheduleTargetTime={rescheduleTarget?.time ?? null}
                   rescheduleTargetDoctorId={rescheduleTarget?.doctorId ?? null}
+                  rescheduleTargetDate={rescheduleTarget?.date ?? null}
                   onClearRescheduleTarget={() => setRescheduleTarget(null)}
                   onFitDurationChange={setFitDurationMin}
                   preferredServiceId={filterServiceId}

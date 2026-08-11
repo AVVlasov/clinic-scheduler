@@ -86,7 +86,7 @@ describe('journey operator-mass-reschedule — снос и разбор пост
 
     fireEvent.click(within(panel).getByTestId('mass-apply'))
     await waitFor(() => {
-      expect(within(panel).getByTestId('mass-apply')).toHaveTextContent(/Подтвердить необратимо/)
+      expect(within(panel).getByTestId('mass-apply')).toHaveTextContent(/Да, отменить/)
     })
     fireEvent.click(within(panel).getByTestId('mass-apply'))
 

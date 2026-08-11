@@ -110,7 +110,7 @@ describe('journey admin-absence-block — отсутствие, занятост
 
       fireEvent.click(within(dialog).getByTestId('absence-apply'))
       await waitFor(() => {
-        expect(within(dialog).getByTestId('absence-apply')).toHaveTextContent(/Подтвердить необратимо/)
+        expect(within(dialog).getByTestId('absence-apply')).toHaveTextContent(/Да, отменить записи/)
       })
       fireEvent.click(within(dialog).getByTestId('absence-apply'))
 
@@ -126,18 +126,29 @@ describe('journey admin-absence-block — отсутствие, занятост
       )
       expect(afterCount, 'после отсутствия слоты врача должны исчезнуть').toBe(0)
 
+      // Внутреннего идентификатора отсутствия на экране быть не должно:
+      // администратору нужно число отменённых и поимённый список, а не «abs-001».
       const notice = screen.getByTestId('absence-applied-notice').textContent ?? ''
-      const absenceIdMatch = notice.match(/Отсутствие (abs-\d+)/)
-      expect(absenceIdMatch?.[1]).toBeTruthy()
-      const absenceId = absenceIdMatch![1]
+      expect(notice).toMatch(/Отменено записей: \d+/)
+      expect(notice).not.toMatch(/abs-\d+/)
 
-      const affected = await apiGet<AffectedResponse>(server, `/absences/${absenceId}/affected`)
-      expect(affected.items.length).toBeGreaterThanOrEqual(2)
+      // Разбор показывается на экране, а не остаётся в маршруте, который никто не зовёт.
+      const affectedList = await screen.findByTestId('absence-affected-list')
+      const patients = await apiGet<{ items: Array<{ id: string; name: string }> }>(server, '/patients')
+      const cancelledPatients = new Set(
+        (await Promise.all(ids.map((id) => apiGet<{ patientId: string }>(server, `/appointments/${id}`))))
+          .map((a) => patients.items.find((p) => p.id === a.patientId)?.name)
+          .filter(Boolean) as string[],
+      )
+      expect(cancelledPatients.size).toBeGreaterThan(0)
+      for (const name of cancelledPatients) {
+        expect(affectedList.textContent ?? '').toContain(name)
+      }
+
       for (const id of ids) {
-        const row = affected.items.find((a) => a.id === id)
-        expect(row, `запись ${id} должна быть в affected`).toBeTruthy()
-        expect(row!.status).toBe('cancelled')
-        expect(row!.cancelReason).toMatch(/Отсутствие/)
+        const row = await apiGet<AffectedResponse['items'][number]>(server, `/appointments/${id}`)
+        expect(row.status).toBe('cancelled')
+        expect(row.cancelReason).toMatch(/Отсутствие/)
       }
     },
     30000,
@@ -176,12 +187,12 @@ describe('journey admin-absence-block — отсутствие, занятост
     const thu = await apiGet<ScheduleResponse>(server, `/schedule/${thursday}`)
     const breaks = thu.slots.flatMap((s) => s.doctors).filter((d) => d.occupancyKind === 'tech_break')
     expect(breaks.length).toBeGreaterThan(0)
-    expect(breaks.every((d) => d.occupancyLabel === 'Техперерыв')).toBe(true)
+    expect(breaks.every((d) => d.occupancyLabel === 'Перерыв')).toBe(true)
 
     const mon = await apiGet<ScheduleResponse>(server, `/schedule/${monday}`)
     const appts = mon.slots.flatMap((s) => s.doctors).filter((d) => d.occupancyKind === 'appointment')
     expect(appts.length).toBeGreaterThan(0)
-    expect(appts.every((d) => d.occupancyLabel && d.occupancyLabel !== 'Блокировка' && d.occupancyLabel !== 'Техперерыв')).toBe(true)
+    expect(appts.every((d) => d.occupancyLabel && d.occupancyLabel !== 'Блокировка' && d.occupancyLabel !== 'Перерыв')).toBe(true)
 
     const labels = new Set([
       ...appts.map((d) => d.occupancyLabel),
@@ -189,7 +200,7 @@ describe('journey admin-absence-block — отсутствие, занятост
       ...breaks.map((d) => d.occupancyLabel),
     ])
     expect(labels.has('Блокировка')).toBe(true)
-    expect(labels.has('Техперерыв')).toBe(true)
+    expect(labels.has('Перерыв')).toBe(true)
     expect(labels.size).toBeGreaterThanOrEqual(3)
 
     render(
@@ -202,6 +213,6 @@ describe('journey admin-absence-block — отсутствие, занятост
     await screen.findByTestId('schedule-grid', {}, { timeout: 15000 })
     const breakCells = screen.getAllByTestId('busy-label').filter((el) => el.getAttribute('data-occupancy-label') === 'tech_break')
     expect(breakCells.length).toBeGreaterThan(0)
-    expect(breakCells[0]).toHaveTextContent('Техперерыв')
+    expect(breakCells[0]).toHaveTextContent('Перерыв')
   })
 })

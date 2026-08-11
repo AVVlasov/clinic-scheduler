@@ -1,21 +1,30 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Box, Flex, Stack, Text } from '@chakra-ui/react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { resolveSection } from '../../__data__/arm-nav'
-import { confirmAppointment, getAppointments, getDoctors, getServices, payAppointment, rescheduleAppointment } from '../../__data__/api'
+import { confirmAppointment, getAppointments, getDoctorCards, getDoctors, getDurationRules, getServices, payAppointment, rescheduleAppointment } from '../../__data__/api'
 import { formatShortDate, parseArmDate, withArmSection } from '../../__data__/dates'
-import type { Appointment, AppointmentStatus, Doctor, Patient, Service } from '../../__data__/types'
+import type { Appointment, AppointmentStatus, Doctor, DurationRule, Patient, Service } from '../../__data__/types'
 
+import { buildPriceMap, cashDue, formatRub, servicesTotal, shiftCashTotal } from './payment'
+import { matchesQueueQuery } from './queue-search'
 import { PatientCardForm } from './patient-card-form'
 import { PatientCardView } from './patient-card-view'
 import { PatientSearch } from './patient-search'
 import { QueueFilter, QueueTable } from './queue-table'
+import { StatTile } from '../ui-kit'
 import { TicketPrint } from './ticket-print'
 import { VisitCard } from './visit-card'
 
 /** Интервал фонового обновления очереди (мс). В тестах можно ускорить vi.setSystemTime + advanceTimers. */
 export const REGISTRAR_POLL_MS = 3000
+
+/**
+ * Автор действий стойки в истории записи. История видна врачу и оператору, и
+ * подпись «operator» под приходом, отмеченным регистратором, — неправда.
+ */
+const REGISTRAR_ACTOR = 'Регистратура'
 
 const countByStatus = (items: Appointment[], status: AppointmentStatus): number =>
   items.reduce((acc, a) => (a.status === status ? acc + 1 : acc), 0)
@@ -23,25 +32,6 @@ const countByStatus = (items: Appointment[], status: AppointmentStatus): number 
 const applyFilter = (items: Appointment[], filter: QueueFilter): Appointment[] => {
   if (filter === 'all') return items
   return items.filter((a) => a.status === filter)
-}
-
-const formatRub = (amount: number): string =>
-  `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`
-
-const buildPriceMap = (services: Service[]): Map<string, number> => {
-  const map = new Map<string, number>()
-  for (const s of services) map.set(s.id, s.price)
-  return map
-}
-
-const appointmentAmount = (a: Appointment, priceMap: Map<string, number>): number => {
-  const ids = a.performedServiceIds.length > 0 ? a.performedServiceIds : a.serviceId ? [a.serviceId] : []
-  let sum = 0
-  for (const id of ids) {
-    const price = priceMap.get(id)
-    if (typeof price === 'number') sum += price
-  }
-  return sum
 }
 
 const formatUpdatedAt = (iso: string): string => {
@@ -61,8 +51,15 @@ export const RegistrarPage = () => {
   const [items, setItems] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
+  // Правила длительности нужны быстрой записи на стойке: расчёт общий с
+  // оператором. Грузятся отдельно от очереди — очередь важнее, и её загрузка не
+  // должна зависеть от справочника правил.
+  const [durationRules, setDurationRules] = useState<DurationRule[]>([])
+  /** Площадка приёма для бланка талона: справочник карточек врачей. */
+  const [siteByDoctorId, setSiteByDoctorId] = useState<Map<string, string>>(new Map())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>('all')
+  const [query, setQuery] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -72,8 +69,6 @@ export const RegistrarPage = () => {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
   const [openedPatient, setOpenedPatient] = useState<Patient | null>(null)
-  const selectedIdRef = useRef<string | null>(null)
-  selectedIdRef.current = selectedId
 
   const navigate = useNavigate()
   /** Переход между разделами регистратора — через адрес, как и в шапке АРМ. */
@@ -81,17 +76,43 @@ export const RegistrarPage = () => {
     navigate(withArmSection(location.search, next))
   }, [navigate, location.search])
 
-  const applyAppointments = useCallback((next: Appointment[]) => {
+  /**
+   * Выбор карточки принадлежит человеку, а не опросу. Первая строка
+   * подставляется только при открытии смены (`autoSelect`); фоновое обновление
+   * лишь сохраняет уже выбранное и отпускает выбор, если запись из смены ушла.
+   * Раньше опрос каждые три секунды открывал первую строку поверх закрытой
+   * карточки, и регистратор терял место в очереди.
+   */
+  const applyAppointments = useCallback((next: Appointment[], options?: { autoSelect?: boolean }) => {
     setItems(next)
     setLastUpdatedAt(new Date().toISOString())
-    const keep = selectedIdRef.current
-    if (keep && next.some((a) => a.id === keep)) {
-      setSelectedId(keep)
-    } else if (next.length > 0) {
-      setSelectedId((prev) => (prev && next.some((a) => a.id === prev) ? prev : next[0].id))
-    } else {
-      setSelectedId(null)
-    }
+    setSelectedId((prev) => {
+      if (prev) return next.some((a) => a.id === prev) ? prev : null
+      return options?.autoSelect && next.length > 0 ? next[0].id : null
+    })
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    // Справочники — вспомогательные: их отказ не должен касаться очереди,
+    // ради которой открыт экран. Поэтому вызов и его синхронные ошибки уходят в
+    // цепочку промиса, а не в рендер.
+    void Promise.resolve()
+      .then(() => getDurationRules())
+      .then((res) => {
+        if (!cancelled) setDurationRules(res.items)
+      })
+      .catch(() => undefined)
+    void Promise.resolve()
+      .then(() => getDoctorCards())
+      .then((res) => {
+        if (cancelled) return
+        const map = new Map<string, string>()
+        for (const card of res.items) map.set(card.id, card.site)
+        setSiteByDoctorId(map)
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -101,7 +122,7 @@ export const RegistrarPage = () => {
     Promise.all([getAppointments(selectedDate), getServices(), getDoctors()])
       .then(([apptsRes, servicesRes, doctorsRes]) => {
         if (cancelled) return
-        applyAppointments(apptsRes.items)
+        applyAppointments(apptsRes.items, { autoSelect: true })
         setServices(servicesRes.items)
         setDoctors(doctorsRes.items)
         setLoadError(null)
@@ -160,7 +181,7 @@ export const RegistrarPage = () => {
     setBusy(true)
     setActionError(null)
     try {
-      await rescheduleAppointment(id, { status })
+      await rescheduleAppointment(id, { status, actor: REGISTRAR_ACTOR })
       await refreshSoft()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Не удалось обновить статус'
@@ -180,11 +201,14 @@ export const RegistrarPage = () => {
   const payVisit = useCallback(async (id: string) => {
     const visit = items.find((a) => a.id === id)
     if (!visit || visit.paidAt) return
-    const amount = appointmentAmount(visit, priceMap)
-    if (amount <= 0) {
-      setActionError('Нет суммы к оплате')
+    // Считать нечего, если в визите нет ни одной услуги. Ноль по ДМС — это не
+    // «нечего считать», а результат расчёта: счёт уходит страховой, и визит
+    // всё равно должен закрыться отметкой об оплате.
+    if (servicesTotal(visit, priceMap) <= 0) {
+      setActionError('В визите нет услуг — сумму оплаты определить не по чему')
       return
     }
+    const amount = cashDue(visit, priceMap)
     setPayBusy(true)
     setActionError(null)
     try {
@@ -225,9 +249,9 @@ export const RegistrarPage = () => {
   }, [services])
 
   const visibleItems = useMemo(() => {
-    const filtered = applyFilter(items, filter)
+    const filtered = applyFilter(items, filter).filter((a) => matchesQueueQuery(a, query))
     return [...filtered].sort((a, b) => a.start.localeCompare(b.start))
-  }, [items, filter])
+  }, [items, filter, query])
   const selected = useMemo(
     () => items.find((a) => a.id === selectedId) ?? null,
     [items, selectedId],
@@ -238,13 +262,12 @@ export const RegistrarPage = () => {
   const inProgressCount = countByStatus(items, 'in_progress')
   const completedCount = countByStatus(items, 'completed')
   const noShowCount = countByStatus(items, 'no_show')
+  // Отменённые в счётчиках были пропущены, и семнадцать строк таблицы
+  // складывались в шестнадцать по плиткам: разошлись — значит одна из двух
+  // цифр врёт, а какая именно, на экране не видно.
+  const cancelledCount = countByStatus(items, 'cancelled')
 
-  const shiftCash = useMemo(
-    () => items
-      .filter((a) => a.paidAt != null)
-      .reduce((acc, a) => acc + (typeof a.paidAmount === 'number' ? a.paidAmount : appointmentAmount(a, priceMap)), 0),
-    [items, priceMap],
-  )
+  const shiftCash = useMemo(() => shiftCashTotal(items, priceMap), [items, priceMap])
 
   if (loadError && !isLoaded) {
     return (
@@ -309,44 +332,15 @@ export const RegistrarPage = () => {
         </Stack>
         <Box flex="1" />
         <Stack direction="row" gap="24px" align="center">
-          <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">Ожидают приёма</Text>
-            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-waiting">
-              {waitingCount}
-            </Text>
-          </Stack>
-          <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">Отмечено приходов</Text>
-            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-arrived">
-              {arrivedCount}
-            </Text>
-          </Stack>
-          <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">Касса смены</Text>
-            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-cash">
-              {formatRub(shiftCash)}
-            </Text>
-          </Stack>
+          <StatTile label="Ожидают приёма" testId="counter-waiting" value={String(waitingCount)} />
+          <StatTile label="Отмечено приходов" testId="counter-arrived" value={String(arrivedCount)} />
+          <StatTile label="Касса смены" testId="counter-cash" value={formatRub(shiftCash)} />
           {/* Три разных счётчика — три колонки, а не строка «а · б · в»:
               под заголовком «Завершено» стояли и «на приёме», и «неявка». */}
-          <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">На приёме</Text>
-            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-in-progress">
-              {inProgressCount}
-            </Text>
-          </Stack>
-          <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">Завершено</Text>
-            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-completed">
-              {completedCount}
-            </Text>
-          </Stack>
-          <Stack gap="0" align="flex-end">
-            <Text fontSize="12px" color="textSecondary">Неявок</Text>
-            <Text fontSize="20px" fontWeight="700" fontFamily="mono" data-testid="counter-no-show">
-              {noShowCount}
-            </Text>
-          </Stack>
+          <StatTile label="На приёме" testId="counter-in-progress" value={String(inProgressCount)} />
+          <StatTile label="Завершено" testId="counter-completed" value={String(completedCount)} />
+          <StatTile label="Неявок" testId="counter-no-show" value={String(noShowCount)} />
+          <StatTile label="Отменено" testId="counter-cancelled" value={String(cancelledCount)} />
         </Stack>
       </Flex>
 
@@ -389,6 +383,7 @@ export const RegistrarPage = () => {
         <PatientCardForm
           doctors={doctors}
           services={services}
+          durationRules={durationRules}
           selectedDate={selectedDate}
           onCreated={(patient) => {
             setOpenedPatient(patient)
@@ -421,14 +416,20 @@ export const RegistrarPage = () => {
         <Flex flex="1" gap="12px" minH="0">
           <QueueTable
             items={visibleItems}
+            totalCount={items.length}
             serviceNames={serviceNames}
+            priceMap={priceMap}
             selectedId={selectedId}
             filter={filter}
+            query={query}
+            onQueryChange={setQuery}
             onFilterChange={setFilter}
             onSelect={setSelectedId}
             onMarkArrived={(id) => { void updateStatus(id, 'arrived') }}
             onMarkWaiting={(id) => { void updateStatus(id, 'scheduled') }}
             onMarkNoShow={(id) => { void updateStatus(id, 'no_show') }}
+            onReturnToQueue={(id) => { void updateStatus(id, 'scheduled') }}
+            onPay={(id) => { void payVisit(id) }}
             onPrintTicket={(id) => setTicketVisitId(id)}
           />
           <VisitCard
@@ -438,6 +439,7 @@ export const RegistrarPage = () => {
             onMarkArrived={() => { if (selected) void updateStatus(selected.id, 'arrived') }}
             onMarkWaiting={() => { if (selected) void updateStatus(selected.id, 'scheduled') }}
             onMarkNoShow={() => { if (selected) void updateStatus(selected.id, 'no_show') }}
+            onReturnToQueue={() => { if (selected) void updateStatus(selected.id, 'scheduled') }}
             onPay={() => { if (selected) void payVisit(selected.id) }}
             onPrintTicket={() => { if (selected) setTicketVisitId(selected.id) }}
             onConfirm={() => { if (selected) void confirmVisit(selected.id) }}
@@ -452,6 +454,7 @@ export const RegistrarPage = () => {
           visit={ticketVisit}
           doctor={doctors.find((d) => d.id === ticketVisit.doctorId) ?? null}
           service={services.find((s) => s.id === ticketVisit.serviceId) ?? null}
+          site={siteByDoctorId.get(ticketVisit.doctorId) ?? null}
           onClose={() => setTicketVisitId(null)}
         />
       ) : null}

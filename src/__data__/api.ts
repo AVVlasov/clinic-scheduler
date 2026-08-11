@@ -1,5 +1,7 @@
 import { getConfigValue } from '@brojs/cli'
 
+import { isHumanReadable, messageForError } from './error-messages'
+
 import type {
   Appointment,
   AppointmentHistoryList,
@@ -62,7 +64,7 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, init)
   } catch {
-    throw new ApiError('Не удалось подключиться к серверу', 0, 'network_error')
+    throw new ApiError(messageForError('network_error', 0), 0, 'network_error')
   }
 
   const body: unknown = await response.json().catch(() => undefined)
@@ -72,24 +74,23 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     const code = typeof errorBody.error === 'string' ? errorBody.error : 'request_failed'
     const serverMessage = typeof errorBody.message === 'string' ? errorBody.message : undefined
 
-    let message = serverMessage
-    if (!message) {
-      if (response.status === 409 && code === 'slot_taken') {
-        message = 'Выбранный слот уже занят'
-      } else if (response.status === 400) {
-        message = 'Проверьте корректность данных'
-      } else if (response.status === 404) {
-        message = 'Не найдено'
-      } else {
-        message = 'Не удалось выполнить запрос'
-      }
-    }
+    // Машинный текст сервера на экран не выпускаем: «Слот
+    // 2026-08-11T13:00:00+03:00 у врача d-003 уже занят (запись a-013)» читается
+    // как поломка. Но там, где сервер объясняет по-человечески и точнее нас
+    // («Основная площадка не может быть пустой»), его формулировка полезнее
+    // общей — поэтому решает не код, а вид самого текста.
+    const message = isHumanReadable(serverMessage)
+      ? serverMessage
+      : messageForError(code, response.status)
 
-    throw new ApiError(message, response.status, code, errorBody)
+    throw new ApiError(message, response.status, code, {
+      ...errorBody,
+      ...(serverMessage ? { serverMessage } : {}),
+    })
   }
 
   if (body === undefined) {
-    throw new ApiError('Сервер вернул некорректный ответ', response.status, 'invalid_response')
+    throw new ApiError(messageForError('invalid_response', response.status), response.status, 'invalid_response')
   }
 
   return body as T
@@ -260,11 +261,16 @@ export const publishWeek = (weekStart: string) => request<PublishWeekResult>('/w
   body: JSON.stringify({ weekStart }),
 })
 
-export const unpublishWeek = (weekStart: string) => request<WeekTemplates>('/week-templates/unpublish', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ weekStart }),
-})
+/**
+ * Снятие публикации. Без `confirmed` сервер отказывает с числом записей недели:
+ * администратор обязан увидеть последствия до того, как неделя закроется.
+ */
+export const unpublishWeek = (weekStart: string, confirmed = false) =>
+  request<WeekTemplates>('/week-templates/unpublish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weekStart, confirmed }),
+  })
 
 export const saveWeekTemplateInterval = (input: SaveWeekTemplateIntervalInput) =>
   request<WeekTemplates>('/week-templates/interval', {

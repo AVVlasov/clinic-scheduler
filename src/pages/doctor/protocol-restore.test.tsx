@@ -39,7 +39,7 @@ const baseAppointments: Appointment[] = [
     diagnosis: 'K01.1 Ретенированный зуб',
     visitType: 'repeat',
     performedServiceIds: ['s-001', 's-003'],
-    recommendations: ['Контрольный осмотр через 7 дней', 'КТ контрольная через 14 дней'],
+    recommendations: ['Контрольный осмотр через 7 дней', 'Контроль давления через 14 дней'],
     nextVisit: { date: '2026-08-24', serviceId: 's-002' },
   },
   {
@@ -145,10 +145,10 @@ describe('DoctorPage — протокол из визита', () => {
     expect(rec1.textContent).toContain('Контрольный осмотр через 7 дней')
     expect(rec1.getAttribute('data-active')).toBe('true')
 
-    const rec2 = screen.getByTestId('visit-rec-КТ контрольная через 14 дней')
+    const rec2 = screen.getByTestId('visit-rec-Контроль давления через 14 дней')
     expect(rec2.getAttribute('data-active')).toBe('true')
 
-    const recOff = screen.getByTestId('visit-rec-Снятие швов через 10 дней')
+    const recOff = screen.getByTestId('visit-rec-Явка с результатами анализов')
     expect(recOff.getAttribute('data-active')).toBe('false')
 
     expect((screen.getByTestId('visit-next-date') as HTMLInputElement).value).toBe('2026-08-24')

@@ -181,7 +181,7 @@ describe('AdminPage — выбор недели (TASK-29)', () => {
     renderPage()
 
     await screen.findByTestId('week-templates')
-    expect(screen.getByTestId('week-current')).toHaveTextContent(CURRENT_WEEK_START)
+    expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', CURRENT_WEEK_START)
   })
 
   it('селектор недели виден: вперёд, назад, индикатор — и кнопка публикации на опубликованной неделе disabled', async () => {
@@ -210,7 +210,7 @@ describe('AdminPage — выбор недели (TASK-29)', () => {
     // уход «назад» на прошлую неделю — это нижняя граница: prev становится disabled
     fireEvent.click(screen.getByTestId('week-prev'))
     await waitFor(() => {
-      expect(screen.getByTestId('week-current')).toHaveTextContent(
+      expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', 
         shiftDate(CURRENT_WEEK_START, -7),
       )
     })
@@ -231,7 +231,7 @@ describe('AdminPage — выбор недели (TASK-29)', () => {
       fireEvent.click(screen.getByTestId('week-next'))
       const expected = shiftDate(CURRENT_WEEK_START, 7 * i)
       await waitFor(() => {
-        expect(screen.getByTestId('week-current')).toHaveTextContent(expected)
+        expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', expected)
       })
     }
 
@@ -258,7 +258,7 @@ describe('AdminPage — выбор недели (TASK-29)', () => {
     // 2) переключаемся на следующую неделю
     fireEvent.click(screen.getByTestId('week-next'))
     await waitFor(() => {
-      expect(screen.getByTestId('week-current')).toHaveTextContent(NEXT_WEEK_START)
+      expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', NEXT_WEEK_START)
     })
 
     // 3) на новой неделе — кнопка публикации доступна и шаблоны были перезапрошены
@@ -291,7 +291,7 @@ describe('AdminPage — выбор недели (TASK-29)', () => {
 
     fireEvent.click(screen.getByTestId('week-next'))
     await waitFor(() => {
-      expect(screen.getByTestId('week-current')).toHaveTextContent(NEXT_WEEK_START)
+      expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', NEXT_WEEK_START)
     })
 
     fireEvent.click(screen.getByTestId('publish-week'))
@@ -301,7 +301,7 @@ describe('AdminPage — выбор недели (TASK-29)', () => {
     // возвращаемся на опубликованную неделю — итога там быть не должно
     fireEvent.click(screen.getByTestId('week-prev'))
     await waitFor(() => {
-      expect(screen.getByTestId('week-current')).toHaveTextContent(CURRENT_WEEK_START)
+      expect(screen.getByTestId('week-current')).toHaveAttribute('data-week-start', CURRENT_WEEK_START)
     })
     expect(screen.queryByTestId('publish-result')).not.toBeInTheDocument()
     expect(postPublish(log)).toHaveLength(1)

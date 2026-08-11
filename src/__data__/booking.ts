@@ -20,7 +20,7 @@ export const paymentTypeLabel = (value: PaymentType | null | undefined): string 
  */
 export const resolveBookingDuration = (
   service: Service,
-  visitType: VisitType,
+  visitType: VisitType | null,
   options?: {
     rules?: DurationRule[]
     doctorId?: string | null
@@ -66,3 +66,19 @@ export const addMinutesToTime = (time: string, minutes: number): string => {
 
 export const formatTimeRange = (startTime: string, durationMin: number): string =>
   `${startTime}–${addMinutesToTime(startTime, durationMin)}`
+
+/**
+ * Тип приёма по умолчанию — из услуги, а не константой.
+ *
+ * Карточка записи подставляла `'repeat'` для любой услуги, и «Первичная
+ * консультация» считалась как повторная: экран администратора обещал 60 минут,
+ * оператор видел 30. Название услуги — то же основание, по которому тип приёма
+ * выбирает человек; для диагностики и лаборатории тип не применяется вовсе.
+ */
+export const defaultVisitTypeForService = (service: Service | null | undefined): VisitType | null => {
+  if (!service) return null
+  if (service.category !== 'Приём') return null
+  if (/первичн/i.test(service.name)) return 'first'
+  if (/повторн|результат/i.test(service.name)) return 'repeat'
+  return 'first'
+}

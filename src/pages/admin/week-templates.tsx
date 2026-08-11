@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { Box, Button, Flex, Stack, Text } from '@chakra-ui/react'
 
-import { doctorsWord, slotsWord } from '../../__data__/plural'
+import { appointmentsWord, doctorsWord, slotsWord } from '../../__data__/plural'
 import type {
+  AffectedAppointment,
   PublishWeekResult,
   WeekTemplateInterval,
   WeekTemplateKind,
@@ -16,7 +17,7 @@ const CELL_MIN_WIDTH = '118px'
 const KIND_LABEL: Record<WeekTemplateKind, string> = {
   work: 'Приём по шаблону',
   block: 'Блокировка',
-  break: 'Сокращённый день',
+  break: 'Перерыв',
   absent: 'Отсутствие',
   off: 'Нет приёма',
 }
@@ -71,12 +72,16 @@ interface WeekTemplatesProps {
   onPublishClick: () => void
   onPublishConfirm: () => void
   onPublishCancel: () => void
-  onUnpublish: () => void
+  onUnpublish: (confirmed?: boolean) => void
   unpublishBusy?: boolean
+  /** Сколько записей на неделе — приходит из отказа сервера на снятие публикации. */
+  unpublishAffected?: number | null
+  intervalAffected?: AffectedAppointment[] | null
   onSaveInterval: (input: {
     doctorId: string
     date: string
     intervals: WeekTemplateInterval[]
+    confirmed?: boolean
   }) => Promise<void>
   saveIntervalBusy?: boolean
   saveIntervalError?: string | null
@@ -99,6 +104,8 @@ export const WeekTemplates = ({
   onPublishCancel,
   onUnpublish,
   unpublishBusy = false,
+  unpublishAffected = null,
+  intervalAffected = null,
   onSaveInterval,
   saveIntervalBusy = false,
   saveIntervalError = null,
@@ -118,16 +125,17 @@ export const WeekTemplates = ({
 
   const closeEdit = () => setEdit(null)
 
-  const handleSave = async () => {
+  const handleSave = async (confirmed = false) => {
     if (!edit) return
     const intervals: WeekTemplateInterval[] = needsTimeBounds(kind)
       ? [{ kind, start, end }]
       : [{ kind, start: '00:00', end: '00:00' }]
     try {
-      await onSaveInterval({ doctorId: edit.doctorId, date: edit.date, intervals })
+      await onSaveInterval({ doctorId: edit.doctorId, date: edit.date, intervals, confirmed })
       setEdit(null)
     } catch {
-      // ошибка показана через saveIntervalError
+      // Отказ «на это время записаны пациенты» показывается списком ниже:
+      // редактор остаётся открытым, чтобы администратор увидел, кого затрагивает.
     }
   }
 
@@ -202,8 +210,11 @@ export const WeekTemplates = ({
                 color="brandGreen700"
                 px="10px"
                 data-testid="week-current"
+                /* Машинная дата остаётся атрибутом — она нужна проверкам и
+                   ссылкам, а на экране администратора читают «10.08». */
+                data-week-start={weekStart}
               >
-                {weekStart}
+                {formatDayDate(weekStart)}
               </Text>
               <Button
                 type="button"
@@ -249,7 +260,7 @@ export const WeekTemplates = ({
                 borderColor="borderDark"
                 borderRadius="compact"
                 disabled={unpublishBusy || publishState === 'publishing'}
-                onClick={onUnpublish}
+                onClick={() => onUnpublish(false)}
                 data-testid="unpublish-week"
               >
                 {unpublishBusy ? 'Снимаем…' : 'Снять публикацию'}
@@ -260,7 +271,7 @@ export const WeekTemplates = ({
               bg="brandGreenDark"
               color="white"
               borderRadius="compact"
-              _hover={{ bg: 'brandGreenDark' }}
+              _hover={{ bg: 'brandGreen700' }}
               disabled={publishState === 'publishing' || data.published}
               onClick={onPublishClick}
               data-testid="publish-week"
@@ -268,6 +279,54 @@ export const WeekTemplates = ({
               Опубликовать неделю
             </Button>
           </Flex>
+
+          {unpublishAffected != null ? (
+            <Box
+              role="dialog"
+              aria-label="Подтверждение снятия публикации"
+              m="12px 16px 0"
+              p="12px 14px"
+              bg="surfaceLight"
+              borderWidth="1px"
+              borderColor="brandOrange"
+              borderRadius="compact"
+              data-testid="unpublish-confirm"
+            >
+              <Text fontSize="14px" fontWeight="700" color="brandOrange700" mb="1">
+                Снять публикацию недели {formatDayDate(data?.weekStart ?? weekStart)}
+                {' – '}
+                {formatDayDate(data?.weekEnd ?? weekStart)}?
+              </Text>
+              <Text fontSize="13px" color="textPrimary" lineHeight="18px" mb="3">
+                На этой неделе <b>{unpublishAffected}</b> {appointmentsWord(unpublishAffected)}.
+                Они останутся в расписании, но новые записи на эту неделю оператор создать не
+                сможет, пока она не опубликована снова.
+              </Text>
+              <Flex gap="2">
+                <Button
+                  size="sm"
+                  bg="brandOrange"
+                  color="textPrimary"
+                  borderRadius="compact"
+                  _hover={{ bg: 'brandOrange600' }}
+                  onClick={() => onUnpublish(true)}
+                  data-testid="unpublish-confirm-yes"
+                >
+                  Снять публикацию
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  borderColor="borderLight"
+                  borderRadius="compact"
+                  onClick={() => onUnpublish(false) /* повторный отказ закроет диалог */}
+                  data-testid="unpublish-confirm-no"
+                >
+                  Отмена
+                </Button>
+              </Flex>
+            </Box>
+          ) : null}
 
           {publishState === 'confirming' ? (
             <Box
@@ -285,8 +344,8 @@ export const WeekTemplates = ({
                 Опубликовать неделю {formatDayDate(data.weekStart)} – {formatDayDate(data.weekEnd)}?
               </Text>
               <Text fontSize="13px" color="textPrimary" lineHeight="18px" mb="3">
-                Публикация нарежет слоты по шаблонам и применится к сетке приёма. Публикацию можно
-                снять и повторить.
+                Публикация нарежет слоты по шаблонам и применится к сетке приёма. Снять публикацию
+                можно позже — уже созданные записи при этом сохраняются.
               </Text>
               <Flex gap="2">
                 <Button
@@ -294,7 +353,7 @@ export const WeekTemplates = ({
                   bg="brandGreenDark"
                   color="white"
                   borderRadius="compact"
-                  _hover={{ bg: 'brandGreenDark' }}
+                  _hover={{ bg: 'brandGreen700' }}
                   onClick={onPublishConfirm}
                   data-testid="publish-confirm-yes"
                 >
@@ -418,18 +477,47 @@ export const WeekTemplates = ({
                   </>
                 ) : null}
               </Flex>
+              {intervalAffected && intervalAffected.length > 0 ? (
+                <Box
+                  mb="3"
+                  p="8px 10px"
+                  bg="white"
+                  borderWidth="1px"
+                  borderColor="brandOrange"
+                  borderRadius="compact"
+                  data-testid="interval-affected"
+                >
+                  <Text fontSize="13px" fontWeight="700" color="brandOrange700" mb="1">
+                    На это время уже записаны пациенты: {intervalAffected.length}
+                  </Text>
+                  <Stack gap="0.5" mb="2">
+                    {intervalAffected.map((item) => (
+                      <Text key={item.id} fontSize="13px" color="textPrimary">
+                        {item.time} — {item.patientName}
+                      </Text>
+                    ))}
+                  </Stack>
+                  <Text fontSize="12px" color="textSecondary" lineHeight="16px">
+                    Если сохранить, эти пациенты останутся в расписании, но время у врача будет
+                    закрыто: им нужно предложить другое. Отмените изменение либо сначала перенесите
+                    записи.
+                  </Text>
+                </Box>
+              ) : null}
               <Flex gap="2">
                 <Button
                   size="sm"
-                  bg="brandGreenDark"
-                  color="white"
+                  bg={intervalAffected && intervalAffected.length > 0 ? 'brandOrange' : 'brandGreenDark'}
+                  color={intervalAffected && intervalAffected.length > 0 ? 'textPrimary' : 'white'}
                   borderRadius="compact"
-                  _hover={{ bg: 'brandGreenDark' }}
+                  _hover={{ bg: intervalAffected && intervalAffected.length > 0 ? 'brandOrange600' : 'brandGreen700' }}
                   disabled={saveIntervalBusy}
-                  onClick={() => { void handleSave() }}
+                  onClick={() => { void handleSave(Boolean(intervalAffected && intervalAffected.length > 0)) }}
                   data-testid="interval-save"
                 >
-                  {saveIntervalBusy ? 'Сохранение…' : 'Сохранить'}
+                  {saveIntervalBusy
+                    ? 'Сохранение…'
+                    : (intervalAffected && intervalAffected.length > 0 ? 'Всё равно сохранить' : 'Сохранить')}
                 </Button>
                 <Button
                   size="sm"

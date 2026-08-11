@@ -17,6 +17,7 @@ import { armPath } from '../__data__/urls'
 import { URLs } from '../__data__/urls'
 import { todayDate, shiftDate, weekStartOf } from '../__data__/dates'
 
+import { findFreePatient } from './free-slot'
 import { apiGet, apiPost, startJourneyServer, type JourneyServer } from './journey-server'
 
 interface ScheduleResponse {
@@ -44,18 +45,39 @@ interface AppointmentsResponse {
 let server: JourneyServer
 
 /** День и время, свободные сразу у двух врачей: спор должен идти о ресурсе, а не о смене. */
-const findSharedFreeSlot = async (doctorIds: string[]) => {
+/**
+ * Общее свободное окно на всю длительность записи и при свободном аппарате.
+ * Одна свободная ячейка ничего не обещает: шаг сетки 15 минут, запись длится 30,
+ * а аппарат — второй ресурс, и занятость его у третьего врача даст законный 409,
+ * из-за которого сценарий спорил бы не о том, о чём написан.
+ */
+const findSharedFreeSlot = async (doctorIds: string[], minutes = 30, serviceId?: string) => {
   const start = weekStartOf(todayDate())
+  const needed = Math.ceil(minutes / 15)
   for (let i = 0; i < 14; i += 1) {
     const date = shiftDate(start, i)
     const schedule = await apiGet<ScheduleResponse>(server, `/schedule/${date}`)
-    const slot = schedule.slots.find((s) => doctorIds.every((id) => {
-      const doc = s.doctors.find((d) => d.id === id)
-      return doc && !doc.busy
-    }))
-    if (slot) return { date, time: slot.time }
+    const appts = await apiGet<AppointmentsResponse>(server, `/appointments?date=${date}`)
+    for (let k = 0; k + needed <= schedule.slots.length; k += 1) {
+      const window = schedule.slots.slice(k, k + needed)
+      const allFree = doctorIds.every((id) => window.every((s) => {
+        const doc = s.doctors.find((d) => d.id === id)
+        return doc != null && !doc.busy
+      }))
+      if (!allFree) continue
+      if (serviceId) {
+        const startMs = new Date(`${date}T${schedule.slots[k].time}:00+03:00`).getTime()
+        const endMs = startMs + minutes * 60000
+        const equipmentBusy = appts.items.some((a) => a.serviceId === serviceId
+          && a.status !== 'cancelled' && a.status !== 'no_show'
+          && new Date(a.start).getTime() < endMs
+          && new Date(a.start).getTime() + (a.durationMin ?? 0) * 60000 > startMs)
+        if (equipmentBusy) continue
+      }
+      return { date, time: schedule.slots[k].time }
+    }
   }
-  throw new Error(`нет общего свободного слота у врачей ${doctorIds.join(',')}`)
+  throw new Error(`нет общего свободного окна у врачей ${doctorIds.join(',')}`)
 }
 
 const findFreeSlotFor = async (doctorId: string) => {
@@ -182,11 +204,11 @@ describe('journey admin-catalog — справочники площадки уп
   })
 
   it('оборудование: занятый аппарат виден на ленте и закрывает время у другого врача', async () => {
-    const shared = await findSharedFreeSlot(['d-002', 'd-006'])
+    const shared = await findSharedFreeSlot(['d-002', 'd-006'], 30, 's-004')
 
     const created = await apiPost<{ id: string }>(server, '/appointments', {
       doctorId: 'd-002',
-      patientId: 'p-001',
+      patientId: await findFreePatient(server, shared.date, shared.time, 30),
       start: `${shared.date}T${shared.time}:00+03:00`,
       durationMin: 30,
       serviceId: 's-004',
@@ -196,7 +218,7 @@ describe('journey admin-catalog — справочники площадки уп
     // Второй врач в то же время — аппарат один, сервер отказывает с русской причиной.
     const second = await apiPost<{ error?: string; message?: string }>(server, '/appointments', {
       doctorId: 'd-006',
-      patientId: 'p-002',
+      patientId: await findFreePatient(server, shared.date, shared.time, 30),
       start: `${shared.date}T${shared.time}:00+03:00`,
       durationMin: 30,
       serviceId: 's-004',

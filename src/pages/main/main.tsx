@@ -117,7 +117,7 @@ export const MainPage: React.FC = () => {
               bg="brandGreenDark"
               color="white"
               fontWeight="700"
-              _hover={{ bg: 'brandGreenDark' }}
+              _hover={{ bg: 'brandGreen700' }}
               onClick={() => navigate(route.path)}
               data-testid={`main-card-${route.slug}-open`}
             >

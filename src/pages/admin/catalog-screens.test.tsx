@@ -241,8 +241,8 @@ describe('АРМ администратора — матрица компете�
     })
     expect(screen.getByTestId('matrix-cell-d-002-s-001')).toHaveAttribute('data-value', 'limited')
     expect(screen.getByTestId('matrix-cell-d-001-s-003')).toHaveAttribute('data-value', 'no')
-    expect(screen.getByTestId('matrix-counts')).toHaveTextContent('допусков: 2')
-    expect(screen.getByTestId('matrix-counts')).toHaveTextContent('с ограничением: 1')
+    expect(screen.getByTestId('matrix-counts')).toHaveTextContent('Выполняют: 2')
+    expect(screen.getByTestId('matrix-counts')).toHaveTextContent('С ограничением: 1')
   })
 
   it('клик по клетке отправляет следующее значение на сервер и показывает ответ', async () => {

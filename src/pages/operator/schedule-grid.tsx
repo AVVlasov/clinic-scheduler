@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text } from '@chakra-ui/react'
 
+import { palette } from '../../__data__/tokens'
+
 import type {
   Appointment,
   Doctor,
@@ -96,7 +98,7 @@ const occupancyPresentation = (
   if (kind === 'tech_break') {
     return {
       kind: 'tech_break',
-      label: doctor.occupancyLabel ?? 'Техперерыв',
+      label: doctor.occupancyLabel ?? 'Перерыв',
       bg: 'surfaceLight',
       barColor: 'brandOrange700',
       borderStyle: 'dashed',
@@ -116,11 +118,14 @@ const occupancyPresentation = (
   if (unavailable) {
     return {
       kind: null,
-      label: 'не влезет',
+      // Недоступность показывается штриховкой; словами она объяснена в
+      // aria-label и в карточке слота, а «не влезет» на экране регистратуры —
+      // разговорная форма из головы разработчика.
+      label: null,
       bg: 'surfaceLight',
       barColor: 'danger',
       borderStyle: 'solid',
-      hatch: false,
+      hatch: true,
     }
   }
   return {
@@ -207,11 +212,14 @@ const SlotCell = React.memo(({
           ? 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.1) 3px, rgba(0,0,0,0.1) 6px)'
           : undefined
       }
-      borderWidth="1px"
-      borderColor="borderLight"
+      borderWidth={selected ? '2px' : '1px'}
+      // Выбранная ячейка обязана быть видна: раньше выбор существовал только в
+      // data-атрибуте, и оператор не понимал, какой слот открыт в карточке.
+      borderColor={selected ? 'brandGreenDark' : 'borderLight'}
       borderStyle={presentation.borderStyle}
       borderLeftWidth="3px"
-      borderLeftColor={barColor}
+      borderLeftColor={selected ? 'brandGreenDark' : barColor}
+      boxShadow={selected ? `inset 0 0 0 1px ${palette.brandGreenDark}` : undefined}
       borderRadius="none"
       height={SLOT_HEIGHT}
       display="flex"

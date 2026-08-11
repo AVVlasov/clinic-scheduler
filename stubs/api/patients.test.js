@@ -26,11 +26,21 @@ describe('stubs/api — пациенты: поиск, создание, дубл
     expect(byName.status).toBe(200);
     expect(byName.body.items.some((p) => p.id === 'p-001')).toBe(true);
 
-    const byPhone = await request(app).get('/patients?q=9001000002');
+    // Пациент диктует цифры телефона подряд, без скобок и пробелов.
+    const byPhone = await request(app).get('/patients?q=9031556428');
     expect(byPhone.body.items.some((p) => p.id === 'p-002')).toBe(true);
 
-    const byCard = await request(app).get('/patients?q=UID 0003');
+    const byCard = await request(app).get('/patients?q=0093');
     expect(byCard.body.items.some((p) => p.id === 'p-003')).toBe(true);
+  });
+
+  test('GET /patients?q= ищет по дате рождения — в том виде, в каком картотека её показывает', async () => {
+    const byRu = await request(app).get('/patients?q=12.03.1985');
+    expect(byRu.status).toBe(200);
+    expect(byRu.body.items.some((p) => p.id === 'p-001')).toBe(true);
+
+    const byIso = await request(app).get('/patients?q=1985-03-12');
+    expect(byIso.body.items.some((p) => p.id === 'p-001')).toBe(true);
   });
 
   test('POST /patients создаёт карту и отдаёт cardNumber', async () => {
@@ -77,6 +87,22 @@ describe('stubs/api — пациенты: поиск, создание, дубл
     expect(dup.status).toBe(409);
     expect(dup.body.error).toBe('duplicate_patient');
     expect(dup.body.patient.id).toBe(first.body.id);
+  });
+
+  test('POST /patients без отчества создаёт карту: полное имя без лишних пробелов', async () => {
+    const res = await request(app)
+      .post('/patients')
+      .send({
+        lastName: 'Нгуен',
+        firstName: 'Ань',
+        birthDate: '1990-03-03',
+        phone: '+7 900 555-00-03',
+        documentType: 'foreign',
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe('Нгуен Ань');
+    expect(res.body.name).not.toMatch(/\s{2}|\s$/);
+    expect(res.body.middleName == null || res.body.middleName === '').toBe(true);
   });
 
   test('POST /patients без обязательных полей → 400 с перечислением', async () => {
