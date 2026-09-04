@@ -97,7 +97,7 @@ A subagent that pipes output and ignores `$?` cannot tell PASS from FAIL.
 
 ## When NOT to use
 
-For one-off interactive exploration inside the Glaz bog meta project itself, this skill does not apply — that environment uses Git Bash directly. This skill targets agents acting inside `D:/develop/clinic-scheduler/`.
+This skill targets agents acting inside the repository root of this project (`git rev-parse --show-toplevel`).
 
 ## Related
 
