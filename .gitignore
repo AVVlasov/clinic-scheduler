@@ -7,3 +7,6 @@ dist
 tasks/.verdicts/
 tasks/.bugs/
 tasks/CURRENT-FOCUS.md
+
+# --- перенесено из .git/info/exclude ---
+.claude/worktrees/

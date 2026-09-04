@@ -50,8 +50,9 @@ if echo "$command" | grep -qiE 'DROP\s+TABLE|DROP\s+DATABASE|TRUNCATE\s+TABLE'; 
 fi
 
 # Deleting outside project directory
+project_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 if echo "$command" | grep -qE 'rm\s+.*\.\./|rm\s+/[^D]|del\s+/[sS]'; then
-  echo '{"decision":"block","reason":"Deletion outside project directory blocked. Only modify files within D:/develop/clinic-scheduler/."}'
+  echo "{\"decision\":\"block\",\"reason\":\"Deletion outside project directory blocked. Only modify files within ${project_root}/.\"}"
   exit 0
 fi
 
