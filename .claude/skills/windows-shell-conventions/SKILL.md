@@ -77,7 +77,7 @@ Backtick (`` ` ``) is PowerShell line continuation; for Bash use `\`.
 Always quote paths with spaces:
 
 ```bash
-"D:/develop/clinic-scheduler/.claude/hooks/skill-lint.sh"
+".claude/hooks/skill-lint.sh"
 ```
 
 Forward slashes work in both shells for relative paths; backslashes need escaping in Bash strings.

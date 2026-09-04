@@ -9,7 +9,7 @@
   },
   "models": {
     "$comment": "Модели цикла. Пустая строка = взять то, что настроено в самом бэкенде.",
-    "code": "minimax-coding-plan/MiniMax-M3",
+    "code": "openrouter/minimax/minimax-m3",
     "tester": "",
     "vision": "",
     "judge": ""
@@ -77,7 +77,7 @@
       },
       "worker": {
         "backend": "opencode",
-        "model": "minimax-coding-plan/MiniMax-M3"
+        "model": "openrouter/minimax/minimax-m3"
       }
     }
   },
